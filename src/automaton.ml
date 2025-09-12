@@ -107,14 +107,8 @@ let determinize (a : ('symbol, 'state) automaton) :
     List.map transition_for_symbol alphabet
   in
   let rec process_remaining_states (states : 'state list list)
+      (remaining_states : 'state list list)
       (transitions : ('state list * 'symbol * 'state list) list) =
-    let remaining_states =
-      List.filter
-        (fun state ->
-          List.find_opt (fun (state0, _, _) -> state0 = state) transitions
-          = None)
-        states
-    in
     match remaining_states with
     | [] ->
         {
@@ -139,9 +133,10 @@ let determinize (a : ('symbol, 'state) automaton) :
           |> List.sort_uniq compare
         in
         process_remaining_states (new_states @ states)
+          (new_states @ other_states)
           (new_transitions @ transitions)
   in
-  process_remaining_states [ initial_state ] []
+  process_remaining_states [ initial_state ] [ initial_state ] []
 
 let print_automaton (string_of_symbol : 'symbol -> string)
     (string_of_state : 'state -> string) (a : ('symbol, 'state) automaton) :
