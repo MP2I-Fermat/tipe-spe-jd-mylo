@@ -10,6 +10,34 @@ type 'symbol or_epsilon = Epsilon | Symbol of 'symbol
 type ('symbol, 'state) epsilon_automaton =
   ('symbol or_epsilon, 'state) automaton
 
+type ('symbol, 'state) execution_state = {
+  automaton : ('symbol, 'state) automaton;
+  current_state : 'state;
+}
+
+exception Not_deterministic
+
+let start_execution (a : ('symbol, 'state) automaton) :
+    ('symbol, 'state) execution_state =
+  match a.initial_states with
+  | initial_state :: [] -> { automaton = a; current_state = initial_state }
+  | _ -> raise Not_deterministic
+
+let next_state (e : ('symbol, 'state) execution_state) (s : 'symbol) :
+    ('symbol, 'state) execution_state option =
+  match
+    List.find_all
+      (fun (state0, symbol, state1) -> state0 = e.current_state && symbol = s)
+      e.automaton.transitions
+  with
+  | [] -> None
+  | (_, _, state1) :: [] ->
+      Some { automaton = e.automaton; current_state = state1 }
+  | _ -> raise Not_deterministic
+
+let is_final_state (e : _ execution_state) : bool =
+  List.mem e.current_state e.automaton.final_states
+
 (** `remove_epsilon_transitions a` returns an automaton equivalent to a with all
     epsilon-transitions removed.
 
@@ -137,6 +165,18 @@ let determinize (a : ('symbol, 'state) automaton) :
           (new_transitions @ transitions)
   in
   process_remaining_states [ initial_state ] [ initial_state ] []
+
+let remove_state (state : 'state) (a : ('symbol, 'state) automaton) :
+    ('symbol, 'state) automaton =
+  {
+    states = List.filter (fun s -> not (s = state)) a.states;
+    initial_states = List.filter (fun s -> not (s = state)) a.initial_states;
+    final_states = List.filter (fun s -> not (s = state)) a.final_states;
+    transitions =
+      List.filter
+        (fun (state0, _, state1) -> not (state0 = state || state1 = state))
+        a.transitions;
+  }
 
 let print_automaton (string_of_symbol : 'symbol -> string)
     (string_of_state : 'state -> string) (a : ('symbol, 'state) automaton) :

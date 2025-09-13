@@ -1,0 +1,61 @@
+open Regex
+open Automaton
+open Utils
+
+type 'a token = { token_type : 'a; value : string }
+
+exception Tokenize_failure
+
+let tokenize (rules : (char regex * 'a) list) (text : string) : 'a token list =
+  let automatons =
+    List.map
+      (fun (regex, t) ->
+        ( regex |> automaton_of_regex |> remove_epsilon_transitions
+          |> determinize |> remove_state [],
+          t ))
+      rules
+  in
+  let rec tokenize_from (remaining_text : char list)
+      (reversed_result : 'a token list) : 'a token list =
+    if List.length remaining_text = 0 then reversed_result
+    else
+      let rec read_longest_token_from
+          (alive_states : (char, _) execution_state list)
+          (current_result : ('a token * char list) option)
+          (current_lexeme : char list) (remaining_text : char list) :
+          ('a token * char list) option =
+        if List.length alive_states = 0 then current_result
+        else
+          let final_states = List.filter is_final_state alive_states in
+          let next_result =
+            match final_states with
+            | [] -> current_result
+            | e :: _ ->
+                Some
+                  ( {
+                      token_type = List.assoc e.automaton automatons;
+                      value = implode (List.rev current_lexeme);
+                    },
+                    remaining_text )
+          in
+          match remaining_text with
+          | [] -> next_result
+          | c :: next_text ->
+              let next_states =
+                alive_states
+                |> List.filter_map (fun state -> next_state state c)
+              in
+              let next_lexeme = c :: current_lexeme in
+              read_longest_token_from next_states next_result next_lexeme
+                next_text
+      in
+      let states = automatons |> List.map fst |> List.map start_execution in
+      match read_longest_token_from states None [] remaining_text with
+      | None -> raise Tokenize_failure
+      | Some (token, remaining_text) ->
+          tokenize_from remaining_text (token :: reversed_result)
+  in
+  List.rev (tokenize_from (explode text) [])
+
+let string_of_token (string_of_type : 'a -> string) (token : 'a token) =
+  "Token(" ^ string_of_type token.token_type ^ ", " ^ token.value ^ ")"
