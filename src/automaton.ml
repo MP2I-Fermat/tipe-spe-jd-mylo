@@ -107,7 +107,7 @@ let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
   in
   remove_transitons_from_states a.states a.final_states a.transitions
 
-(** `determinize a` returns an automaton equivalent to a that is deterministic
+(** `determinize a` returns an automaton equivalent to `a` that is deterministic
     and complete. *)
 let determinize (a : ('symbol, 'state) automaton) :
     ('symbol, 'state list) automaton =

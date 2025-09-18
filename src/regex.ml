@@ -85,12 +85,13 @@ let automaton_of_regex (r : 'symbol regex) : ('symbol, int) epsilon_automaton =
                         (final_state, Automaton.Epsilon, initial_state)))
           |> List.flatten
         in
+        let epsilon_state = state_count in
         ( {
-            states = inner_automaton.states;
-            initial_states = inner_automaton.initial_states;
-            final_states = inner_automaton.final_states;
+            states = epsilon_state :: inner_automaton.states;
+            initial_states = epsilon_state :: inner_automaton.initial_states;
+            final_states = epsilon_state :: inner_automaton.final_states;
             transitions = inner_automaton.transitions @ loopback_transitions;
           },
-          state_count )
+          state_count + 1 )
   in
   fst (automaton_of_regex_with_context r 0)
