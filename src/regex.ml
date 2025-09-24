@@ -1,6 +1,7 @@
 open Automaton
 
 type 'symbol regex =
+  | Empty
   | Epsilon
   | Symbol of 'symbol
   | Concatenation of 'symbol regex * 'symbol regex
@@ -13,6 +14,14 @@ let automaton_of_regex (r : 'symbol regex) : ('symbol, int) epsilon_automaton =
   let rec automaton_of_regex_with_context (r : 'symbol regex)
       (state_count : int) : ('symbol, int) epsilon_automaton * int =
     match r with
+    | Empty ->
+        ( {
+            states = [];
+            initial_states = [];
+            final_states = [];
+            transitions = [];
+          },
+          state_count )
     | Epsilon ->
         ( {
             states = [ state_count ];
