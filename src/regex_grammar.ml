@@ -30,7 +30,7 @@ let regex_token_rules =
         ( Regex.Symbol '\\',
           Regex.Empty |> add_character '(' |> add_character ')'
           |> add_character '|' |> add_character '*' |> add_character '\\'
-          |> add_character 'n' ),
+          |> add_character 'n' |> add_character 't' |> add_character 'r' ),
       Escape );
     ( Regex.Empty
       |> add_character_range ' ' '\''
@@ -62,6 +62,8 @@ let rec regex_of_regex_syntax_tree
       let escaped_char = value.[1] in
       match escaped_char with
       | 'n' -> Regex.Symbol '\n'
+      | 't' -> Regex.Symbol '\t'
+      | 'r' -> Regex.Symbol '\r'
       | _ -> Regex.Symbol escaped_char)
   | Node
       ( _,
