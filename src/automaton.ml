@@ -44,68 +44,104 @@ let is_final_state (e : _ execution_state) : bool =
     The returned automaton may not be deterministic. *)
 let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
     ('symbol, 'state) automaton =
-  let rec remove_transitons_from_states (remaining_states : 'state list)
-      (final_states : 'state list)
-      (transitions : ('state * 'symbol or_epsilon * 'state) list) =
-    let non_epsilon_transitions =
-      transitions
-      |> List.filter_map (fun (state0, symbol, state1) ->
-             match symbol with
-             | Epsilon -> None
-             | Symbol actual_symbol -> Some (state0, actual_symbol, state1))
-    in
-    match remaining_states with
+  let rec build_result_from
+      (remaining_epsilon_transitions : ('state list * 'state) list)
+      (result_transitions : ('state * 'symbol * 'state) list)
+      (result_final_states : 'state list) =
+    match remaining_epsilon_transitions with
     | [] ->
         {
           states = a.states;
           initial_states = a.initial_states;
-          final_states;
-          transitions = non_epsilon_transitions;
+          final_states = result_final_states;
+          transitions = result_transitions;
         }
-    | state :: next_remaining_states ->
-        let state_outgoing_transitions =
-          transitions
-          |> List.filter_map (fun (state0, symbol, state1) ->
-                 if state0 = state && not (state1 = state && symbol = Epsilon)
-                 then Some (symbol, state1)
-                 else None)
-        in
-
+    | (incoming_states, end_state) :: remaining_epsilon_transitions ->
         let next_final_states =
-          if List.mem state final_states then
+          if List.mem end_state result_final_states then
             let new_final_states =
-              a.states
-              |> List.filter (fun other_state ->
-                     List.mem (other_state, Epsilon, state) transitions)
-              |> List.filter (fun state -> not (List.mem state final_states))
+              List.filter
+                (fun state -> not (List.mem state result_final_states))
+                incoming_states
             in
-            final_states @ new_final_states
-          else final_states
+            List.rev_append new_final_states result_final_states
+          else result_final_states
         in
 
+        let outgoing_transitions =
+          List.filter_map
+            (fun (state0, symbol, state1) ->
+              if state0 = end_state then Some (symbol, state1) else None)
+            result_transitions
+        in
         let new_transitions =
-          a.states
-          |> List.map (fun other_state ->
-                 if other_state = state then transitions
-                 else if List.mem (other_state, Epsilon, state) transitions then
-                   List.map
-                     (fun (symbol, state1) -> (other_state, symbol, state1))
-                     state_outgoing_transitions
-                 else transitions)
+          incoming_states
+          |> List.map (fun state0 ->
+                 List.map
+                   (fun (symbol, state1) -> (state0, symbol, state1))
+                   outgoing_transitions)
           |> List.flatten
-          |> List.filter (fun transition ->
-                 not (List.mem transition transitions))
+          |> List.filter (fun new_transition ->
+                 not (List.mem new_transition result_transitions))
         in
         let next_transitions =
-          transitions @ new_transitions
-          |> List.filter (fun (_, symbol, state1) ->
-                 not (state1 = state && symbol = Epsilon))
+          List.rev_append new_transitions result_transitions
         in
 
-        remove_transitons_from_states next_remaining_states next_final_states
-          next_transitions
+        let outgoing_epsilon_transitions =
+          List.filter_map
+            (fun (incoming_states', end_state') ->
+              if List.mem end_state incoming_states' then Some end_state'
+              else None)
+            remaining_epsilon_transitions
+        in
+        let new_epsilon_transitions =
+          incoming_states
+          |> List.map (fun state0 ->
+                 List.map
+                   (fun state1 -> (state0, state1))
+                   outgoing_epsilon_transitions)
+          |> List.flatten
+          (* Don't introduce any e-loops. *)
+          |> List.filter (fun (state0, state1) -> state0 <> state1)
+        in
+        let next_remaining_epsilon_transitions =
+          List.map
+            (fun (incoming_states, end_state) ->
+              let new_incoming_states =
+                new_epsilon_transitions
+                |> List.filter_map (fun (state0, state1) ->
+                       if state1 = end_state then Some state0 else None)
+                |> List.filter (fun new_incoming_state ->
+                       not (List.mem new_incoming_state incoming_states))
+              in
+              (List.rev_append new_incoming_states incoming_states, end_state))
+            remaining_epsilon_transitions
+        in
+
+        build_result_from next_remaining_epsilon_transitions next_transitions
+          next_final_states
   in
-  remove_transitons_from_states a.states a.final_states a.transitions
+  let epsilon_transitions =
+    a.states
+    |> List.map (fun end_state ->
+           ( List.filter_map
+               (fun (state0, symbol, state1) ->
+                 if state1 = end_state && symbol = Epsilon then Some state1
+                 else None)
+               a.transitions,
+             end_state ))
+    |> List.filter (fun (start_states, _) -> not (start_states = []))
+  in
+  let non_epsilon_transitions =
+    List.filter_map
+      (fun (state0, symbol, state1) ->
+        match symbol with
+        | Epsilon -> None
+        | Symbol actual_symbol -> Some (state0, actual_symbol, state1))
+      a.transitions
+  in
+  build_result_from epsilon_transitions non_epsilon_transitions a.final_states
 
 (** `determinize a` returns an automaton equivalent to `a` that is deterministic
     and complete. *)
@@ -160,9 +196,10 @@ let determinize (a : ('symbol, 'state) automaton) :
           |> List.filter (fun state -> not (List.mem state states))
           |> List.sort_uniq compare
         in
-        process_remaining_states (new_states @ states)
-          (new_states @ other_states)
-          (new_transitions @ transitions)
+        process_remaining_states
+          (List.rev_append new_states states)
+          (List.rev_append new_states other_states)
+          (List.rev_append new_transitions transitions)
   in
   process_remaining_states [ initial_state ] [ initial_state ] []
 

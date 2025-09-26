@@ -1,3 +1,6 @@
 *.out
 *.cmi
 *.cmo
+*.cmx
+*.o
+perf.data
