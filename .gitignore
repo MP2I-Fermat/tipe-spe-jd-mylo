@@ -4,3 +4,10 @@
 *.cmx
 *.o
 perf.data
+
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.pdf
+*.synctex.gz
