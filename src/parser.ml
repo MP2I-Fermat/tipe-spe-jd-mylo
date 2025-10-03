@@ -1,5 +1,6 @@
 open Lexer
 open Automaton
+open Utils
 
 type ('token_type, 'non_terminal) grammar_entry =
   | NonTerminal of 'non_terminal
@@ -18,7 +19,7 @@ type ('token_type, 'non_terminal) syntax_tree =
 (* Représente les situations LR(1), du style
  * α₁…αⱼ↑ α₁₊ⱼ…αₙ ~ {b₁…bₙ} *)
 type ('token_type, 'non_terminal) lr1_situation =
-  ('token_type, 'non_terminal) rule * int * 'token_type list list
+  ('token_type, 'non_terminal) rule * int * 'token_type list
 
 (* Renvoie l’ensemble Premier_LL(1)(s) dans la grammaire g *)
 let premier_LL1 (s : ('token_type, 'non_terminal) grammar_entry list)
@@ -61,8 +62,9 @@ let premier_LL1 (s : ('token_type, 'non_terminal) grammar_entry list)
               List.fold_left List.rev_append premier_nm1 premiers_derivations
               |> List.sort_uniq compare
             in
-            (* (premier_i(N)) est en fait constant à partir du rang n - 1, voir preuves/premier_n_cts.
-            On ne s'en rend compte que maintenant car on n'avait pas calculé premier_n des derivations possibles. *)
+            (* (premier_i(N)) est en fait constant à partir du rang n - 1 (voir
+             * preuves/premier_n_cts). On ne s'en rend compte que maintenant car
+             * on n'avait pas calculé premier_n des derivations possibles. *)
             ( prem_n,
               premiers_derivations_sont_constantes && prem_n = premier_nm1 )
       | a1 :: _ ->
@@ -73,7 +75,8 @@ let premier_LL1 (s : ('token_type, 'non_terminal) grammar_entry list)
             let prem_n =
               List.rev_append prem_nm1_a1 prem_nm1 |> List.sort_uniq compare
             in
-            (* premier_i(a1...am) est constant à partir du rang n - 1, voir preuves/premier_n_cts. *)
+            (* premier_i(a1...am) est constant à partir du rang n - 1 (voir
+             * preuves/premier_n_cts). *)
             (prem_n, prem_a1_est_constant && prem_n = prem_nm1)
       | [] -> failwith "Les règles N -> ε ne sont pas gérées"
   in
@@ -102,6 +105,88 @@ let test_premier_LL1 =
   assert (premier_LL1 [ NonTerminal 'U' ] grammaire2 = [ 'a' ]);
   assert (premier_LL1 [ NonTerminal 'V' ] grammaire2 = [ 'c' ]);
   assert (premier_LL1 [ NonTerminal 'S' ] grammaire2 = [ 'a'; 'c' ])
+
+
+(* Renvoie l’ensemble Premier_LR(1)(s, σ) dans la grammaire g *)
+let premier_LR1 (s : ('token_type, 'non_terminal) grammar_entry list)
+    (sigma: 'token_type list)
+    (g : ('token_type, 'non_terminal) grammar) : 'token_type list =
+      match s with
+      | [] -> sigma
+      | _ -> premier_LL1 s g
+
+
+(* Renvoie la fermeture de e un ensemble de situations LR(1). Le calcul se fait
+ * par saturation *)
+let fermeture_situations_LR1
+    (e: ('token_type, 'non_terminal) lr1_situation list)
+    (g: ('token_type, 'non_terminal) grammar):
+    ('token_type, 'non_terminal) lr1_situation list =
+  (* Si le non-terminal de regle est nt, renvoie la situation nt->^γ~σ2.
+   * Renvoie None sinon *)
+  let nouvelle_situation_regle (nt: 'non_terminal)
+      (sigma2: 'token_type list)
+      (regle: ('token_type, 'non_terminal) rule) :
+      ('token_type, 'non_terminal) lr1_situation option =
+    if fst regle = nt then
+      Some (regle, 0, sigma2)
+    else None
+  in
+  (* Sachant une situation s: N -> α^Tβ~σ avec T un non-terminal, renvoie
+   * la liste des situations T->^γ~premierLR1(β, σ) pour T->γ règle de g *)
+  let liste_nouvelles_situations (s: ('token_type, 'non_terminal) lr1_situation) :
+    ('token_type, 'non_terminal) lr1_situation list option =
+      let regle, indice, sigma = s in
+      let regle_fin = list_skip (snd regle) indice in
+      match regle_fin with
+      | [] -> None
+      | (NonTerminal nt)::beta ->
+          let premier = premier_LR1 beta sigma g in
+          Some (List.filter_map (nouvelle_situation_regle nt premier) g)
+      | _ -> None
+  in
+  (* Fait une étape supplémentaire de la saturation, à partir de f un ensemble
+   * intermédiaire entre e et la fermeture. *)
+  let etape_saturation (f: ('token_type, 'non_terminal) lr1_situation list) :
+    ('token_type, 'non_terminal) lr1_situation list =
+      f::(List.filter_map liste_nouvelles_situations f)
+      |> List.concat
+      |> List.sort_uniq compare
+  in
+  (* Effectue la saturation en s’arrêtant dès qu’on atteint la stabilité *)
+  let rec saturation (f: ('token_type, 'non_terminal) lr1_situation list) :
+      ('token_type, 'non_terminal) lr1_situation list =
+    let f' = etape_saturation f in
+    if f = f' then f
+    else saturation f'
+  in
+  saturation e
+
+
+let test_fermeture_situations_LR1 : unit =
+  (* Dans les examples suivants, les symboles « drapeau » dans le livre sont
+   * représentés par le caractère 'e' (pour “end of file”) *)
+  (* page 123, example 148 *)
+  let regle1 = ('S', [Terminal 'a'; NonTerminal 'T'; Terminal 'c']) in
+  let regle2 = ('T', [Terminal 'b']) in
+  let g = [regle1; regle2] in
+  let situation1 = (regle1, 0, ['e']) in
+  let situation2 = (regle1, 1, ['e']) in
+  let situation3 = (regle2, 0, ['c']) in
+  assert (fermeture_situations_LR1 [situation1] g = [situation1]);
+  assert (fermeture_situations_LR1 [situation2] g = [situation2; situation3]);
+  (* page 124, example 149 *)
+  let regle1 =
+    ('S', [Terminal 'a'; NonTerminal 'T'; NonTerminal 'U']) in
+  let regle2 = ('T', [Terminal 'b']) in
+  let regle3 = ('U', [Terminal 'c']) in
+  let g = [regle1; regle2; regle3] in
+  let situation1 = (regle1, 0, ['e']) in
+  let situation2 = (regle1, 1, ['e']) in
+  let situation3 = (regle2, 0, ['c']) in
+  assert (fermeture_situations_LR1 [situation1] g = [situation1]);
+  assert (fermeture_situations_LR1 [situation2] g = [situation2; situation3]);
+
 
 (*
 let parse (g : ('token_type, 'non_terminal) grammar)
