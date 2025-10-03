@@ -6,7 +6,8 @@ type 'a token = { token_type : 'a; value : string }
 
 exception Tokenize_failure
 
-let tokenize (rules : (char regex * 'a) list) (text : string) : 'a token list =
+let tokenize (rules : (char regex * 'a) list) (tok_eof : 'a) (text : string) :
+    'a token list =
   let automatons =
     List.map
       (fun (regex, t) ->
@@ -17,7 +18,8 @@ let tokenize (rules : (char regex * 'a) list) (text : string) : 'a token list =
   in
   let rec tokenize_from (remaining_text : char list)
       (reversed_result : 'a token list) : 'a token list =
-    if List.length remaining_text = 0 then reversed_result
+    if List.length remaining_text = 0 then
+      { token_type = tok_eof; value = "" } :: reversed_result
     else
       let rec read_longest_token_from
           (alive_states : (char, _) execution_state list)

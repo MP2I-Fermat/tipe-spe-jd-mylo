@@ -9,6 +9,7 @@ type grammar_token_type =
   | Rule_identifier
   | Whitespace
   | Newline
+  | Eof
 
 type grammar_node_type =
   | Grammar
@@ -178,7 +179,7 @@ let grammar_of_syntax_tree
   (token_rules, grammar_rules)
 
 let parse_grammar (s : string) =
-  let tokens = tokenize grammar_token_rules s in
+  let tokens = tokenize grammar_token_rules Eof s in
   let tokens_no_whitespace =
     List.filter (fun token -> token.token_type <> Whitespace) tokens
   in

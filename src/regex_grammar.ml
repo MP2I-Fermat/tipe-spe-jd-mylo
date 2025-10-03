@@ -9,6 +9,7 @@ type regex_token_type =
   | Star
   | Escape
   | Character
+  | Eof
 
 let add_character (c : char) (r : char regex) : char regex =
   Regex.Union (r, Regex.Symbol c)
@@ -84,6 +85,6 @@ let rec regex_of_regex_syntax_tree
   | _ -> failwith "Invalid rule"
 
 let parse_regex (src : string) : char regex =
-  let tokens = tokenize regex_token_rules src in
+  let tokens = tokenize regex_token_rules Eof src in
   let tree = parse regex_grammar tokens in
   regex_of_regex_syntax_tree tree
