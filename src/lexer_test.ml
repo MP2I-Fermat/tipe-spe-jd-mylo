@@ -2,7 +2,7 @@ open Lexer
 open Regex
 open Utils
 
-type token_type = Or | Star | Open_Paren | Close_Paren | Epsilon | Symbol
+type token_type = Or | Star | Open_Paren | Close_Paren | Epsilon | Symbol | Eof
 
 let string_of_token_type (t : token_type) =
   match t with
@@ -12,6 +12,7 @@ let string_of_token_type (t : token_type) =
   | Close_Paren -> "Close_Paren"
   | Epsilon -> "Epsilon"
   | Symbol -> "Symbol"
+  | Eof -> "[EOF]"
 
 let epsilon_regex =
   List.fold_left
@@ -34,7 +35,7 @@ let symbol_rules =
 
 let regex_rules = special_rules @ symbol_rules
 let text_regex_source = "abc|(123)*|EPSILON"
-let tokens = tokenize regex_rules text_regex_source
+let tokens = tokenize regex_rules Eof text_regex_source
 
 let _ =
   List.fold_left
