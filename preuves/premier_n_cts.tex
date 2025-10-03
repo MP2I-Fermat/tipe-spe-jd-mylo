@@ -1,4 +1,5 @@
 \documentclass[a4paper, 12pt]{article}
+\usepackage[french]{babel}
 \usepackage{amssymb}
 \usepackage{amsmath}
 
@@ -8,9 +9,9 @@
 \begin{document}
 \maketitle
 
-Puisque notre grammaire ne contient pas de re\`gles $N \rightarrow \varepsilon$,
-on peut de\'finir les suites
-$(premier_i(\overrightarrow{\alpha}))_{i \in \mathbb{N}}$ comme suit:
+Puisque notre grammaire ne contient pas de r\`egles $N \rightarrow \varepsilon$,
+on peut d\'efinir les suites
+$(premier_i(\overrightarrow{\alpha}))_{i \in \mathbb{N}}$ comme suit~:
 
 \begin{center}
     \begin{tabular}{ l l }
@@ -20,7 +21,7 @@ $(premier_i(\overrightarrow{\alpha}))_{i \in \mathbb{N}}$ comme suit:
     \bigskip
     $\begin{aligned}
              & \begin{aligned}
-                   premier_{n+1}(N) = & \thinspace premier_n(N) \bigcup_{N \rightarrow \overrightarrow{\alpha}} premier_n(\overrightarrow{\alpha}) \\
+                   premier_{n+1}(N) = & \thinspace premier_n(N) \cup \bigcup_{N \rightarrow \overrightarrow{\alpha}} premier_n(\overrightarrow{\alpha}) \\
                                       & \thinspace \text{si $N$ est un non-terminal}
                \end{aligned} \\
              & premier_{n+1}(\alpha_1...\alpha_i) = premier_n(\alpha_1...\alpha_i) \cup premier_n(\alpha_1) \thickspace \text{sinon}
@@ -32,23 +33,23 @@ On d\'emontre alors les propri\'et\'es suivantes:
 
 \bigskip
 
-\textit{Propri\'et\'e 1}:
+\textit{Propri\'et\'e 1}~:
 Si pour toute r\`egle $N \rightarrow \overrightarrow{\alpha}$,
-$(premier_i(\overrightarrow{\alpha}))$ est constant a partir du rang $n$ et
+$(premier_i(\overrightarrow{\alpha}))$ est constant \`a partir du rang $n$ et
 $premier_n(\overrightarrow{\alpha}) \subset premier_n(N)$,
-alors $(premier_i(N))$ est constant a partir du rang $n$.
+alors $(premier_i(N))$ est constant \`a partir du rang $n$.
 
-\textit{D\'emonstration}:
-Par r\'ecurrence sur $k \in \mathbb{N}$ avec $P(k): premier_{n+k}(N) = premier_n(N)$:
+\textit{D\'emonstration}~:
+Par r\'ecurrence sur $k \in \mathbb{N}$ avec $P(k): premier_{n+k}(N) = premier_n(N)$~:
 \begin{itemize}
     \item $P(0)$ est imm\'ediat.
-    \item Soit $k \in \mathbb{N}$ et supposons $P(k)$ vrai. Alors:
+    \item Soit $k \in \mathbb{N}$ et supposons $P(k)$ vrai. Alors~:
           \par $\begin{aligned}
                   premier_{n+k+1}(N) = & \thinspace premier_{n+k}(N) \bigcup_{N \rightarrow \overrightarrow{\alpha}} premier_{n+k}(\overrightarrow{\alpha}) \\
                   =                    & \thinspace premier_{n+k}(N) \bigcup_{N \rightarrow \overrightarrow{\alpha}} premier_n(\overrightarrow{\alpha})     \\
                                        & \thinspace \text{\small (car $(premier_i(\overrightarrow{\alpha}))$ est constant a partir du rang $n$)}            \\
                   =                    & \thinspace premier_n(N) \bigcup_{N \rightarrow \overrightarrow{\alpha}} premier_n(\overrightarrow{\alpha})         \\
-                                       & \thinspace \text{\small (d'\`apres $P(k)$)}                                                                        \\
+                                       & \thinspace \text{\small (d'apr\`es $P(k)$)}                                                                        \\
                   =                    & \thinspace premier_n(N)                                                                                            \\
                                        & \thinspace\text{\small (car $premier_n(\overrightarrow{\alpha}) \subset premier_n(N)$)}
               \end{aligned}$
@@ -57,24 +58,24 @@ Par r\'ecurrence sur $k \in \mathbb{N}$ avec $P(k): premier_{n+k}(N) = premier_n
 
 \bigskip
 
-\textit{Propri\'et\'e 2}:
+\textit{Propri\'et\'e 2}~:
 Soit $\overrightarrow{\alpha} = \alpha_1...\alpha_m$ une d\'erivation avec $m > 1$ ou $\alpha_1$ terminal. Si
 $(premier_i(\alpha_1))$ est constant \`a partir du rang $n$ et
 $permier_n(\alpha_1) \subset premier_n(\overrightarrow{\alpha})$, alors
 $(permier_i(\overrightarrow{\alpha}))$ est constant \`a partir du range $n$.
 
-\textit{D\'emonstration}:
+\textit{D\'emonstration}~:
 Par r\'ecurrence sur $k \in \mathbb{N}$ avec $P(k): premier_{n+k}(\overrightarrow{\alpha}) = premier_n(\overrightarrow{\alpha})$
 
 \begin{itemize}
     \item $P(0)$ est imm\'ediat.
-    \item Soit $k \in \mathbb{N}$ et supposons $P(k)$ vrai. Alors:
+    \item Soit $k \in \mathbb{N}$ et supposons $P(k)$ vrai. Alors~:
           \par $\begin{aligned}
                   premier_{n+k+1} = & \thinspace premier_{n+k}(\overrightarrow{\alpha}) \cup premier_{n+k}(\alpha_1)                 \\
                   =                 & \thinspace premier_{n+k}(\overrightarrow{\alpha}) \cup premier_n(\alpha_1)                     \\
                                     & \thinspace \text{\small (car $(premier_i(\alpha_1))$ est constant \`a partir du rang $n$)}     \\
                   =                 & \thinspace premier_n(\overrightarrow{\alpha}) \cup premier_n(\alpha_1)                         \\
-                                    & \thinspace \text{\small (d'\`apres $P(k)$)}                                                    \\
+                                    & \thinspace \text{\small (d'apr\`es $P(k)$)}                                                    \\
                   =                 & \thinspace premier_n(\overrightarrow{\alpha})                                                  \\
                                     & \thinspace\text{\small (car $premier_n(\alpha_1) \subset premier_n(\overrightarrow{\alpha})$)}
               \end{aligned}$ \\
