@@ -21,6 +21,18 @@ type ('token_type, 'non_terminal) syntax_tree =
 type ('token_type, 'non_terminal) lr1_situation =
   ('token_type, 'non_terminal) rule * int * 'token_type list
 
+
+type ('token_type, 'non_terminal) lr1_automaton_state =
+  ('token_type, 'non_terminal) lr1_situation list
+
+(* Représente un automate LR(1) *)
+type ('token_type, 'non_terminal) lr1_automaton =
+  (
+    ('token_type, 'non_terminal) grammar_entry,
+    ('token_type, 'non_terminal) lr1_automaton_state
+  ) automaton
+
+
 (* Renvoie l’ensemble Premier_LL(1)(s) dans la grammaire g *)
 let premier_LL1 (s : ('token_type, 'non_terminal) grammar_entry list)
     (g : ('token_type, 'non_terminal) grammar) : 'token_type list =
@@ -185,8 +197,43 @@ let test_fermeture_situations_LR1 : unit =
   let situation2 = (regle1, 1, ['e']) in
   let situation3 = (regle2, 0, ['c']) in
   assert (fermeture_situations_LR1 [situation1] g = [situation1]);
-  assert (fermeture_situations_LR1 [situation2] g = [situation2; situation3]);
+  assert (fermeture_situations_LR1 [situation2] g = [situation2; situation3])
 
+
+(* Renvoie la fermeture des situations LR(1) de la situation (regle, 0, [eof])
+ * si le non-terminal de la règle est l’axiome, None sinon. *)
+let transforme_axiome_en_situations (g: ('token_type, 'non_terminal) grammar)
+    (axiome: 'non_terminal) (lexeme_eof: 'token_type)
+    (regle: ('token_type, 'non_terminal) rule) :
+    ('token_type, 'non_terminal) lr1_situation list option =
+  if fst regle = axiome then
+    Some (fermeture_situations_LR1 [(regle, 0, [lexeme_eof])] g)
+  else
+    None
+
+
+(* Construit l’automate LR(1) de la grammaire g. eof_token désigne le jeton
+ * de fin de fichier, il ne doit pas être utilisé dans les règles de la
+ * grammaire (mais il devra figurer dans la sortie de l’analyseur lexical) *)
+let construit_automate_LR1 (g: ('token_type, 'non_terminal) grammar)
+    (axiome: 'non_terminal) (lexeme_eof: 'token_type) :
+    ('token_type, 'non_terminal) lr1_automaton =
+  let etat_initial =
+    List.filter_map (transforme_axiome_en_situations g axiome lexeme_eof) g
+    |> List.concat
+    |> List.sort_uniq compare
+  in
+  (* Ajoute à l’automate toutes les transitions (et éventuellement les états)
+   * depuis le premier état de a_traiter. deja_vu est la liste (triée sans
+   * doublons) d’états déjà vus. *)
+  let traite_un_etat (automate: ('token_type, 'non_terminal) lr1_automaton)
+      (a_traiter: ('token_type, 'non_terminal) lr1_automaton_state list)
+      (deja_vu: ('token_type, 'non_terminal) lr1_automaton_state list) =
+    match a_traiter with
+    | [] -> automate
+    | _ -> failwith "todo"
+  in
+  failwith "todo"
 
 (*
 let parse (g : ('token_type, 'non_terminal) grammar)
