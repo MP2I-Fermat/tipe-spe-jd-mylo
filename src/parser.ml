@@ -133,16 +133,14 @@ let premier_LR1 (s : ('token_type, 'non_terminal) grammar_entry list)
       | _ -> premier_LL1 s g
 
 
-(* Renvoie une copie de la liste l où les premiers éléments de chaque couple
- * sont uniques dans la liste et les seconds éléments de chaque couple (a, b')
- * sont la réunion sans doublons de tous les b tels que (a, b) est dans l
- * Exemple : regroupe_union [(a, [1; 2]); (b, [3]); (a, [4; 2])] =
-   [(a, [1; 2; 4]); (b, [3])] *)
-(* TODO: réécrire doc *)
+(* Renvoie une copie de la liste l où les deux premiers éléments de chaque
+ * triplet sont uniques dans la liste et les c' de chaque triplet (a, b, c')
+ * sont la réunion sans doublons de tous les c tels que (a, b, c) est dans l
+ * Exemple : cf. tests *)
 let regroupe_union (l: ('a * 'b * 'c list) list) : ('a * 'b * 'c list) list =
-  (* S’il n’existe pas de (a, _) dans l, ajoute (a, b) à l. Sinon, en supposant
-   * qu’il existe un unique (a, b') dans l, renvoie l où b' est remplacée par
-   * b@b' *)
+  (* S’il n’existe pas de (a, b, _) dans l, ajoute (a, b, c) à l. Sinon, en
+   * supposant qu’il existe un unique (a, b, c') dans l, renvoie l où c' est
+   * remplacée par c@c' *)
   let rec ajoute_union
       (l: ('a * 'b * 'c list) list)
       ((a, b, c): ('a * 'b * 'c list))
@@ -335,23 +333,23 @@ let construit_automate_LR1 (g: ('token_type, 'non_terminal) grammar)
       if List.mem e deja_vu then
         construit_automate automate q deja_vu
       else
-      let tnt = liste_terminaux_et_non_terminaux_a_iterer e [] in
-      let transitions, etats = nouvelles_transitions tnt e [] [] in
-      let nouveaux_etats = List.sort_uniq compare (etats@automate.states) in
-      let nouvelles_transitions =
-        List.sort_uniq compare (transitions@automate.transitions)
-      in
-      let nouvel_automate = {
-        states = nouveaux_etats;
-        initial_states = automate.initial_states;
-        final_states = automate.final_states;
-        transitions = nouvelles_transitions
-      } in
-      let nouveaux_deja_vus = List.sort_uniq compare e::deja_vu in
-      construit_automate
-        nouvel_automate
-        (List.rev_append nouveaux_etats a_traiter)
-        nouveaux_deja_vus
+        let tnt = liste_terminaux_et_non_terminaux_a_iterer e [] in
+        let transitions, etats = nouvelles_transitions tnt e [] [] in
+        let nouveaux_etats = List.sort_uniq compare (etats@automate.states) in
+        let nouvelles_transitions =
+          List.sort_uniq compare (transitions@automate.transitions)
+        in
+        let nouvel_automate = {
+          states = nouveaux_etats;
+          initial_states = automate.initial_states;
+          final_states = automate.final_states;
+          transitions = nouvelles_transitions
+        } in
+        let nouveaux_deja_vus = List.sort_uniq compare (e::deja_vu) in
+        construit_automate
+          nouvel_automate
+          (List.rev_append etats a_traiter)
+          nouveaux_deja_vus
   in
   let etat_initial =
     List.filter_map (transforme_axiome_en_situations g axiome lexeme_eof) g
