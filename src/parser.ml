@@ -398,6 +398,64 @@ let test_construit_automate_LR1 : unit =
   } in
   assert (construit_automate_LR1 g 'S' eof = a)
 
+(* Renvoie None si `a` est sans conflits LR(1), et un état de `a` présentant un conflit sinon. *)
+  let trouve_conflits (a: ('token_type, 'non_terminal) lr1_automaton) :
+    ('token_type, 'non_terminal) lr1_automaton_state option =
+    (* Renvoie true ssi `s` est un état LR(1) présentant un conflit. *)
+    let est_conflit (s: ('token_type, 'non_terminal) lr1_automaton_state) : bool =
+      (* Renvoie l'union des ensembles suivants pour toutes les situations a reduction si aucun
+         conflit réduire/réduire n'est trouvé.
+         Sinon, renvoie None. *)
+      let rec suivants_situations_finales (situations: ('token_type, 'non_terminal) lr1_situation list)
+          (res: 'token_type list) :
+          'token_type list option =
+        match situations with
+        | [] -> Some res
+        | ((_, derivation), curseur, suivant)::q ->
+            if curseur <> List.length derivation then
+              (* Cet etat n'est pas un candidat pour la reduction *)
+              suivants_situations_finales q res
+            else
+              if List.for_all (fun token_type -> not (List.mem token_type res)) suivant then
+                suivants_situations_finales q (List.rev_append suivant res)
+              else
+                (* Conflit réduire/réduire. Inutile de verifier que les règles 
+                   causant ce conflit sont bien différents car on les a
+                   dédupliqués avec regroupe_union. *)
+                None
+      in
+
+      let suivants = suivants_situations_finales s [] in
+      match suivants with
+      (* On a trouvé un conflit réduire/réduire. *)
+      | None -> true
+      | Some suivants ->
+        let est_conflit_lire_reduire (((_, derivation), curseur, _): ('token_type, 'non_terminal) lr1_situation) : bool =
+          (* Rien a lire dans cet état. *)
+          if curseur = List.length derivation then false
+          else
+            let next = List.nth derivation curseur in
+            match next with
+            | NonTerminal _ -> false
+            (* Vérifier que l'on n'a pas envie de lire un terminal candidat pour une réduction. *)
+            | Terminal t -> List.mem t suivants
+        in
+        if List.for_all (fun situation -> not (est_conflit_lire_reduire situation)) s then
+          (* Pas de conflit. *)
+          false
+        else
+          (* Conflit lire/réduire. *)
+          true
+    in
+
+    let rec trouve_conflit (remaining_states: ('token_type, 'non_terminal) lr1_automaton_state list) :
+        ('token_type, 'non_terminal) lr1_automaton_state option =
+      match remaining_states with
+      | [] -> None
+      | s::q -> if est_conflit s then Some s else trouve_conflit q
+  in
+
+  trouve_conflit a.states
 
 (*************************** Fonctions d’affichage ***************************)
 let string_of_symbol (s: (char, char) grammar_entry) : string =
