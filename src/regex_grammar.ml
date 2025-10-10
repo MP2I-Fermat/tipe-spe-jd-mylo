@@ -10,6 +10,7 @@ type regex_token_type =
   | Or
   | Plus
   | Star
+  | Question
   | Escape
   | Character
   | Eof
@@ -33,12 +34,14 @@ let regex_token_rules =
     (Regex.Symbol '|', Or);
     (Regex.Symbol '*', Star);
     (Regex.Symbol '+', Plus);
+    (Regex.Symbol '?', Question);
     ( Regex.Concatenation
         ( Regex.Symbol '\\',
           Regex.Empty |> add_character '(' |> add_character ')'
           |> add_character '|' |> add_character '*' |> add_character '\\'
           |> add_character 'n' |> add_character 't' |> add_character 'r'
-          |> add_character '[' |> add_character ']' |> add_character '+' ),
+          |> add_character '[' |> add_character ']' |> add_character '+'
+          |> add_character '?' ),
       Escape );
     ( Regex.Empty
       |> add_character_range ' ' '\''
@@ -59,6 +62,7 @@ let regex_grammar =
     (Regex, [ NonTerminal Regex; Terminal Or; NonTerminal Regex ]);
     (Regex, [ NonTerminal Regex; Terminal Star ]);
     (Regex, [ NonTerminal Regex; Terminal Plus ]);
+    (Regex, [ NonTerminal Regex; Terminal Question ]);
     (Regex, [ NonTerminal Regex; NonTerminal Regex ]);
     ( Regex,
       [
@@ -141,6 +145,9 @@ let rec regex_of_regex_syntax_tree
   | Node (Regex, [ inner; Leaf { token_type = Plus } ]) ->
       let inner_regex = regex_of_regex_syntax_tree inner in
       Regex.Concatenation (inner_regex, Regex.Star inner_regex)
+  | Node (Regex, [ inner; Leaf { token_type = Question } ]) ->
+      let inner_regex = regex_of_regex_syntax_tree inner in
+      Regex.Union (Regex.Epsilon, inner_regex)
   | Node (Regex, [ first; second ]) ->
       Regex.Concatenation
         (regex_of_regex_syntax_tree first, regex_of_regex_syntax_tree second)
