@@ -50,4 +50,6 @@ let string_of_lr1_grammar_state
 ;;
 
 print_automaton string_of_lr1_grammar_symbol string_of_lr1_grammar_state
-  automaton
+  automaton;
+
+assert (trouve_conflits automaton = None)
