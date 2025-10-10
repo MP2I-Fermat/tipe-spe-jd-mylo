@@ -32,6 +32,11 @@ type ('token_type, 'non_terminal) lr1_automaton =
     ('token_type, 'non_terminal) lr1_automaton_state
   ) automaton
 
+type ('token_type, 'non_terminal) lr1_transition =
+  ('token_type, 'non_terminal) lr1_automaton_state *
+  ('token_type, 'non_terminal) grammar_entry *
+  ('token_type, 'non_terminal) lr1_automaton_state
+
 
 (* Renvoie l’ensemble Premier_LL(1)(s) dans la grammaire g *)
 let premier_LL1 (s : ('token_type, 'non_terminal) grammar_entry list)
@@ -197,7 +202,9 @@ let test_fermeture_situations_LR1 : unit =
   let situation2 = (regle1, 1, ['e']) in
   let situation3 = (regle2, 0, ['c']) in
   assert (fermeture_situations_LR1 [situation1] g = [situation1]);
-  assert (fermeture_situations_LR1 [situation2] g = [situation2; situation3])
+  assert (fermeture_situations_LR1 [situation2] g = [situation2; situation3]);
+  (* Ensemble vide *)
+  assert (fermeture_situations_LR1 [] [] = [])
 
 
 (* Renvoie la fermeture des situations LR(1) de la situation (regle, 0, [eof])
@@ -218,22 +225,166 @@ let transforme_axiome_en_situations (g: ('token_type, 'non_terminal) grammar)
 let construit_automate_LR1 (g: ('token_type, 'non_terminal) grammar)
     (axiome: 'non_terminal) (lexeme_eof: 'token_type) :
     ('token_type, 'non_terminal) lr1_automaton =
+  (* Étant donné une liste l de situations LR(1), renvoie la liste des terminaux
+   * et non terminaux pouvant être lus, concaténée (sans doublons) avec
+   * accu supposée sans doublons. Cette fonction est récursive terminale. *)
+  let rec liste_terminaux_et_non_terminaux_a_iterer
+      (l: ('token_type, 'non_terminal) lr1_situation list)
+      (accu: ('token_type, 'non_terminal) grammar_entry list)
+      : ('token_type, 'non_terminal) grammar_entry list =
+    match l with
+    | [] -> accu
+    | ((_, rule), idx, _)::q ->
+        if idx = List.length rule then
+          liste_terminaux_et_non_terminaux_a_iterer q accu
+        else
+          let alpha = List.nth rule idx in
+          let nouvel_accu = alpha::accu |> List.sort_uniq compare in
+          liste_terminaux_et_non_terminaux_a_iterer q nouvel_accu
+  in
+  (* Renvoie la liste des situations LR(1) parmi l dont le symbole sous le
+   * curseur est alpha *)
+  let alpha_sous_le_curseur
+      (l: ('token_type, 'non_terminal) lr1_situation list)
+      (alpha: ('token_type, 'non_terminal) grammar_entry)
+      : ('token_type, 'non_terminal) lr1_situation list =
+    List.filter
+      (fun ((_, rule), idx, _) ->
+        if idx = List.length rule then false
+        else List.nth rule idx = alpha)
+      l
+  in
+  (* À partir d’une liste tnt de terminaux et de non terminaux à itérer,
+   * construit, pour chaque alpha de tnt, la transition partant de l’état e
+   * (liste de situations LR(1)) étiquetée par alpha, puis renvoie la liste
+   * de ces transitions concaténée avec accu_transitions.
+   * Renvoie également la liste des états atteints par ces transitions, en
+   * concaténant avec accu_etats. *)
+  let rec nouvelles_transitions
+      (tnt: ('token_type, 'non_terminal) grammar_entry list)
+      (e: ('token_type, 'non_terminal) lr1_situation list)
+      (accu_transitions: ('token_type, 'non_terminal) lr1_transition list)
+      (accu_etats: ('token_type, 'non_terminal) lr1_automaton_state list)
+      : ('token_type, 'non_terminal) lr1_transition list *
+        ('token_type, 'non_terminal) lr1_automaton_state list =
+    match tnt with
+    | [] -> accu_transitions, accu_etats
+    | alpha::q ->
+      let liste_a_fermer =
+        alpha_sous_le_curseur e alpha |>
+        List.map (fun (r, idx, s) -> (r, idx+1, s))
+      in
+      let e' = fermeture_situations_LR1 liste_a_fermer g in
+      let t = (e, alpha, e') in
+      let nouvel_accu_e = e'::accu_etats in
+      let nouvel_accu_t = t::accu_transitions in
+      nouvelles_transitions q e nouvel_accu_t nouvel_accu_e
+  in
+  (* Ajoute à l’automate toutes les transitions (et éventuellement les états)
+   * depuis chaque état de a_traiter, en ajoutant les états qu’il faut traiter
+   * à a_traiter. deja_vu est la liste (triée sans doublons) d’états déjà vus.
+   *)
+  let rec construit_automate
+      (automate: ('token_type, 'non_terminal) lr1_automaton)
+      (a_traiter: ('token_type, 'non_terminal) lr1_automaton_state list)
+      (deja_vu: ('token_type, 'non_terminal) lr1_automaton_state list) :
+      ('token_type, 'non_terminal) lr1_automaton =
+    match a_traiter with
+    | [] -> automate
+    | e::q -> (* e est une liste de situations lr1 *)
+      if List.mem e deja_vu then
+        construit_automate automate q deja_vu
+      else
+      let tnt = liste_terminaux_et_non_terminaux_a_iterer e [] in
+      let transitions, etats = nouvelles_transitions tnt e [] [] in
+      let nouveaux_etats = List.sort_uniq compare (etats@automate.states) in
+      let nouvelles_transitions =
+        List.sort_uniq compare (transitions@automate.transitions)
+      in
+      let nouvel_automate = {
+        states = nouveaux_etats;
+        initial_states = automate.initial_states;
+        final_states = automate.final_states;
+        transitions = nouvelles_transitions
+      } in
+      let nouveaux_deja_vus = List.sort_uniq compare e::deja_vu in
+      construit_automate
+        nouvel_automate
+        (List.rev_append nouveaux_etats a_traiter)
+        nouveaux_deja_vus
+  in
   let etat_initial =
     List.filter_map (transforme_axiome_en_situations g axiome lexeme_eof) g
     |> List.concat
     |> List.sort_uniq compare
   in
-  (* Ajoute à l’automate toutes les transitions (et éventuellement les états)
-   * depuis le premier état de a_traiter. deja_vu est la liste (triée sans
-   * doublons) d’états déjà vus. *)
-  let traite_un_etat (automate: ('token_type, 'non_terminal) lr1_automaton)
-      (a_traiter: ('token_type, 'non_terminal) lr1_automaton_state list)
-      (deja_vu: ('token_type, 'non_terminal) lr1_automaton_state list) =
-    match a_traiter with
-    | [] -> automate
-    | _ -> failwith "todo"
+  construit_automate {
+    states = [etat_initial];
+    initial_states = [etat_initial];
+    final_states = [];
+    transitions = []
+  } [etat_initial] []
+
+
+let test_construit_automate_LR1 : unit =
+  let regle1 = ('S', [Terminal 'i']) in
+  let regle2 =
+    ('S', [Terminal 'i'; Terminal '['; Terminal 'c'; Terminal ']'])
   in
-  failwith "todo"
+  let g = [regle1; regle2] in
+  let eof = 'e' in
+  let situation11 = (regle1, 0, [eof]) in
+  let situation12 = (regle2, 0, [eof]) in
+  let situation21 = (regle1, 1, [eof]) in
+  let situation22 = (regle2, 1, [eof]) in
+  let situation3 = (regle2, 2, [eof]) in
+  let situation4 = (regle2, 3, [eof]) in
+  let situation5 = (regle2, 4, [eof]) in
+  let etat1 = [situation11; situation12] in
+  let etat2 = [situation21; situation22] in
+  let etat3 = [situation3] in
+  let etat4 = [situation4] in
+  let etat5 = [situation5] in
+  let etats = List.sort compare [etat1; etat2; etat3; etat4; etat5] in
+  let transitions = List.sort compare [
+    (etat1, Terminal 'i', etat2);
+    (etat2, Terminal '[', etat3);
+    (etat3, Terminal 'c', etat4);
+    (etat4, Terminal ']', etat5);
+  ] in
+  let a = {
+    states = etats;
+    initial_states = [etat1];
+    final_states = [];
+    transitions = transitions
+  } in
+  assert (construit_automate_LR1 g 'S' eof = a)
+
+
+(*************************** Fonctions d’affichage ***************************)
+let string_of_symbol (s: (char, char) grammar_entry) : string =
+  match s with
+  | Terminal c
+  | NonTerminal c -> string_of_char c
+
+let string_of_situation (((n, rule), idx, sigma): (char, char) lr1_situation)
+    : string =
+  let ns = string_of_char n in
+  let rule_chars = List.map (
+    fun x -> match x with | Terminal c | NonTerminal c -> c
+  ) rule in
+  let rule_beginning = implode (list_beginning rule_chars idx) in
+  let rule_end = implode (list_skip rule_chars idx) in
+  let sigma_s = List.map string_of_char sigma |> String.concat ", " in
+  ns ^ " -> " ^ rule_beginning ^ "^" ^ rule_end ^ " ~ {" ^ sigma_s ^ "}"
+
+let string_of_state (s: (char, char) lr1_automaton_state) : string =
+  let strings = List.map string_of_situation s in
+  "(" ^ (String.concat ", " strings) ^ ")"
+
+let print_lr1_automaton (a: (char, char) lr1_automaton) : unit =
+  print_automaton string_of_symbol string_of_state a
+(*****************************************************************************)
 
 (*
 let parse (g : ('token_type, 'non_terminal) grammar)
