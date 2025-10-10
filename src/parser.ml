@@ -386,8 +386,6 @@ let print_lr1_automaton (a: (char, char) lr1_automaton) : unit =
   print_automaton string_of_symbol string_of_state a
 (*****************************************************************************)
 
-(*
 let parse (g : ('token_type, 'non_terminal) grammar)
     (text : 'token_type token list) : ('token_type, 'non_terminal) syntax_tree =
-  _
-*)
+  failwith "todo"
