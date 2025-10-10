@@ -133,8 +133,48 @@ let premier_LR1 (s : ('token_type, 'non_terminal) grammar_entry list)
       | _ -> premier_LL1 s g
 
 
+(* Renvoie une copie de la liste l où les premiers éléments de chaque couple
+ * sont uniques dans la liste et les seconds éléments de chaque couple (a, b')
+ * sont la réunion sans doublons de tous les b tels que (a, b) est dans l
+ * Exemple : regroupe_union [(a, [1; 2]); (b, [3]); (a, [4; 2])] =
+   [(a, [1; 2; 4]); (b, [3])] *)
+(* TODO: réécrire doc *)
+let regroupe_union (l: ('a * 'b * 'c list) list) : ('a * 'b * 'c list) list =
+  (* S’il n’existe pas de (a, _) dans l, ajoute (a, b) à l. Sinon, en supposant
+   * qu’il existe un unique (a, b') dans l, renvoie l où b' est remplacée par
+   * b@b' *)
+  let rec ajoute_union
+      (l: ('a * 'b * 'c list) list)
+      ((a, b, c): ('a * 'b * 'c list))
+      : ('a * 'b * 'c list) list =
+    match l with
+    | [] -> [(a, b, c)]
+    | (x, x', c')::q when (x, x') = (a, b) -> (a, b, c@c')::q
+    | (x, x', c')::q -> (x, x', c')::(ajoute_union q (a, b, c))
+  in
+  (* Comme regroupe_union mais en partant de l' (i.e. fait un ajoute_union à l'
+   * sur chaque élément de l) *)
+  let rec renverse_union (l: ('a * 'b * 'c list) list) (l': ('a * 'b * 'c list) list)
+      : ('a * 'b * 'c list) list =
+    match l with
+    | [] -> l'
+    | x::q -> renverse_union q (ajoute_union l' x)
+  in
+  renverse_union l [] |>
+    List.map (fun (a, b, c) -> (a, b, List.sort_uniq compare c))
+
+
+let test_regroupe_union : unit =
+  assert (
+    regroupe_union [('a', 'a', [1; 2]); ('b', 'b', [3]); ('a', 'a', [4; 2])] =
+      [('a', 'a', [1; 2; 4]); ('b', 'b', [3])]
+  );
+  assert (regroupe_union [] = [])
+
+
 (* Renvoie la fermeture de e un ensemble de situations LR(1). Le calcul se fait
- * par saturation *)
+ * par saturation. Il n’y a pas plusieurs fois la même situation mais avec deux
+ * σ différents. *)
 let fermeture_situations_LR1
     (e: ('token_type, 'non_terminal) lr1_situation list)
     (g: ('token_type, 'non_terminal) grammar):
@@ -177,7 +217,7 @@ let fermeture_situations_LR1
     if f = f' then f
     else saturation f'
   in
-  saturation e
+  regroupe_union (saturation e)
 
 
 let test_fermeture_situations_LR1 : unit =
@@ -316,7 +356,7 @@ let construit_automate_LR1 (g: ('token_type, 'non_terminal) grammar)
   let etat_initial =
     List.filter_map (transforme_axiome_en_situations g axiome lexeme_eof) g
     |> List.concat
-    |> List.sort_uniq compare
+    |> regroupe_union
   in
   construit_automate {
     states = [etat_initial];
