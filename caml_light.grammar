@@ -1,0 +1,327 @@
+# See https://caml.inria.fr/pub/distrib/caml-light-0.74/cl74refman.txt
+# The axiom for this grammar is IMPLEMENTATION
+
+# P11
+ident := [A-Za-z][A-Za-z0-9_]*
+
+integer_literal := -?([0-9]+|(0[xX][0-9A-Fa-f]+)|(0[oO][0-7]+)|(0[bB][0-1]+))
+float_literal := -?[0-9]+(.[0-9]*)?([eE][+-]?[0-9]+)?
+
+# P12
+# It's not fully clear what a regular-char is supposed to be. Here we assume it's any printable char that is not ` or \.
+char_literal := `([ -\[\]-_a-~]|(\\[\\`ntbr])|(\\[0-9][0-9][0-9]))`
+
+# TODO: Add # to the set of allowed characters once.
+string_literal := "([ !$-~]|(\\"))*"
+
+# Reserved words
+and := and
+else := else
+if := if
+of := of
+try := try
+as := as
+end := end
+in := in
+or := or
+type := type
+begin := begin
+exception := exception
+let := let
+prefix := prefix
+value := value
+do := do
+for := for
+match := match
+rec := rec
+where := where
+done := done
+fun := fun
+mutable := mutable
+then := then
+while := while
+downto := downto
+function := function
+not := not
+to := to
+with := with
+
+hash := #
+bang := !
+bang_equals := !=
+ampersand := &
+open_paren := \(
+close_paren := \)
+star := \*
+star_dot := \*.
+plus := \+
+plus_dot := \+.
+comma := ,
+minus := -
+minus_dot := -.
+right_arrow := ->
+dot := .
+dot_paren := .\(
+slash := /
+slash_dot := /.
+colon := :
+double_colon := ::
+colon_equals := :=
+semicolon := ;
+double_semicolon := ;;
+less := <
+less_dot := <.
+left_arrow := <-
+leq <=
+leq_dot <=.
+neq := <>
+neq_dot := <>.
+eq := =
+eq_dot := =.
+double_eq := ==
+greater := >
+greater_dot >.
+geq := >=
+geq_dot := >=.
+at := @
+open_bracket := \[
+open_bracket_bar := \[|
+close_bracket := \]
+caret := ^
+underscore := _
+double_underscore := __
+open_brace := {
+pipe := |
+close_bracket_bar := |\]
+close_brace := }
+apostrophe := '
+double_star := \*\*
+
+# P13
+GLOBAL_NAME -> ident
+GLOBAL_NAME -> ident double_underscore ident
+
+# TODO: Do we support the `prefix operator-name` variant?
+VARIABLE -> GLOBAL_NAME
+C_CONSTR -> GLOBAL_NAME
+C_CONSTR -> open_brace close_brace
+C_CONSTR -> open_paren close_paren
+NC_CONSTR -> GLOBAL_NAME
+TYPE_CONSTR -> GLOBAL_NAME
+LABEL -> GLOBAL_NAME
+
+# P15
+TYP_EXPR -> apostrophe ident                                     # e.g type 'a t = 'a
+TYP_EXPR -> open_paren TYP_EXPR close_paren                      # e.g type t = (a)
+TYP_EXPR -> TYP_EXPR right_arrow TYP_EXPR                        # e.g type t = a -> b
+TYP_EXPR -> TYP_EXPR star TYP_EXPR                               # e.g type t = a * b
+TYP_EXPR -> TYPE_CONSTR                                          # e.g type t = foo
+TYP_EXPR -> TYP_EXPR TYPE_CONSTR                                 # e.g type t = a foo
+TYP_CONSTR_ARGS -> TYP_EXPR
+TYP_CONSTR_ARGS -> TYP_EXPR comma TYP_CONSTR_ARGS
+TYP_EXPR -> open_paren TYP_CONSTR_ARGS close_paren TYPE_CONSTR   # e.g type t = (a, b) foo
+
+# P16
+CONSTANT -> integer_literal
+CONSTANT -> float_literal
+CONSTANT -> char_literal
+CONSTANT -> string_literal
+CONSTANT -> C_CONSTR
+
+
+# P17
+PATTERN -> ident                                                 # e.g p
+PATTERN -> underscore                                            # e.g _
+PATTERN -> PATTERN as ident                                      # e.g (p as foo)
+PATTERN -> open_paren PATTERN close_paren                        # e.g (p)
+PATTERN -> open_paren PATTERN colon TYP_EXPR close_paren         # e.g (p : string)
+PATTERN -> PATTERN pipe PATTERN                                  # e.g p1 | p2
+PATTERN -> CONSTANT                                              # e.g "foo"
+PATTERN -> NC_CONSTR PATTERN                                     # e.g Some p
+PATTERN -> PATTERN comma PATTERN                                 # e.g p1, p2
+FIELD_PATTERN -> LABEL eq PATTERN
+FIELD_PATTERN_LIST -> FIELD_PATTERN
+FIELD_PATTERN_LIST -> FIELD_PATTERN semicolon FIELD_PATTERN
+PATTERN -> open_brace FIELD_PATTERN_LIST close_brace             # e.g { foo = p1 }
+PATTERN -> open_bracket close_bracket                            # e.g []
+PATTERN_LIST -> PATTERN
+PATTERN_LIST -> PATTERN semicolon PATTERN_LIST
+PATTERN -> open_bracket PATTERN_LIST close_bracket               # e.g [p]
+PATTERN -> PATTERN double_colon PATTERN                          # e.g p1::p2
+
+
+# P19
+EXPR -> ident                                                    # e.g foo
+EXPR -> VARIABLE                                                 # e.g Foo__bar
+EXPR -> CONSTANT                                                 # e.g "foo"
+EXPR -> open_paren EXPR close_paren                              # e.g (e)
+EXPR -> begin EXPR end                                           # e.g begin e end
+EXPR -> open_paren EXPR colon TYP_EXPR close_paren               # e.g (e : typ)
+EXPR -> EXPR comma EXPR                                          # e.g e1, e2
+EXPR -> NC_CONSTR EXPR                                           # e.g Bar e
+EXPR -> EXPR double_colon EXPR                                   # e.g e1::e2
+EXPR_LIST -> EXPR
+EXPR_LIST -> EXPR semicolon EXPR_LIST
+EXPR -> open_bracket EXPR_LIST close_bracket                     # e.g [e1; e2]
+EXPR -> open_bracket_bar EXPR_LIST close_bracket_bar             # e.g [|e1; e2|]
+FIELD_EXPR -> LABEL eq EXPR
+FIELD_EXPR_LIST -> FIELD_EXPR
+FIELD_EXPR_LIST -> FIELD_EXPR semicolon FIELD_EXPR_LIST
+EXPR -> open_brace FIELD_EXPR_LIST close_brace                   # e.g { foo = e1 }
+EXPR -> EXPR EXPR                                                # e.g e1 e2
+EXPR -> PREFIX_OP EXPR                                           # e.g -e1
+EXPR -> EXPR INFIX_OP EXPR                                       # e.g e1 ^ e2
+EXPR -> EXPR dot LABEL                                           # e.g e.foo
+EXPR -> EXPR dot LABEL left_arrow EXPR                           # e.g e1.foo <- e2
+EXPR -> EXPR dot_paren EXPR close_paren                          # e.g e1.(e2)
+EXPR -> EXPR dot_paren EXPR close_paren left_arrow EXPR          # e.g e1.(e2) <- e3
+EXPR -> EXPR ampersand EXPR                                      # e.g e1 & e2
+EXPR -> EXPR or EXPR                                             # e.g e1 or e2
+EXPR -> if EXPR then EXPR                                        # e.g if e1 then e2
+EXPR -> if EXPR then EXPR else EXPR                              # e.g if e1 then e2 else 33
+EXPR -> while EXPR do EXPR done                                  # e.g while e1 do e2 done
+EXPR -> for ident eq EXPR to EXPR do EXPR done                   # e.g for foo = e1 to e2 do e3 done
+EXPR -> for ident eq EXPR downto EXPR do EXPR done               # e.g for foo = e1 downto e2 do e3 done
+EXPR -> EXPR semicolon EXPR                                      # e.g e1; e2
+EXPR -> match EXPR with SIMPLE_MATCHING                          # e.g match e1 with Foo -> e2
+EXPR -> fun MULTIPLE_MATCHING                                    # e.g fun Foo -> e
+EXPR -> function MULTIPLE_MATCHING                               # e.g function Foo -> e
+EXPR -> try EXPR with SIMPLE_MATCHING                            # e.g try e1 with Err -> e2
+LET_BINDING_LIST -> LET_BINDING
+LET_BINDING_LIST -> LET_BINDING and LET_BINDING_LIST
+EXPR -> let LET_BINDING_LIST in EXPR                             # e.g let e1 = e2 in e3
+EXPR -> let rec LET_BINDING_LIST in EXPR                         # e.g let rec e1 = e2 in e3
+
+SIMPLE_MATCHING -> PATTERN right_arrow EXPR
+SIMPLE_MATCHING -> PATTERN right_arrow EXPR pipe SIMPLE_MATCHING
+
+MULTIPLE_MATCHING -> PATTERN_LIST right_arrow EXPR
+MULTIPLE_MATCHING -> PATTERN_LIST right_arrow EXPR pipe MULTIPLE_MATCHING
+
+PATTERN_LIST -> PATTERN
+PATTERN_LIST -> PATTERN PATTERN_LIST
+
+LET_BINDING -> PATTERN eq EXPR
+LET_BINDING -> VARIABLE PATTERN_LIST eq EXPR
+
+PREFIX_OP -> minus
+PREFIX_OP -> minus_dot
+PREFIX_OP -> bang
+
+INFIX_OP -> plus
+INFIX_OP -> minus
+INFIX_OP -> star
+INFIX_OP -> slash
+INFIX_OP -> mod
+INFIX_OP -> plus_dot
+INFIX_OP -> minus_dot
+INFIX_OP -> star_dot
+INFIX_OP -> slash_dot
+INFIX_OP -> double_star
+INFIX_OP -> at
+INFIX_OP -> caret
+INFIX_OP -> bang
+INFIX_OP -> colon_equals
+INFIX_OP -> eq
+INFIX_OP -> neq
+INFIX_OP -> double_eq
+INFIX_OP -> bang_equals
+INFIX_OP -> less
+INFIX_OP -> leq
+INFIX_OP -> greater
+INFIX_OP -> geq
+INFIX_OP -> less_dot
+INFIX_OP -> leq_dot
+INFIX_OP -> greater_dot
+INFIX_OP -> geq_dot
+
+# 27
+
+TYPE_DEFINITION -> type TYPEDEF_LIST
+TYPEDEF_LIST -> TYPEDEF
+TYPEDEF_LIST -> TYPEDEF and TYPEDEF_LIST
+
+TYPE_CONSTR_DECL_LIST -> CONSTR_DECL
+TYPE_CONSTR_DECL_LIST -> CONSTR_DECL pipe TYPE_CONSTR_DECL_LIST
+
+LABEL_DECL_LIST -> LABEL_DECL
+LABEL_DECL_LIST -> LABEL_DECL semicolon LABEL_DECL_LIST
+
+TYPEDEF -> ident eq TYPE_CONSTR_DECL_LIST                                   # e.g type foo = One | Two | Three of foo
+TYPEDEF -> ident eq open_brace LABEL_DECL_LIST close_brace                  # e.g type foo = { bar : string }
+TYPEDEF -> ident double_eq TYP_EXPR                                         # ???                                         
+TYPEDEF -> ident                                                            # e.g type foo = list
+TYPEDEF -> TYPE_PARAMS ident eq TYPE_CONSTR_DECL_LIST                       # Same as above, but with 'a or ('a, 'b)
+TYPEDEF -> TYPE_PARAMS ident eq open_brace LABEL_DECL_LIST close_brace      # ^
+TYPEDEF -> TYPE_PARAMS ident double_eq TYP_EXPR                             # ^
+TYPEDEF -> TYPE_PARAMS ident                                                # ^
+
+TYPE_PARAMS -> apostrophe ident
+TYPE_PARAM_LIST -> apostrophe ident
+TYPE_PARAM_LIST -> apostrophe ident comma TYPE_PARAM_LIST
+TYPE_PARAMS -> open_paren TYPE_PARAM_LIST close_paren
+
+CONSTR_DECL -> ident
+CONSTR_DECL -> ident of TYP_EXPR
+
+LABEL_DECL -> ident colon TYP_EXPR
+LABEL_DECL -> mutable ident colon TYP_EXPR
+
+# 28
+
+EXCEPTION_CONSTR_DECL_LIST -> CONSTR_DECL
+EXCEPTION_CONSTR_DECL_LIST -> CONSTR_DECL and EXCEPTION_CONSTR_DECL_LIST
+EXCEPTION_DEFINITION -> exception exception EXCEPTION_CONSTR_DECL_LIST
+
+# TODO: Add directives once we can specify # in grammar source files.
+
+IMPLEMENTATION -> IMPL_PHRASE double_semicolon
+IMPLEMENTATION -> IMPL_PHRASE double_semicolon IMPLEMENTATION
+
+IMPL_PHRASE -> EXPR
+IMPL_PHRASE -> VALUE_DEFINITION
+IMPL_PHRASE -> TYPE_DEFINITION
+IMPL_PHRASE -> EXCEPTION_DEFINITION
+#IMPL_PHRASE -> DIRECTIVE
+
+VALUE_DEFINITION -> let LET_BINDING_LIST
+VALUE_DEFINITION -> let rec LET_BINDING_LIST
+
+# P32
+EXPR -> EXPR where LET_BINDING
+EXPR -> EXPR where rec LET_BINDING
+
+# P33
+dot_open_bracket := .\[
+EXPR -> EXPR dot_open_bracket EXPR close_bracket
+EXPR -> EXPR dot_open_bracket EXPR close_bracket left_arrow EXPR
+
+infix_symbol := [=<>@^\|&~\+-*/$%][!$%&\*\+-./:;<=>\?@^|~]*
+prefix_symbol := [!?][!$%&\*\+-./:;<=>\?@^|~]*
+
+EXPR -> prefix_symbol EXPR
+EXPR -> EXPR infix_symbol EXPR
+
+EXPR_LIST -> EXPR semicolon
+EXPR -> EXPR comma EXPR comma
+EXPR -> EXPR semicolon EXPR semicolon
+PATTERN -> pipe PATTERN
+
+double_ampersand := &&
+double_pipe := \|\|
+
+EXPR -> EXPR double_ampersand EXPR
+EXPR -> EXPR double_pipe EXPR
+
+# Our changes to make Caml Light more like modern OCaml (for "seamless" parsing of OCaml programs)
+
+# Character literals with ' instead of `
+modern_char_literal = '([ -\[\]-_a-~]|(\\[\\'ntbr])|(\\[0-9][0-9][0-9]))'
+CONSTANT -> modern_char_literal
+
+# Module implementations without required double semicolons
+IMPLEMENTATION -> IMPL_PHRASE
+IMPLEMENTATION -> IMPL_PHRASE IMPLEMENTATION
+
+# Empty array literals
+C_CONSTR -> open_bracket_bar close_bracket_bar
