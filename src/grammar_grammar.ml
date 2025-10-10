@@ -10,6 +10,8 @@ type grammar_token_type =
   | Question
   | Whitespace
   | Newline
+  | Comment_start
+  | Unrecognizable
   | Eof
 
 type grammar_node_type =
@@ -36,6 +38,9 @@ let grammar_token_rules =
     (Concatenation (Symbol ' ', Star (Symbol ' ')), Whitespace);
     (Symbol '\n', Newline);
     (Symbol '?', Question);
+    (Symbol '#', Comment_start);
+    ( Regex.Empty |> add_character_range (char_of_int 0) (char_of_int 255),
+      Unrecognizable );
   ]
 
 let grammar_rules =
@@ -229,5 +234,19 @@ let parse_grammar (s : string) =
   let tokens_no_whitespace =
     List.filter (fun token -> token.token_type <> Whitespace) tokens
   in
-  let syntax_tree = parse grammar_rules tokens_no_whitespace in
+
+  let rec remove_comments (tokens : grammar_token_type token list)
+      (in_comment : bool) (res : grammar_token_type token list) :
+      grammar_token_type token list =
+    match tokens with
+    | [] -> res
+    | { token_type = Comment_start } :: q -> remove_comments q true res
+    | ({ token_type = Newline } as x) :: q -> remove_comments q false (x :: res)
+    | x :: q ->
+        let next_res = if in_comment then res else x :: res in
+        remove_comments q in_comment next_res
+  in
+
+  let tokens_clean = List.rev (remove_comments tokens_no_whitespace false []) in
+  let syntax_tree = parse grammar_rules tokens_clean in
   grammar_of_syntax_tree syntax_tree
