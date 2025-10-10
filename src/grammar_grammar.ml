@@ -6,7 +6,8 @@ open Regex_grammar
 type grammar_token_type =
   | Terminal_pattern
   | Derivation_symbol
-  | Rule_identifier
+  | Identifier
+  | Question
   | Whitespace
   | Newline
   | Eof
@@ -16,6 +17,7 @@ type grammar_node_type =
   | Grammar_entry
   | Terminal_definition
   | Rule_identifier_list
+  | Rule_identifier_list_entry
   | NonTerminal_definition
 
 let grammar_token_rules =
@@ -30,9 +32,10 @@ let grammar_token_rules =
       |> add_character_range 'A' 'Z'
       |> add_character_range 'a' 'z'
       |> add_character '_',
-      Rule_identifier );
+      Identifier );
     (Concatenation (Symbol ' ', Star (Symbol ' ')), Whitespace);
     (Symbol '\n', Newline);
+    (Symbol '?', Question);
   ]
 
 let grammar_rules =
@@ -43,17 +46,20 @@ let grammar_rules =
     (Grammar_entry, [ Terminal Newline ]);
     (Grammar_entry, [ NonTerminal Terminal_definition; Terminal Newline ]);
     (Grammar_entry, [ NonTerminal NonTerminal_definition; Terminal Newline ]);
-    ( Terminal_definition,
-      [ Terminal Rule_identifier; Terminal Terminal_pattern ] );
+    (Terminal_definition, [ Terminal Identifier; Terminal Terminal_pattern ]);
     ( NonTerminal_definition,
       [
-        Terminal Rule_identifier;
+        Terminal Identifier;
         Terminal Derivation_symbol;
         NonTerminal Rule_identifier_list;
       ] );
-    (Rule_identifier_list, [ Terminal Rule_identifier ]);
+    (Rule_identifier_list, [ NonTerminal Rule_identifier_list_entry ]);
     ( Rule_identifier_list,
-      [ NonTerminal Rule_identifier_list; Terminal Rule_identifier ] );
+      [
+        NonTerminal Rule_identifier_list_entry; NonTerminal Rule_identifier_list;
+      ] );
+    (Rule_identifier_list_entry, [ Terminal Identifier ]);
+    (Rule_identifier_list_entry, [ Terminal Identifier; Terminal Question ]);
   ]
 
 let grammar_of_syntax_tree
@@ -70,43 +76,78 @@ let grammar_of_syntax_tree
     | Node
         ( Terminal_definition,
           [
-            Leaf { token_type = Rule_identifier; value = name };
+            Leaf { token_type = Identifier; value = name };
             Leaf { token_type = Terminal_pattern; value = pattern };
           ] ) ->
         (parse_regex (strip_prefix_from_terminal_pattern pattern), name)
     | _ -> failwith "Not a terminal definition"
   in
 
-  let rec build_identifier_list
-      (tree : (grammar_token_type, grammar_node_type) syntax_tree)
-      (result : string list) : string list =
-    match tree with
-    | Node
-        (Rule_identifier_list, [ Leaf { token_type = Rule_identifier; value } ])
-      ->
-        value :: result
-    | Node
-        ( Rule_identifier_list,
-          [
-            (Node (Rule_identifier_list, _) as remaining);
-            Leaf { token_type = Rule_identifier; value };
-          ] ) ->
-        build_identifier_list remaining (value :: result)
-    | _ -> failwith "Not an identifier list"
+  let build_identifier_list
+      (tree : (grammar_token_type, grammar_node_type) syntax_tree) :
+      string list list =
+    let rec build_into_rev
+        (tree : (grammar_token_type, grammar_node_type) syntax_tree)
+        (res : string list list) =
+      match tree with
+      | Node
+          ( Rule_identifier_list,
+            [
+              Node
+                ( Rule_identifier_list_entry,
+                  [ Leaf { token_type = Identifier; value } ] );
+            ] ) ->
+          List.map (fun r -> value :: r) res
+      | Node
+          ( Rule_identifier_list,
+            [
+              Node
+                ( Rule_identifier_list_entry,
+                  [
+                    Leaf { token_type = Identifier; value };
+                    Leaf { token_type = Question };
+                  ] );
+            ] ) ->
+          List.rev_append (List.map (fun r -> value :: r) res) res
+      | Node
+          ( Rule_identifier_list,
+            [
+              Node
+                ( Rule_identifier_list_entry,
+                  [ Leaf { token_type = Identifier; value } ] );
+              remaining;
+            ] ) ->
+          build_into_rev remaining (List.map (fun r -> value :: r) res)
+      | Node
+          ( Rule_identifier_list,
+            [
+              Node
+                ( Rule_identifier_list_entry,
+                  [
+                    Leaf { token_type = Identifier; value };
+                    Leaf { token_type = Question };
+                  ] );
+              remaining;
+            ] ) ->
+          build_into_rev remaining
+            (List.rev_append (List.map (fun r -> value :: r) res) res)
+      | _ -> failwith "Not an identifier list"
+    in
+    List.map List.rev (build_into_rev tree [])
   in
 
   let build_non_terminal_definition
       (definition : (grammar_token_type, grammar_node_type) syntax_tree) :
-      string * string list =
+      string * string list list =
     match definition with
     | Node
         ( NonTerminal_definition,
           [
-            Leaf { token_type = Rule_identifier; value = name };
+            Leaf { token_type = Identifier; value = name };
             Leaf { token_type = Derivation_symbol };
             (Node (Rule_identifier_list, _) as identifier_list);
           ] ) ->
-        (name, build_identifier_list identifier_list [])
+        (name, build_identifier_list identifier_list)
     | _ -> failwith "Not a nonterminal definition"
   in
 
@@ -138,7 +179,12 @@ let grammar_of_syntax_tree
             (Node (NonTerminal_definition, _) as definition);
             Leaf { token_type = Newline };
           ] ) ->
-        (token_rules, build_non_terminal_definition definition :: grammar_rules)
+        let name, derivations = build_non_terminal_definition definition in
+
+        ( token_rules,
+          List.rev_append
+            (List.map (fun d -> (name, d)) derivations)
+            grammar_rules )
     | _ -> failwith "Not a grammar entry"
   in
 
