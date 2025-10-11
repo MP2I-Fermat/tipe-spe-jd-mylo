@@ -293,8 +293,8 @@ EXPR -> EXPR where rec LET_BINDING
 
 # P33
 dot_open_bracket := .\[
-EXPR -> EXPR dot_open_bracket EXPR close_bracket
-EXPR -> EXPR dot_open_bracket EXPR close_bracket left_arrow EXPR
+EXPR -> EXPR dot_open_bracket EXPR close_bracket                    # e.g e1.[e2]
+EXPR -> EXPR dot_open_bracket EXPR close_bracket left_arrow EXPR    # e.g e1.[e2] <- e3
 
 infix_symbol := [=<>@^\|&~\+-*/$%][!$%&\*\+-./:;<=>\?@^|~]*
 prefix_symbol := [!?][!$%&\*\+-./:;<=>\?@^|~]*
