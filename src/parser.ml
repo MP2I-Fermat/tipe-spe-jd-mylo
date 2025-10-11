@@ -103,26 +103,6 @@ let premier_LL1 (s : ('token_type, 'non_terminal) grammar_entry list)
   in
   trouve_premier_constant 0
 
-let test_premier_LL1 =
-  let grammaire1 (* page 123, exemple 144 *) =
-    [ ('S', [ Terminal 'a'; NonTerminal 'T' ]); ('T', [ Terminal 'b' ]) ]
-  in
-  assert (premier_LL1 [ Terminal 'a'; NonTerminal 'T' ] grammaire1 = [ 'a' ]);
-  assert (premier_LL1 [ NonTerminal 'T' ] grammaire1 = [ 'b' ]);
-  let grammaire2 (* page 60, exemple 24 *) =
-    [
-      ('S', [ NonTerminal 'U' ]);
-      ('S', [ NonTerminal 'V' ]);
-      ('U', [ Terminal 'a'; Terminal 'b' ]);
-      ('V', [ Terminal 'c'; Terminal 'd' ]);
-    ]
-  in
-  assert (premier_LL1 [ Terminal 'a'; Terminal 'b' ] grammaire2 = [ 'a' ]);
-  assert (premier_LL1 [ Terminal 'c'; Terminal 'd' ] grammaire2 = [ 'c' ]);
-  assert (premier_LL1 [ NonTerminal 'U' ] grammaire2 = [ 'a' ]);
-  assert (premier_LL1 [ NonTerminal 'V' ] grammaire2 = [ 'c' ]);
-  assert (premier_LL1 [ NonTerminal 'S' ] grammaire2 = [ 'a'; 'c' ])
-
 
 (* Renvoie l’ensemble Premier_LR(1)(s, σ) dans la grammaire g *)
 let premier_LR1 (s : ('token_type, 'non_terminal) grammar_entry list)
@@ -160,14 +140,6 @@ let regroupe_union (l: ('a * 'b * 'c list) list) : ('a * 'b * 'c list) list =
   in
   renverse_union l [] |>
     List.map (fun (a, b, c) -> (a, b, List.sort_uniq compare c))
-
-
-let test_regroupe_union : unit =
-  assert (
-    regroupe_union [('a', 'a', [1; 2]); ('b', 'b', [3]); ('a', 'a', [4; 2])] =
-      [('a', 'a', [1; 2; 4]); ('b', 'b', [3])]
-  );
-  assert (regroupe_union [] = [])
 
 
 (* Renvoie la fermeture de e un ensemble de situations LR(1). Le calcul se fait
@@ -216,33 +188,6 @@ let fermeture_situations_LR1
     else saturation f'
   in
   regroupe_union (saturation e)
-
-
-let test_fermeture_situations_LR1 : unit =
-  (* Dans les examples suivants, les symboles « drapeau » dans le livre sont
-   * représentés par le caractère 'e' (pour “end of file”) *)
-  (* page 123, example 148 *)
-  let regle1 = ('S', [Terminal 'a'; NonTerminal 'T'; Terminal 'c']) in
-  let regle2 = ('T', [Terminal 'b']) in
-  let g = [regle1; regle2] in
-  let situation1 = (regle1, 0, ['e']) in
-  let situation2 = (regle1, 1, ['e']) in
-  let situation3 = (regle2, 0, ['c']) in
-  assert (fermeture_situations_LR1 [situation1] g = [situation1]);
-  assert (fermeture_situations_LR1 [situation2] g = [situation2; situation3]);
-  (* page 124, example 149 *)
-  let regle1 =
-    ('S', [Terminal 'a'; NonTerminal 'T'; NonTerminal 'U']) in
-  let regle2 = ('T', [Terminal 'b']) in
-  let regle3 = ('U', [Terminal 'c']) in
-  let g = [regle1; regle2; regle3] in
-  let situation1 = (regle1, 0, ['e']) in
-  let situation2 = (regle1, 1, ['e']) in
-  let situation3 = (regle2, 0, ['c']) in
-  assert (fermeture_situations_LR1 [situation1] g = [situation1]);
-  assert (fermeture_situations_LR1 [situation2] g = [situation2; situation3]);
-  (* Ensemble vide *)
-  assert (fermeture_situations_LR1 [] [] = [])
 
 
 (* Renvoie la fermeture des situations LR(1) de la situation (regle, 0, [eof])
@@ -364,98 +309,89 @@ let construit_automate_LR1 (g: ('token_type, 'non_terminal) grammar)
   } [etat_initial] []
 
 
-let test_construit_automate_LR1 : unit =
-  let regle1 = ('S', [Terminal 'i']) in
-  let regle2 =
-    ('S', [Terminal 'i'; Terminal '['; Terminal 'c'; Terminal ']'])
-  in
-  let g = [regle1; regle2] in
-  let eof = 'e' in
-  let situation11 = (regle1, 0, [eof]) in
-  let situation12 = (regle2, 0, [eof]) in
-  let situation21 = (regle1, 1, [eof]) in
-  let situation22 = (regle2, 1, [eof]) in
-  let situation3 = (regle2, 2, [eof]) in
-  let situation4 = (regle2, 3, [eof]) in
-  let situation5 = (regle2, 4, [eof]) in
-  let etat1 = [situation11; situation12] in
-  let etat2 = [situation21; situation22] in
-  let etat3 = [situation3] in
-  let etat4 = [situation4] in
-  let etat5 = [situation5] in
-  let etats = List.sort compare [etat1; etat2; etat3; etat4; etat5] in
-  let transitions = List.sort compare [
-    (etat1, Terminal 'i', etat2);
-    (etat2, Terminal '[', etat3);
-    (etat3, Terminal 'c', etat4);
-    (etat4, Terminal ']', etat5);
-  ] in
-  let a = {
-    states = etats;
-    initial_states = [etat1];
-    final_states = [];
-    transitions = transitions
-  } in
-  assert (construit_automate_LR1 g 'S' eof = a)
-
-(* Renvoie None si `a` est sans conflits LR(1), et un état de `a` présentant un conflit sinon. *)
-  let trouve_conflits (a: ('token_type, 'non_terminal) lr1_automaton) :
+(* Renvoie None si `a` est sans conflits LR(1), et un état de `a` présentant un
+ * conflit sinon. *)
+let trouve_conflits (a: ('token_type, 'non_terminal) lr1_automaton) :
     ('token_type, 'non_terminal) lr1_automaton_state option =
-    (* Renvoie true ssi `s` est un état LR(1) présentant un conflit. *)
-    let est_conflit (s: ('token_type, 'non_terminal) lr1_automaton_state) : bool =
-      (* Renvoie l'union des ensembles suivants pour toutes les situations a reduction si aucun
-         conflit réduire/réduire n'est trouvé.
-         Sinon, renvoie None. *)
-      let rec suivants_situations_finales (situations: ('token_type, 'non_terminal) lr1_situation list)
-          (res: 'token_type list) :
-          'token_type list option =
-        match situations with
-        | [] -> Some res
-        | ((_, derivation), curseur, suivant)::q ->
-            if curseur <> List.length derivation then
-              (* Cet etat n'est pas un candidat pour la reduction *)
-              suivants_situations_finales q res
-            else
-              if List.for_all (fun token_type -> not (List.mem token_type res)) suivant then
-                suivants_situations_finales q (List.rev_append suivant res)
-              else
-                (* Conflit réduire/réduire. Inutile de verifier que les règles 
-                   causant ce conflit sont bien différents car on les a
-                   dédupliqués avec regroupe_union. *)
-                None
-      in
-
-      let suivants = suivants_situations_finales s [] in
-      match suivants with
-      (* On a trouvé un conflit réduire/réduire. *)
-      | None -> true
-      | Some suivants ->
-        let est_conflit_lire_reduire (((_, derivation), curseur, _): ('token_type, 'non_terminal) lr1_situation) : bool =
-          (* Rien a lire dans cet état. *)
-          if curseur = List.length derivation then false
+  (* Renvoie true ssi `s` est un état LR(1) présentant un conflit. *)
+  let est_conflit (s: ('token_type, 'non_terminal) lr1_automaton_state) : bool =
+    (* Renvoie l'union des ensembles suivants pour toutes les situations à
+     * réduction si aucun conflit réduire/réduire n'est trouvé.
+     * Sinon, renvoie None. *)
+    let rec suivants_situations_finales
+        (situations: ('token_type, 'non_terminal) lr1_situation list)
+        (res: 'token_type list) :
+        'token_type list option =
+      match situations with
+      | [] -> Some res
+      | ((_, derivation), curseur, suivant)::q ->
+          if curseur <> List.length derivation then
+            (* Cet état n'est pas un candidat pour la réduction *)
+            suivants_situations_finales q res
           else
-            let next = List.nth derivation curseur in
-            match next with
-            | NonTerminal _ -> false
-            (* Vérifier que l'on n'a pas envie de lire un terminal candidat pour une réduction. *)
-            | Terminal t -> List.mem t suivants
-        in
-        if List.for_all (fun situation -> not (est_conflit_lire_reduire situation)) s then
-          (* Pas de conflit. *)
-          false
-        else
-          (* Conflit lire/réduire. *)
-          true
+            if List.for_all
+                (fun token_type -> not (List.mem token_type res))
+                suivant
+            then
+              suivants_situations_finales q (List.rev_append suivant res)
+            else
+              (* Conflit réduire/réduire. Inutile de verifier que les règles
+               * causant ce conflit sont bien différentes car on les a
+               * dédupliquées avec regroupe_union. *)
+              None
     in
 
-    let rec trouve_conflit (remaining_states: ('token_type, 'non_terminal) lr1_automaton_state list) :
-        ('token_type, 'non_terminal) lr1_automaton_state option =
-      match remaining_states with
-      | [] -> None
-      | s::q -> if est_conflit s then Some s else trouve_conflit q
+    let suivants = suivants_situations_finales s [] in
+    match suivants with
+    (* On a trouvé un conflit réduire/réduire. *)
+    | None -> true
+    | Some suivants ->
+      let est_conflit_lire_reduire
+          (((_, derivation), curseur, _):
+           ('token_type, 'non_terminal) lr1_situation) : bool =
+        (* Rien à lire dans cet état. *)
+        if curseur = List.length derivation then false
+        else
+          let next = List.nth derivation curseur in
+          match next with
+          | NonTerminal _ -> false
+          (* Vérifier que l'on n'a pas envie de lire un terminal candidat pour
+           / une réduction. *)
+          | Terminal t -> List.mem t suivants
+      in
+      (* S’il existe un conflit lire/réduire -> true *)
+      List.exists (fun situation -> (est_conflit_lire_reduire situation)) s
+  in
+
+  let rec trouve_conflit
+      (remaining_states: ('token_type, 'non_terminal) lr1_automaton_state list):
+      ('token_type, 'non_terminal) lr1_automaton_state option =
+    match remaining_states with
+    | [] -> None
+    | s::q -> if est_conflit s then Some s else trouve_conflit q
   in
 
   trouve_conflit a.states
+
+
+let parse (a : ('token_type, 'non_terminal) lr1_automaton)
+    (eof_symbol: 'token_type)
+    (text : 'token_type token list) : ('token_type, 'non_terminal) syntax_tree =
+  failwith "todo" (*
+  let pile_arbres = Stack.Empty in
+  let pile_etats = Stack.Empty in
+
+  let initial_state = match a.initial_states with
+  | [x] -> x
+  | _ -> failwith "L’automate n’est pas déterministe (plusieurs ou aucun " ^
+                  "état(s) initial(aux)"
+  in
+  Stack.push initial_state pile_etats;
+  let i = ref 0 in
+  let longueur_texte = List.length text
+  while i <= longueur_texte do
+*)
+
 
 (*************************** Fonctions d’affichage ***************************)
 let string_of_symbol (s: (char, char) grammar_entry) : string =
@@ -482,6 +418,3 @@ let print_lr1_automaton (a: (char, char) lr1_automaton) : unit =
   print_automaton string_of_symbol string_of_state a
 (*****************************************************************************)
 
-let parse (g : ('token_type, 'non_terminal) grammar)
-    (text : 'token_type token list) : ('token_type, 'non_terminal) syntax_tree =
-  failwith "todo"

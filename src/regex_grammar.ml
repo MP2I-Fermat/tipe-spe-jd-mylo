@@ -157,5 +157,6 @@ let rec regex_of_regex_syntax_tree
 
 let parse_regex (src : string) : char regex =
   let tokens = tokenize regex_token_rules Eof src in
-  let tree = parse regex_grammar tokens in
+  let automaton = construit_automate_LR1 regex_grammar Regex Eof in
+  let tree = parse automaton Eof tokens in
   regex_of_regex_syntax_tree tree
