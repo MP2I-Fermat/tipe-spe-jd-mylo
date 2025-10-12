@@ -447,24 +447,55 @@ let trouve_conflits (a : ('token_type, 'non_terminal) lr1_automaton) :
 
   trouve_conflit a.states
 
-let parse (a : ('token_type, 'non_terminal) lr1_automaton)
-    (eof_symbol : 'token_type) (text : 'token_type token list) :
-    ('token_type, 'non_terminal) syntax_tree =
-  failwith "todo"
-(*
-  let pile_arbres = Stack.Empty in
-  let pile_etats = Stack.Empty in
 
-  let initial_state = match a.initial_states with
+(* Renvoie true si la situation s est une situation à réduction, false sinon *)
+let a_reduire (s: ('token_type, 'non_terminal) lr1_situation) : bool =
+  let (_, rule), idx, _ = s in
+  idx = List.length rule
+
+
+(* À partir d’un état e et d’un terminal t, renvoie une règle que l’on peut
+ * réduire (i.e. une situation N->a_1…a_n^ ~ σ où t∈σ) ou None s’il n’y en
+ * n’a pas. *)
+let rec trouve_reduction_a_faire
+    (e: ('token_type, 'non_terminal) lr1_automaton_state)
+    (t: 'token_type) : ('token_type, 'non_terminal) rule option =
+  match e with
+  | [] -> None
+  | (rule, idx, sigma)::q ->
+      if a_reduire (rule, idx, sigma) && List.mem t sigma then
+        Some rule
+      else
+        trouve_reduction_a_faire q t
+
+
+let parse (a : ('token_type, 'non_terminal) lr1_automaton)
+    (eof_symbol: 'token_type)
+    (text : 'token_type token list) :
+    ('token_type, 'non_terminal) syntax_tree =
+  (*
+  let pile_arbres = Stack.create () in
+  let pile_etats = Stack.create () in
+
+  let etat_initial = match a.initial_states with
   | [x] -> x
-  | _ -> failwith "L’automate n’est pas déterministe (plusieurs ou aucun " ^
-                  "état(s) initial(aux)"
+  | _ -> failwith ("L’automate n’est pas déterministe (plusieurs ou aucun " ^
+                   "état(s) initial(aux)")
   in
-  Stack.push initial_state pile_etats;
-  let i = ref 0 in
-  let longueur_texte = List.length text
-  while i <= longueur_texte do
-*)
+  Stack.push etat_initial pile_etats;
+  let etat_courant = ref etat_initial in
+
+  (*let i = ref 0 in
+  let longueur_texte = List.length text in
+
+  while !i <= longueur_texte do
+    match trouve_reduction_a_faire !etat_courant (fst )
+  done;*)
+  let parse_a_partir
+    (text: ('token_type token) list)
+    (deja_fait: 'token_type token list)
+  *)
+  failwith "todo"
 
 (*************************** Fonctions d’affichage ***************************)
 let string_of_symbol (s : (char, char) grammar_entry) : string =
