@@ -43,7 +43,7 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
     (g : ('token_type, 'non_terminal) grammar) : 'token_type list =
   (* Construit une liste de paires (d, [d1, d2, ...]) telles que premier(d) inclus dans premier(di).
      L'ensemble des inclusions renvoyées est l’entièreté des inclusions nécessaires pour construire
-     l'ensemble premier(s) (c.f 4.2.1.3 théorème 32). *)
+     l'ensemble premier(s) (cf. 4.2.1.3 théorème 32). *)
   let rec construire_inclusions
       (derivations_a_traiter : ('token_type, 'non_terminal) derivation list)
       (inclusions :
