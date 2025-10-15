@@ -38,21 +38,24 @@ type ('token_type, 'non_terminal) lr1_transition =
   * ('token_type, 'non_terminal) grammar_entry
   * ('token_type, 'non_terminal) lr1_automaton_state
 
+(* Type « inclusion », représentant le fait que premier(d) soit inclus dans
+ * chacun des premier(di) (couple (d, [d1, d2, ...]) *)
+type ('token_type, 'non_terminal) inclusion =
+  ('token_type, 'non_terminal) derivation (* d *)
+  * ('token_type, 'non_terminal) derivation list (* [d1, d2, ...] *)
+
 (* Renvoie l’ensemble Premier_LL(1)(s) dans la grammaire g *)
 let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
     (g : ('token_type, 'non_terminal) grammar) : 'token_type list =
-  (* Construit une liste de paires (d, [d1, d2, ...]) telles que premier(d) inclus dans premier(di).
-     L'ensemble des inclusions renvoyées est l’entièreté des inclusions nécessaires pour construire
-     l'ensemble premier(s) (cf. 4.2.1.3 théorème 32). *)
+  (* Construit une liste de paires (d, [d1, d2, ...]) telles que premier(d) soit
+   * inclus dans premier(di).
+   * L'ensemble des inclusions renvoyées est l’entièreté des inclusions
+   * nécessaires pour construire l'ensemble premier(s) (cf. 4.2.1.3, théorème
+   * 32). *)
   let rec construire_inclusions
       (derivations_a_traiter : ('token_type, 'non_terminal) derivation list)
-      (inclusions :
-        (('token_type, 'non_terminal) derivation
-        * ('token_type, 'non_terminal) derivation list)
-        list) :
-      (('token_type, 'non_terminal) derivation
-      * ('token_type, 'non_terminal) derivation list)
-      list =
+      (inclusions : ('token_type, 'non_terminal) inclusion list) :
+      ('token_type, 'non_terminal) inclusion list =
     match derivations_a_traiter with
     | [] -> inclusions
     | derivation :: derivations_a_traiter ->
@@ -62,48 +65,39 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
           | [ Terminal a ] -> []
           (* premier(a1) est inclus dans premier(a1...an) *)
           | x :: _ :: _ -> [ [ x ] ]
-          (* Pour tout N -> a1...an, premier(a1...an) est inclus dans premier(N) *)
+          (* Pour tout N -> a1...an, premier(a1...an) est inclus dans premier(N)
+           *)
           | [ NonTerminal n ] ->
               List.filter_map (fun (n', d) -> if n = n' then Some d else None) g
           | [] -> failwith "Cannot compute premier_LL1 of an empty derivation"
         in
 
-        (* Ajoute les inclusions spécifiées par nouveaux_inclus (pour tout d dans remaining, premier(d)
-           est inclus dans premier(derivation)) a inclusions.
-           Renvoie la nouvelle liste d'inclusions et une liste de dérivations jusqu'ici inconnus
-           qui sont alors a traiter. *)
+        (* Ajoute les inclusions spécifiées par nouveaux_inclus (pour tout d
+         * dans remaining, premier(d) est inclus dans premier(derivation)) à
+         * inclusions.
+         * Renvoie la nouvelle liste d'inclusions et une liste de dérivations
+         * jusqu'ici inconnues qui sont alors à traiter. *)
         let rec merge_inclusions
             (nouveaux_inclus : ('token_type, 'non_terminal) derivation list)
-            (inclusions :
-              (('token_type, 'non_terminal) derivation
-              * ('token_type, 'non_terminal) derivation list)
-              list)
+            (inclusions : ('token_type, 'non_terminal) inclusion list)
             (nouvelles_derivations :
               ('token_type, 'non_terminal) derivation list) :
-            (('token_type, 'non_terminal) derivation
-            * ('token_type, 'non_terminal) derivation list)
-            list
+            ('token_type, 'non_terminal) inclusion list
             * ('token_type, 'non_terminal) derivation list =
-          (* Ajoute nouvelle_inclusion a inclusions_globales.
-             Renvoie la nouvelle valeur de inclusions_globales et un booléen indiquant si
-             nouvelle_inclusion est une derivation jusqu'ici inconnue. *)
+          (* Ajoute nouvelle_inclusion à inclusions_globales.
+           * Renvoie la nouvelle valeur de inclusions_globales et un booléen
+           * indiquant si nouvelle_inclusion est une dérivation jusqu'ici
+           * inconnue. *)
           let rec merge_inclusion
               (nouvelle_inclusion : ('token_type, 'non_terminal) derivation)
               (inclusions_globales :
-                (('token_type, 'non_terminal) derivation
-                * ('token_type, 'non_terminal) derivation list)
-                list)
+                ('token_type, 'non_terminal) inclusion list)
               (res_inclusions_globales :
-                (('token_type, 'non_terminal) derivation
-                * ('token_type, 'non_terminal) derivation list)
-                list) :
-              (('token_type, 'non_terminal) derivation
-              * ('token_type, 'non_terminal) derivation list)
-              list
-              * bool =
+                ('token_type, 'non_terminal) inclusion list) :
+              ('token_type, 'non_terminal) inclusion list * bool =
             match inclusions_globales with
             | [] ->
-                ( (nouvelle_inclusion, [ derivation ]) :: res_inclusions_globales,
+                ( (nouvelle_inclusion, [derivation])::res_inclusions_globales,
                   not (List.mem derivation derivations_a_traiter) )
             | (d', inclusions) :: q ->
                 if d' <> nouvelle_inclusion then
@@ -139,10 +133,11 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
   in
 
   let inclusions = construire_inclusions [ s ] [ (s, []) ] in
-  (* Une liste de paires (d, val) ou val est la valeur actuelle de premier(d). *)
+  (* Une liste de paires (d, val) ou val est la valeur actuelle de premier(d).
+   *)
   let valeurs = ref (List.map (fun (d, _) -> (d, [])) inclusions) in
 
-  (* Met a jour la valeur de premier(d). *)
+  (* Met à jour la valeur de premier(d). *)
   let remplace_valeur (d : ('token_type, 'non_terminal) derivation)
       (valeur : 'token_type list) : unit =
     let rec remplace_valeur_dans
@@ -275,7 +270,7 @@ let transforme_axiome_en_situations (g : ('token_type, 'non_terminal) grammar)
     Some (fermeture_situations_LR1 [ (regle, 0, [ lexeme_eof ]) ] g)
   else None
 
-(* Construit l’automate LR(1) de la grammaire g. eof_token désigne le jeton
+(* Construit l’automate LR(1) de la grammaire g. eof_token désigne le lexème
  * de fin de fichier, il ne doit pas être utilisé dans les règles de la
  * grammaire (mais il devra figurer dans la sortie de l’analyseur lexical) *)
 let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
@@ -347,7 +342,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
     match a_traiter with
     | [] -> automate
     | e :: q ->
-        (* e est une liste de situations lr1 *)
+        (* e est une liste de situations LR(1) *)
         if List.mem e deja_vu then construit_automate automate q deja_vu
         else
           let tnt = liste_terminaux_et_non_terminaux_a_iterer e [] in
