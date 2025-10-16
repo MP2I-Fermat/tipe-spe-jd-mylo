@@ -325,3 +325,6 @@ IMPLEMENTATION -> IMPL_PHRASE IMPLEMENTATION
 
 # Empty array literals
 C_CONSTR -> open_bracket_bar close_bracket_bar
+
+# begin end as synonym for ()
+C_CONSTR -> begin end
