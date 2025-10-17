@@ -542,11 +542,10 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
             Stack.push (Node (nt, n_arbres)) pile_arbres;
             let _ = pop_n pile_etats n in
             etat_courant := Stack.top pile_etats;
-            begin match q with
-            | [Token t] when t.token_type = eof_symbol ->
-                parse_a_partir [NonTerminalRepr nt]
-            | _ -> parse_a_partir (NonTerminalRepr nt::text)
-            end
+            if t.token_type = eof_symbol then
+              parse_a_partir [NonTerminalRepr nt]
+            else
+              parse_a_partir (NonTerminalRepr nt::text)
       end
   in
   parse_a_partir nouveau_texte
