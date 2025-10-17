@@ -527,10 +527,7 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
               a.transitions in
             etat_courant := begin match nouvelles_liste_etats with
               | [e] -> e
-              | _ -> failwith (
-                "L’automate n’est pas déterministe (plusieurs ou aucune " ^
-                "transition à un moment)"
-              )
+              | _ -> failwith "Impossible de lire !"
             end;
             Stack.push !etat_courant pile_etats;
             (* La ligne suivante ne figure pas dans l’algo du livre *)
