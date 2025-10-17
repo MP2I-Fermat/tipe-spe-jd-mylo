@@ -538,7 +538,7 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
             parse_a_partir q
         | Some (nt, regle) ->
             let n = List.length regle in
-            let n_arbres = pop_n pile_arbres n in
+            let n_arbres = pop_n pile_arbres n |> List.rev in
             Stack.push (Node (nt, n_arbres)) pile_arbres;
             let _ = pop_n pile_etats n in
             etat_courant := Stack.top pile_etats;
