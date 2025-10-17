@@ -4,7 +4,7 @@ open Utils
 
 type 'a token = { token_type : 'a; value : string; start : int }
 
-exception Tokenize_failure
+exception Tokenize_failure of { current_pos : int }
 
 let tokenize (rules : (char regex * 'a) list) (tok_eof : 'a) (text : string) :
     'a token list =
@@ -60,7 +60,7 @@ let tokenize (rules : (char regex * 'a) list) (tok_eof : 'a) (text : string) :
         match
           read_longest_token_from global_offset states None [] remaining_text
         with
-        | None -> raise Tokenize_failure
+        | None -> raise (Tokenize_failure { current_pos = global_offset })
         | Some (token, remaining_text) ->
             tokenize_from
               (global_offset + String.length token.value)
