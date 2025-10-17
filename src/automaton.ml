@@ -127,7 +127,7 @@ let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
     |> List.map (fun end_state ->
            ( List.filter_map
                (fun (state0, symbol, state1) ->
-                 if state1 = end_state && symbol = Epsilon then Some state1
+                 if state1 = end_state && symbol = Epsilon then Some state0
                  else None)
                a.transitions,
              end_state ))
