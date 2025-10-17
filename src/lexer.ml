@@ -2,7 +2,7 @@ open Regex
 open Automaton
 open Utils
 
-type 'a token = { token_type : 'a; value : string }
+type 'a token = { token_type : 'a; value : string; start : int }
 
 exception Tokenize_failure
 
@@ -19,12 +19,13 @@ let tokenize (rules : (char regex * 'a) list) (tok_eof : 'a) (text : string) :
             t ))
         rules
     in
-    let rec tokenize_from (remaining_text : char list)
+    let rec tokenize_from (global_offset : int) (remaining_text : char list)
         (reversed_result : 'a token list) : 'a token list =
-      if List.length remaining_text = 0 then
-        { token_type = tok_eof; value = "" } :: reversed_result
+      if remaining_text = [] then
+        { token_type = tok_eof; value = ""; start = global_offset }
+        :: reversed_result
       else
-        let rec read_longest_token_from
+        let rec read_longest_token_from (start : int)
             (alive_states : (char, _) execution_state list)
             (current_result : ('a token * char list) option)
             (current_lexeme : char list) (remaining_text : char list) :
@@ -40,6 +41,7 @@ let tokenize (rules : (char regex * 'a) list) (tok_eof : 'a) (text : string) :
                     ( {
                         token_type = List.assoc e.automaton automatons;
                         value = implode (List.rev current_lexeme);
+                        start;
                       },
                       remaining_text )
             in
@@ -51,16 +53,22 @@ let tokenize (rules : (char regex * 'a) list) (tok_eof : 'a) (text : string) :
                   |> List.filter_map (fun state -> next_state state c)
                 in
                 let next_lexeme = c :: current_lexeme in
-                read_longest_token_from next_states next_result next_lexeme
-                  next_text
+                read_longest_token_from start next_states next_result
+                  next_lexeme next_text
         in
         let states = automatons |> List.map fst |> List.map start_execution in
-        match read_longest_token_from states None [] remaining_text with
+        match
+          read_longest_token_from global_offset states None [] remaining_text
+        with
         | None -> raise Tokenize_failure
         | Some (token, remaining_text) ->
-            tokenize_from remaining_text (token :: reversed_result)
+            tokenize_from
+              (global_offset + String.length token.value)
+              remaining_text (token :: reversed_result)
     in
-    List.rev (tokenize_from (explode text) [])
+    List.rev (tokenize_from 0 (explode text) [])
 
 let string_of_token (string_of_type : 'a -> string) (token : 'a token) =
-  "Token(" ^ string_of_type token.token_type ^ ", " ^ token.value ^ ")"
+  "Token("
+  ^ string_of_type token.token_type
+  ^ ", " ^ token.value ^ ", start=" ^ string_of_int token.start ^ ")"
