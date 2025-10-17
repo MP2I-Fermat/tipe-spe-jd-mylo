@@ -97,7 +97,7 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
               ('token_type, 'non_terminal) inclusion list * bool =
             match inclusions_globales with
             | [] ->
-                ( (nouvelle_inclusion, [derivation])::res_inclusions_globales,
+                ( (nouvelle_inclusion, [ derivation ]) :: res_inclusions_globales,
                   not (List.mem derivation derivations_a_traiter) )
             | (d', inclusions) :: q ->
                 if d' <> nouvelle_inclusion then
@@ -442,31 +442,25 @@ let trouve_conflits (a : ('token_type, 'non_terminal) lr1_automaton) :
 
   trouve_conflit a.states
 
-
 (* Renvoie true si la situation s est une situation à réduction, false sinon *)
-let a_reduire (s: ('token_type, 'non_terminal) lr1_situation) : bool =
+let a_reduire (s : ('token_type, 'non_terminal) lr1_situation) : bool =
   let (_, rule), idx, _ = s in
   idx = List.length rule
-
 
 (* À partir d’un état e et d’un terminal t, renvoie une règle que l’on peut
  * réduire (i.e. une situation N->a_1…a_n^ ~ σ où t∈σ) ou None s’il n’y en
  * n’a pas. *)
 let rec trouve_reduction_a_faire
-    (e: ('token_type, 'non_terminal) lr1_automaton_state)
-    (t: 'token_type) : ('token_type, 'non_terminal) rule option =
+    (e : ('token_type, 'non_terminal) lr1_automaton_state) (t : 'token_type) :
+    ('token_type, 'non_terminal) rule option =
   match e with
   | [] -> None
-  | (rule, idx, sigma)::q ->
-      if a_reduire (rule, idx, sigma) && List.mem t sigma then
-        Some rule
-      else
-        trouve_reduction_a_faire q t
-
+  | (rule, idx, sigma) :: q ->
+      if a_reduire (rule, idx, sigma) && List.mem t sigma then Some rule
+      else trouve_reduction_a_faire q t
 
 let parse (a : ('token_type, 'non_terminal) lr1_automaton)
-    (eof_symbol: 'token_type)
-    (text : 'token_type token list) :
+    (eof_symbol : 'token_type) (text : 'token_type token list) :
     ('token_type, 'non_terminal) syntax_tree =
   (*
   let pile_arbres = Stack.create () in
@@ -513,4 +507,19 @@ let string_of_state (s : (char, char) lr1_automaton_state) : string =
 
 let print_lr1_automaton (a : (char, char) lr1_automaton) : unit =
   print_automaton string_of_symbol string_of_state a
+
+let print_syntax_tree (t : ('non_terminal, 'token_type) syntax_tree)
+    (string_of_non_terminal : 'non_terminal -> string)
+    (string_of_token : 'token_type token -> string) =
+  let rec print_syntax_tree_indent (indent : string)
+      (t : ('non_terminal, 'token_type) syntax_tree) =
+    match t with
+    | Leaf token -> print_endline (indent ^ string_of_token token)
+    | Node (nt, children) ->
+        print_endline (indent ^ string_of_non_terminal nt ^ ":");
+        List.iter
+          (fun child -> print_syntax_tree_indent (indent ^ "  ") child)
+          children
+  in
+  print_syntax_tree_indent "" t
 (*****************************************************************************)
