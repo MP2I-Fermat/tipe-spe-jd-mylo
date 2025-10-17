@@ -523,8 +523,8 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
         | None ->
             let debut_transition = (!etat_courant, Terminal t.token_type) in
             let nouvelles_liste_etats = List.filter_map
-              (fun (e1, t, e2) ->
-                if (e1, t) = debut_transition then Some e2 else None)
+              (fun (e1, tnt, e2) ->
+                if (e1, tnt) = debut_transition then Some e2 else None)
               a.transitions in
             etat_courant := begin match nouvelles_liste_etats with
               | [e] -> e
