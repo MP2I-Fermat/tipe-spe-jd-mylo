@@ -570,11 +570,11 @@ let string_of_state (s : (char, char) lr1_automaton_state) : string =
 let print_lr1_automaton (a : (char, char) lr1_automaton) : unit =
   print_automaton string_of_symbol string_of_state a
 
-let print_syntax_tree (t : ('non_terminal, 'token_type) syntax_tree)
+let print_syntax_tree (t : ('token_type, 'non_terminal) syntax_tree)
     (string_of_non_terminal : 'non_terminal -> string)
     (string_of_token : 'token_type token -> string) =
   let rec print_syntax_tree_indent (indent : string)
-      (t : ('non_terminal, 'token_type) syntax_tree) =
+      (t : ('token_type, 'non_terminal) syntax_tree) =
     match t with
     | Leaf token -> print_endline (indent ^ string_of_token token)
     | Node (nt, children) ->
