@@ -28,3 +28,9 @@ let rec list_beginning (l: 'a list) (i: int) : 'a list =
     | [] -> failwith "tropcourt"
     | x::q -> x::(list_beginning q (i-1))
 
+
+(* Dépile n éléments de la pile s et les renvoie dans une liste. Le i-ième
+ * élément de la liste est le i-ième à avoir été dépilé. Si jamais on
+ * ne peut pas dépiler, lève l’erreur Stack.Empty *)
+let pop_n (s: 'a Stack.t) (n: int): 'a list =
+  List.init n (fun _ -> Stack.pop s)

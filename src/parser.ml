@@ -6,6 +6,10 @@ type ('token_type, 'non_terminal) grammar_entry =
   | NonTerminal of 'non_terminal
   | Terminal of 'token_type
 
+type ('token_type, 'non_terminal) non_terminal_or_token =
+  | NonTerminalRepr of 'non_terminal
+  | Token of 'token_type token
+
 type ('token_type, 'non_terminal) derivation =
   ('token_type, 'non_terminal) grammar_entry list
 
@@ -460,10 +464,12 @@ let rec trouve_reduction_a_faire
       else trouve_reduction_a_faire q t
 
 let parse (a : ('token_type, 'non_terminal) lr1_automaton)
-    (eof_symbol : 'token_type) (text : 'token_type token list) :
+    (eof_symbol: 'token_type)
+    (texte : 'token_type token list)
+    (axiome : 'non_terminal) :
     ('token_type, 'non_terminal) syntax_tree =
-  (*
-  let pile_arbres = Stack.create () in
+  let pile_arbres: ('token_type, 'non_terminal) syntax_tree Stack.t =
+    Stack.create () in
   let pile_etats = Stack.create () in
 
   let etat_initial = match a.initial_states with
@@ -474,17 +480,73 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
   Stack.push etat_initial pile_etats;
   let etat_courant = ref etat_initial in
 
-  (*let i = ref 0 in
-  let longueur_texte = List.length text in
+  let nouveau_texte = List.map (fun x -> Token x) texte in
 
-  while !i <= longueur_texte do
-    match trouve_reduction_a_faire !etat_courant (fst )
-  done;*)
-  let parse_a_partir
-    (text: ('token_type token) list)
-    (deja_fait: 'token_type token list)
-  *)
-  failwith "todo"
+  let rec parse_a_partir
+      (text: ('token_type, 'non_terminal) non_terminal_or_token list) :
+      ('token_type, 'non_terminal) syntax_tree =
+    match text with
+    | [] -> begin
+        match Stack.pop_opt pile_arbres with
+        | None -> failwith "Aucun arbre n’a été généré !";
+        | Some sommet -> begin
+          if not (Stack.is_empty pile_arbres) then
+            failwith ("La lecture du texte a été terminée avant la fin de " ^
+                      "l’analyse syntaxique");
+          match sommet with
+          | Leaf _ ->
+              failwith "L’arbre généré n’est pas issu de l’axiome"
+          | Node (s, _) when s <> axiome ->
+              failwith "L’arbre généré n’est pas issu de l’axiome"
+          | Node (s, e) -> Node (s, e)
+          end
+        end
+    | x::q ->
+      match x with
+      | NonTerminalRepr nt ->
+          let nouvelles_liste_etats = List.filter_map
+            (fun (e1, t, e2) ->
+              if (e1, t) = (!etat_courant, NonTerminal nt) then
+                Some e2
+              else
+                None)
+            a.transitions in
+          etat_courant := begin match nouvelles_liste_etats with
+            | [e] -> e
+            | _ -> failwith "Impossible de lire !"
+          end;
+          Stack.push !etat_courant pile_etats;
+          parse_a_partir q
+
+      | Token t -> begin
+        match trouve_reduction_a_faire !etat_courant t.token_type with
+        | None ->
+            let debut_transition = (!etat_courant, Terminal t.token_type) in
+            let nouvelles_liste_etats = List.filter_map
+              (fun (e1, t, e2) ->
+                if (e1, t) = debut_transition then Some e2 else None)
+              a.transitions in
+            etat_courant := begin match nouvelles_liste_etats with
+              | [e] -> e
+              | _ -> failwith (
+                "L’automate n’est pas déterministe (plusieurs ou aucune " ^
+                "transition à un moment)"
+              )
+            end;
+            Stack.push !etat_courant pile_etats;
+            (* La ligne suivante ne figure pas dans l’algo du livre *)
+            Stack.push (Leaf t) pile_arbres;
+            parse_a_partir q
+        | Some (nt, regle) ->
+            let n = List.length regle in
+            let n_arbres = pop_n pile_arbres n in
+            Stack.push (Node (nt, n_arbres)) pile_arbres;
+            let _ = pop_n pile_etats n in
+            etat_courant := Stack.top pile_etats;
+            parse_a_partir (NonTerminalRepr nt::q)
+      end
+  in
+  parse_a_partir nouveau_texte
 
 (*************************** Fonctions d’affichage ***************************)
 let string_of_symbol (s : (char, char) grammar_entry) : string =

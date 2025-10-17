@@ -249,5 +249,5 @@ let parse_grammar (s : string) =
 
   let tokens_clean = List.rev (remove_comments tokens_no_whitespace false []) in
   let automaton = construit_automate_LR1 grammar_rules Grammar Eof in
-  let syntax_tree = parse automaton Eof tokens_clean in
+  let syntax_tree = parse automaton Eof tokens_clean Grammar in
   grammar_of_syntax_tree syntax_tree
