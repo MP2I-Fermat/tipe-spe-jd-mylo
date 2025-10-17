@@ -486,7 +486,9 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
       (text: ('token_type, 'non_terminal) non_terminal_or_token list) :
       ('token_type, 'non_terminal) syntax_tree =
     match text with
-    | [] -> begin
+    | [] ->
+        failwith "Pas de lexème de fin de fichier !"
+    | [Token t] when t.token_type = eof_symbol -> begin
         match Stack.pop_opt pile_arbres with
         | None -> failwith "Aucun arbre n’a été généré !";
         | Some sommet -> begin
@@ -517,7 +519,6 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
           end;
           Stack.push !etat_courant pile_etats;
           parse_a_partir q
-
       | Token t -> begin
         match trouve_reduction_a_faire !etat_courant t.token_type with
         | None ->
@@ -543,7 +544,7 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
             Stack.push (Node (nt, n_arbres)) pile_arbres;
             let _ = pop_n pile_etats n in
             etat_courant := Stack.top pile_etats;
-            parse_a_partir (NonTerminalRepr nt::q)
+            parse_a_partir (NonTerminalRepr nt::text)
       end
   in
   parse_a_partir nouveau_texte
