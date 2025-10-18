@@ -468,6 +468,8 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
     (texte : 'token_type token list)
     (axiome : 'non_terminal) :
     ('token_type, 'non_terminal) syntax_tree =
+  if trouve_conflits a <> None then failwith ("L'automate présente des conflits" ^
+    " - la grammaire n'est pas LR(1)");
   let pile_arbres: ('token_type, 'non_terminal) syntax_tree Stack.t =
     Stack.create () in
   let pile_etats = Stack.create () in
