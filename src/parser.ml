@@ -488,37 +488,39 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
       (text: ('token_type, 'non_terminal) non_terminal_or_token list) :
       ('token_type, 'non_terminal) syntax_tree =
     match text with
-    | [] -> begin
-        match Stack.pop_opt pile_arbres with
-        | None -> failwith "Aucun arbre n’a été généré !";
-        | Some sommet -> begin
-          if not (Stack.is_empty pile_arbres) then
-            failwith ("La lecture du texte a été terminée avant la fin de " ^
-                      "l’analyse syntaxique");
-          match sommet with
-          | Leaf _ ->
-              failwith "L’arbre généré n’est pas issu de l’axiome"
-          | Node (s, _) when s <> axiome ->
-              failwith "L’arbre généré n’est pas issu de l’axiome"
-          | Node (s, e) -> Node (s, e)
-          end
-        end
+    | [] -> failwith "Le token EOF n'aurait pas du être lu"
     | x::q ->
       match x with
       | NonTerminalRepr nt ->
-          let nouvelles_liste_etats = List.filter_map
-            (fun (e1, t, e2) ->
-              if (e1, t) = (!etat_courant, NonTerminal nt) then
-                Some e2
+          let est_a_eof = match q with
+          | [Token { token_type }] when token_type = eof_symbol -> true
+          | _ -> false
+          in
+          if !etat_courant = etat_initial && nt = axiome && est_a_eof then
+            let racine = Stack.pop_opt pile_arbres in
+            match racine with
+            | None -> failwith "État invalide: absence de racine apres lecture du texte"
+            | Some racine -> begin
+              if not (Stack.is_empty pile_arbres) then
+                failwith "Axiome lu alors qu'il restait des arbres"
               else
-                None)
-            a.transitions in
-          etat_courant := begin match nouvelles_liste_etats with
-            | [e] -> e
-            | _ -> failwith "Impossible de lire !"
-          end;
-          Stack.push !etat_courant pile_etats;
-          parse_a_partir q
+                racine
+            end
+          else begin
+            let nouvelles_liste_etats = List.filter_map
+              (fun (e1, t, e2) ->
+                if (e1, t) = (!etat_courant, NonTerminal nt) then
+                  Some e2
+                else
+                  None)
+              a.transitions in
+            etat_courant := begin match nouvelles_liste_etats with
+              | [e] -> e
+              | _ -> failwith "Impossible de lire !"
+            end;
+            Stack.push !etat_courant pile_etats;
+            parse_a_partir q
+          end
       | Token t -> begin
         match trouve_reduction_a_faire !etat_courant t.token_type with
         | None ->
@@ -529,7 +531,11 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
               a.transitions in
             etat_courant := begin match nouvelles_liste_etats with
               | [e] -> e
-              | _ -> failwith "Impossible de lire !"
+              | _ -> 
+                if t.token_type <> eof_symbol then
+                  failwith "Impossible de lire !"
+                else
+                  failwith "Lecture du texte terminée sans que l'analyse syntaxique ait abouti"
             end;
             Stack.push !etat_courant pile_etats;
             (* La ligne suivante ne figure pas dans l’algo du livre *)
@@ -541,10 +547,7 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
             Stack.push (Node (nt, n_arbres)) pile_arbres;
             let _ = pop_n pile_etats n in
             etat_courant := Stack.top pile_etats;
-            if t.token_type = eof_symbol then
-              parse_a_partir [NonTerminalRepr nt]
-            else
-              parse_a_partir (NonTerminalRepr nt::text)
+            parse_a_partir (NonTerminalRepr nt::text)
       end
   in
   parse_a_partir nouveau_texte
