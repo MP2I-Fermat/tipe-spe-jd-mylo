@@ -52,27 +52,38 @@ let regex_token_rules =
       Character );
   ]
 
-type regex_rule = Regex | Character_class | Character_class_entry
+type regex_rule =
+  | Regex_union
+  | Regex_concatenation
+  | Regex_primitive
+  | Character_class
+  | Character_class_entry
 
 let regex_grammar =
   [
-    (Regex, [ Terminal Character ]);
-    (Regex, [ Terminal Escape ]);
-    (Regex, [ Terminal Open_paren; NonTerminal Regex; Terminal Close_paren ]);
-    (Regex, [ NonTerminal Regex; Terminal Or; NonTerminal Regex ]);
-    (Regex, [ NonTerminal Regex; Terminal Star ]);
-    (Regex, [ NonTerminal Regex; Terminal Plus ]);
-    (Regex, [ NonTerminal Regex; Terminal Question ]);
-    (Regex, [ NonTerminal Regex; NonTerminal Regex ]);
-    ( Regex,
+    (Regex_union, [ NonTerminal Regex_concatenation ]);
+    ( Regex_union,
+      [ NonTerminal Regex_concatenation; Terminal Or; NonTerminal Regex_union ]
+    );
+    (Regex_concatenation, [ NonTerminal Regex_primitive ]);
+    ( Regex_concatenation,
+      [ NonTerminal Regex_primitive; NonTerminal Regex_concatenation ] );
+    (Regex_primitive, [ NonTerminal Regex_primitive; Terminal Star ]);
+    (Regex_primitive, [ NonTerminal Regex_primitive; Terminal Plus ]);
+    (Regex_primitive, [ NonTerminal Regex_primitive; Terminal Question ]);
+    (Regex_primitive, [ Terminal Character ]);
+    (Regex_primitive, [ Terminal Escape ]);
+    ( Regex_primitive,
+      [ Terminal Open_paren; NonTerminal Regex_union; Terminal Close_paren ] );
+    ( Regex_primitive,
       [
         Terminal Open_bracket;
         NonTerminal Character_class;
         Terminal Close_bracket;
       ] );
+    (Character_class, [ NonTerminal Character_class_entry ]);
     ( Character_class,
       [ NonTerminal Character_class_entry; NonTerminal Character_class ] );
-    (Character_class, [ NonTerminal Character_class_entry ]);
     (Character_class_entry, [ Terminal Character ]);
     (Character_class_entry, [ Terminal Escape ]);
   ]
@@ -125,38 +136,46 @@ let rec regex_of_regex_syntax_tree
   in
 
   match node with
-  | Node (Regex, [ Leaf { token_type = Character; value } ]) ->
+  | Node (Regex_union, [ node ]) -> regex_of_regex_syntax_tree node
+  | Node (Regex_union, [ node1; Leaf { token_type = Or }; node2 ]) ->
+      Regex.Union
+        (regex_of_regex_syntax_tree node1, regex_of_regex_syntax_tree node2)
+  | Node (Regex_concatenation, [ node ]) -> regex_of_regex_syntax_tree node
+  | Node (Regex_concatenation, [ node1; node2 ]) ->
+      Regex.Concatenation
+        (regex_of_regex_syntax_tree node1, regex_of_regex_syntax_tree node2)
+  | Node (Regex_primitive, [ node; Leaf { token_type = Star } ]) ->
+      Regex.Star (regex_of_regex_syntax_tree node)
+  | Node (Regex_primitive, [ node; Leaf { token_type = Plus } ]) ->
+      let inner = regex_of_regex_syntax_tree node in
+      Regex.Concatenation (inner, Regex.Star inner)
+  | Node (Regex_primitive, [ node; Leaf { token_type = Question } ]) ->
+      Regex.Union (Regex.Epsilon, Regex.Star (regex_of_regex_syntax_tree node))
+  | Node (Regex_primitive, [ Leaf { token_type = Character; value } ]) ->
       Regex.Symbol value.[0]
-  | Node (Regex, [ Leaf { token_type = Escape; value } ]) ->
+  | Node (Regex_primitive, [ Leaf { token_type = Escape; value } ]) ->
       Regex.Symbol (expand_escape value)
   | Node
-      ( Regex,
+      ( Regex_primitive,
         [
           Leaf { token_type = Open_paren };
-          inner;
+          node;
           Leaf { token_type = Close_paren };
         ] ) ->
-      regex_of_regex_syntax_tree inner
-  | Node (Regex, [ left; Leaf { token_type = Or }; right ]) ->
-      Regex.Union
-        (regex_of_regex_syntax_tree left, regex_of_regex_syntax_tree right)
-  | Node (Regex, [ inner; Leaf { token_type = Star } ]) ->
-      Regex.Star (regex_of_regex_syntax_tree inner)
-  | Node (Regex, [ inner; Leaf { token_type = Plus } ]) ->
-      let inner_regex = regex_of_regex_syntax_tree inner in
-      Regex.Concatenation (inner_regex, Regex.Star inner_regex)
-  | Node (Regex, [ inner; Leaf { token_type = Question } ]) ->
-      let inner_regex = regex_of_regex_syntax_tree inner in
-      Regex.Union (Regex.Epsilon, inner_regex)
-  | Node (Regex, [ first; second ]) ->
-      Regex.Concatenation
-        (regex_of_regex_syntax_tree first, regex_of_regex_syntax_tree second)
-  | Node (Character_class, _) ->
-      build_character_class (flatten_character_class node)
+      regex_of_regex_syntax_tree node
+  | Node
+      ( Regex_primitive,
+        [
+          Leaf { token_type = Open_bracket };
+          node;
+          Leaf { token_type = Close_bracket };
+        ] ) ->
+      let character_class = flatten_character_class node in
+      build_character_class character_class
   | _ -> failwith "Invalid rule"
 
 let parse_regex (src : string) : char regex =
   let tokens = tokenize regex_token_rules Eof src in
-  let automaton = construit_automate_LR1 regex_grammar Regex Eof in
-  let tree = parse automaton Eof tokens Regex in
+  let automaton = construit_automate_LR1 regex_grammar Regex_union Eof in
+  let tree = parse automaton Eof tokens Regex_union in
   regex_of_regex_syntax_tree tree
