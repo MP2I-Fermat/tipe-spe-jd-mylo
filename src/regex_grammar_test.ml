@@ -52,8 +52,9 @@ let string_of_regex_grammar_entry
   | Terminal t -> string_of_regex_token_type t
 
 let string_of_regex_situation
-    (((n, rule), idx, sigma) : (regex_token_type, regex_rule) lr1_situation) :
-    string =
+    ((((n, rule), idx), sigma) :
+      (regex_token_type, regex_rule) lr0_situation * regex_token_type Hashset.t)
+    : string =
   let ns = string_of_regex_rule n in
   let rule_beginning =
     list_beginning rule idx
@@ -66,17 +67,19 @@ let string_of_regex_situation
     |> String.concat " "
   in
   let sigma_s =
-    List.map string_of_regex_token_type sigma |> String.concat ", "
+    Hashset.to_list sigma
+    |> List.map string_of_regex_token_type
+    |> String.concat ", "
   in
   ns ^ " -> " ^ rule_beginning ^ "^" ^ rule_end ^ " ~ {" ^ sigma_s ^ "}"
 
 let string_of_regex_state
     (s : (regex_token_type, regex_rule) lr1_automaton_state) : string =
-  let strings = List.map string_of_regex_situation s in
+  let strings =
+    Hashtbl.to_seq s |> List.of_seq |> List.map string_of_regex_situation
+  in
   "(" ^ String.concat ", " strings ^ ")"
 ;;
-
-print_automaton string_of_regex_grammar_entry string_of_regex_state automaton;;
 
 match trouve_conflits automaton with
 | None -> ()

@@ -33,24 +33,26 @@ let string_of_lr1_grammar_symbol s =
   | NonTerminal t -> string_of_grammar_node_type t
 
 let string_of_situation
-    (((n, rule), idx, sigma) :
-      (grammar_token_type, grammar_node_type) lr1_situation) : string =
+    ((((n, rule), idx), sigma) :
+      (grammar_token_type, grammar_node_type) lr0_situation
+      * grammar_token_type Hashset.t) : string =
   let ns = string_of_grammar_node_type n in
   let rule_strings = List.map string_of_lr1_grammar_symbol rule in
   let rule_beginning = String.concat " " (list_beginning rule_strings idx) in
   let rule_end = String.concat " " (list_skip rule_strings idx) in
   let sigma_s =
-    List.map string_of_grammar_token_type sigma |> String.concat ", "
+    Hashset.to_list sigma
+    |> List.map string_of_grammar_token_type
+    |> String.concat ", "
   in
   ns ^ " -> " ^ rule_beginning ^ "^" ^ rule_end ^ " ~ {" ^ sigma_s ^ "}"
 
 let string_of_lr1_grammar_state
     (s : (grammar_token_type, grammar_node_type) lr1_automaton_state) : string =
-  let strings = List.map string_of_situation s in
+  let strings =
+    Hashtbl.to_seq s |> List.of_seq |> List.map string_of_situation
+  in
   "(" ^ String.concat ", " strings ^ ")"
-
-(* print_automaton string_of_lr1_grammar_symbol string_of_lr1_grammar_state
-  automaton; *)
 
 (* assert (trouve_conflits automaton = None) *)
 
