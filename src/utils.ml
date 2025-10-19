@@ -35,31 +35,42 @@ let rec seq_find (f : 'a -> bool) (s : 'a Seq.t) : 'a option =
   | Seq.Cons (e, t) -> if f e then Some e else seq_find f t
 
 module Hashset = struct
-  type 'a t = ('a, unit) Hashtbl.t
+  type 'a t = { mutable data : ('a, unit) Hashtbl.t; mutable rw : bool }
 
-  let create () : 'a t = Hashtbl.create 8
-  let mem (t : 'a t) a = Hashtbl.find_opt t a <> None
-  let add (t : 'a t) a = Hashtbl.replace t a ()
+  let create () : 'a t = { data = Hashtbl.create 8; rw = true }
+  let mem (t : 'a t) a = Hashtbl.find_opt t.data a <> None
+
+  let add (t : 'a t) a =
+    if not t.rw then (
+      t.data <- Hashtbl.copy t.data;
+      t.rw <- true);
+
+    Hashtbl.replace t.data a ()
 
   let mem_add (t : 'a t) a =
     let added = not (mem t a) in
     if added then add t a;
     added
 
-  let remove (t : 'a t) a = Hashtbl.remove t a
-  let length (t : 'a t) = Hashtbl.length t
-  let iter f (t : 'a t) = Hashtbl.iter (fun a _ -> f a) t
+  let remove (t : 'a t) a =
+    if not t.rw then (
+      t.data <- Hashtbl.copy t.data;
+      t.rw <- true);
+    Hashtbl.remove t.data a
+
+  let length (t : 'a t) = Hashtbl.length t.data
+  let iter f (t : 'a t) = Hashtbl.iter (fun a _ -> f a) t.data
   let is_empty (t : 'a t) = length t = 0
 
   let remove_one (t : 'a t) =
-    match (Hashtbl.to_seq_keys t) () with
+    match (Hashtbl.to_seq_keys t.data) () with
     | Nil -> raise (Invalid_argument "Cannot remove from an empty set")
     | Cons (key, _) ->
         remove t key;
         key
 
   let union (t1 : 'a t) (t2 : 'a t) =
-    let res = Hashtbl.create (length t1 + length t2) in
+    let res = { data = Hashtbl.create (length t1 + length t2); rw = true } in
     iter (add res) t1;
     iter (add res) t2;
     res
@@ -87,7 +98,9 @@ module Hashset = struct
   let equals (t1 : 'a t) (t2 : 'a t) =
     length t1 = length t2 && length (intersection t1 t2) = length t1
 
-  let copy (t : 'a t) = Hashtbl.copy t
+  let copy (t : 'a t) =
+    t.rw <- false;
+    { data = t.data; rw = false }
 end
 
 let hashtbl_remove_one (t : ('k, 'v) Hashtbl.t) =
