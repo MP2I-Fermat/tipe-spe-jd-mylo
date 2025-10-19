@@ -533,7 +533,7 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
               | [e] -> e
               | _ -> 
                 if t.token_type <> eof_symbol then
-                  failwith "Impossible de lire !"
+                  failwith ("Impossible de lire " ^ t.value ^ " (" ^ string_of_int t.start ^ ")")
                 else
                   failwith "Lecture du texte terminée sans que l'analyse syntaxique ait abouti"
             end;
