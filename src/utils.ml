@@ -89,3 +89,11 @@ module Hashset = struct
 
   let copy (t : 'a t) = Hashtbl.copy t
 end
+
+let hashtbl_remove_one (t : ('k, 'v) Hashtbl.t) =
+  match (Hashtbl.to_seq_keys t) () with
+  | Nil -> raise (Invalid_argument "Cannot remove from an empty set")
+  | Cons (key, _) ->
+      let value = Hashtbl.find t key in
+      Hashtbl.remove t key;
+      (key, value)
