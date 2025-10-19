@@ -45,7 +45,10 @@ type ('token_type, 'non_terminal) lr1_transition =
 
 (* Renvoie l’ensemble Premier_LL(1)(s) dans la grammaire g *)
 let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
-    (g : ('token_type, 'non_terminal) grammar) : 'token_type Hashset.t =
+    (g : ('token_type, 'non_terminal) grammar)
+    (cache :
+      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t) Hashtbl.t)
+    : 'token_type Hashset.t =
   (* Crée un dictionnaire d tel que d[s] est l'ensemble des derivations w tels
      que premier(s) est inclus dans premier(w).
      cf. 4.2.1.3 Théorème 32 (p 63). *)
@@ -60,24 +63,26 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
 
     while not (Hashset.is_empty a_traiter) do
       let derivation = Hashset.remove_one a_traiter in
-      let derivation_contient =
-        match derivation with
-        | [ Terminal _ ] -> []
-        | [ NonTerminal n ] ->
-            List.filter_map (fun (n', d) -> if n = n' then Some d else None) g
-        | x :: q -> [ [ x ] ]
-        | [] -> failwith "Cannot compute premier_LL1 of an empty derivation"
-      in
-      derivation_contient
-      |> List.iter (fun derivation_contenue ->
-             match Hashtbl.find_opt inclusions derivation_contenue with
-             | Some sur_derivations -> Hashset.add sur_derivations derivation
-             | None ->
-                 let sur_derivations = Hashset.create () in
-                 Hashset.add sur_derivations derivation;
-                 Hashtbl.replace inclusions derivation_contenue sur_derivations;
-                 (* C'est une derivation jusqu'ici inconnue. *)
-                 Hashset.add a_traiter derivation_contenue)
+      if Hashtbl.find_opt cache derivation = None then
+        let derivation_contient =
+          match derivation with
+          | [ Terminal _ ] -> []
+          | [ NonTerminal n ] ->
+              List.filter_map (fun (n', d) -> if n = n' then Some d else None) g
+          | x :: q -> [ [ x ] ]
+          | [] -> failwith "Cannot compute premier_LL1 of an empty derivation"
+        in
+        derivation_contient
+        |> List.iter (fun derivation_contenue ->
+               match Hashtbl.find_opt inclusions derivation_contenue with
+               | Some sur_derivations -> Hashset.add sur_derivations derivation
+               | None ->
+                   let sur_derivations = Hashset.create () in
+                   Hashset.add sur_derivations derivation;
+                   Hashtbl.replace inclusions derivation_contenue
+                     sur_derivations;
+                   (* C'est une derivation jusqu'ici inconnue. *)
+                   Hashset.add a_traiter derivation_contenue)
     done;
 
     inclusions
@@ -97,7 +102,12 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
       | [ Terminal a ] ->
           Hashset.add premier_k a;
           Hashset.add a_traiter k
-      | _ -> ())
+      | _ -> (
+          match Hashtbl.find_opt cache k with
+          | None -> ()
+          | Some premier ->
+              Hashtbl.replace valeurs k premier;
+              Hashset.add a_traiter k))
     inclusions;
 
   (* Saturation *)
@@ -119,13 +129,17 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
       sur_derivations
   done;
 
+  Hashtbl.iter (Hashtbl.replace cache) valeurs;
+
   Hashtbl.find valeurs s
 
 (* Renvoie l’ensemble Premier_LR(1)(s, σ) dans la grammaire g *)
 let premier_LR1 (s : ('token_type, 'non_terminal) derivation)
-    (sigma : 'token_type Hashset.t) (g : ('token_type, 'non_terminal) grammar) :
-    'token_type Hashset.t =
-  match s with [] -> sigma | _ -> premier_LL1 s g
+    (sigma : 'token_type Hashset.t) (g : ('token_type, 'non_terminal) grammar)
+    (cache :
+      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t) Hashtbl.t)
+    : 'token_type Hashset.t =
+  match s with [] -> sigma | _ -> premier_LL1 s g cache
 
 (* Sature e jusqu'a que e soit une fermeture des situations LR(1) de e. *)
 let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
@@ -140,6 +154,8 @@ let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
     if fst regle = nt then Some ((regle, 0), Hashset.copy sigma2) else None
   in
 
+  let premier_cache = Hashtbl.create 2 in
+
   (* Sachant une situation s: N -> α^Tβ~σ avec T un non-terminal, renvoie
    * la liste des situations T->^γ~premierLR1(β, σ) pour T->γ règle de g *)
   let liste_nouvelles_situations
@@ -150,7 +166,7 @@ let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
     let regle_fin = list_skip derivation curseur in
     match regle_fin with
     | NonTerminal nt :: beta ->
-        let premier = premier_LR1 beta sigma g in
+        let premier = premier_LR1 beta sigma g premier_cache in
         List.filter_map (nouvelle_situation_regle nt premier) g
     | _ -> []
   in
