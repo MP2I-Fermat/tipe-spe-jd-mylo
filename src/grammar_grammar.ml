@@ -26,14 +26,20 @@ let grammar_token_rules =
   [
     ( Concatenation
         ( Concatenation (Symbol ':', Symbol '='),
-          Empty |> add_character_range ' ' '~' ),
+          Regex.Star (Empty |> add_character_range ' ' '~') ),
       Terminal_pattern );
     ( Concatenation (Concatenation (Symbol '-', Symbol '>'), Symbol ' '),
       Derivation_symbol );
-    ( Regex.Empty
-      |> add_character_range 'A' 'Z'
-      |> add_character_range 'a' 'z'
-      |> add_character '_',
+    ( Regex.Concatenation
+        ( Regex.Empty
+          |> add_character_range 'A' 'Z'
+          |> add_character_range 'a' 'z'
+          |> add_character '_',
+          Regex.Star
+            (Regex.Empty
+            |> add_character_range 'A' 'Z'
+            |> add_character_range 'a' 'z'
+            |> add_character '_') ),
       Identifier );
     (Concatenation (Symbol ' ', Star (Symbol ' ')), Whitespace);
     (Symbol '\n', Newline);
@@ -138,7 +144,7 @@ let grammar_of_syntax_tree
             (List.rev_append (List.map (fun r -> value :: r) res) res)
       | _ -> failwith "Not an identifier list"
     in
-    List.map List.rev (build_into_rev tree [])
+    List.map List.rev (build_into_rev tree [ [] ])
   in
 
   let build_non_terminal_definition
