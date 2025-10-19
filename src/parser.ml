@@ -468,8 +468,8 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
     (texte : 'token_type token list)
     (axiome : 'non_terminal) :
     ('token_type, 'non_terminal) syntax_tree =
-  if trouve_conflits a <> None then failwith ("L'automate présente des conflits" ^
-    " - la grammaire n'est pas LR(1)");
+  if trouve_conflits a <> None then
+    failwith "L'automate présente des conflits – la grammaire n'est pas LR(1)";
   let pile_arbres: ('token_type, 'non_terminal) syntax_tree Stack.t =
     Stack.create () in
   let pile_etats = Stack.create () in
@@ -499,7 +499,8 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
           if !etat_courant = etat_initial && nt = axiome && est_a_eof then
             let racine = Stack.pop_opt pile_arbres in
             match racine with
-            | None -> failwith "État invalide: absence de racine apres lecture du texte"
+            | None -> failwith
+                      "État invalide : absence de racine apres lecture du texte"
             | Some racine -> begin
               if not (Stack.is_empty pile_arbres) then
                 failwith "Axiome lu alors qu'il restait des arbres"
@@ -533,9 +534,11 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
               | [e] -> e
               | _ -> 
                 if t.token_type <> eof_symbol then
-                  failwith ("Impossible de lire " ^ t.value ^ " (" ^ string_of_int t.start ^ ")")
+                  failwith ("Impossible de lire " ^ t.value ^ " (" ^
+                            string_of_int t.start ^ ")")
                 else
-                  failwith "Lecture du texte terminée sans que l'analyse syntaxique ait abouti"
+                  failwith ("Lecture du texte terminée sans que l'analyse " ^
+                            "syntaxique n'ait abouti")
             end;
             Stack.push !etat_courant pile_etats;
             (* La ligne suivante ne figure pas dans l’algo du livre *)
