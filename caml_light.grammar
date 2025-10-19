@@ -5,7 +5,7 @@
 ident := [A-Za-z][A-Za-z0-9_]*
 
 integer_literal := -?([0-9]+|(0[xX][0-9A-Fa-f]+)|(0[oO][0-7]+)|(0[bB][0-1]+))
-float_literal := -?[0-9]+(.[0-9]*)?([eE][+-]?[0-9]+)?
+float_literal := -?[0-9]+(.[0-9]*)?([eE][\+-]?[0-9]+)?
 
 # P12
 # It's not fully clear what a regular-char is supposed to be. Here we assume it's any printable char that is not ` or \.
@@ -45,6 +45,7 @@ function := function
 not := not
 to := to
 with := with
+mod := mod
 
 hash := #
 bang := !
@@ -72,27 +73,27 @@ double_semicolon := ;;
 less := <
 less_dot := <.
 left_arrow := <-
-leq <=
-leq_dot <=.
+leq := <=
+leq_dot := <=.
 neq := <>
 neq_dot := <>.
 eq := =
 eq_dot := =.
 double_eq := ==
 greater := >
-greater_dot >.
+greater_dot := >.
 geq := >=
 geq_dot := >=.
 at := @
 open_bracket := \[
-open_bracket_bar := \[|
+open_bracket_bar := \[\|
 close_bracket := \]
 caret := ^
 underscore := _
 double_underscore := __
 open_brace := {
-pipe := |
-close_bracket_bar := |\]
+pipe := \|
+close_bracket_bar := \|\]
 close_brace := }
 apostrophe := '
 double_star := \*\*
@@ -296,8 +297,8 @@ dot_open_bracket := .\[
 EXPR -> EXPR dot_open_bracket EXPR close_bracket                    # e.g e1.[e2]
 EXPR -> EXPR dot_open_bracket EXPR close_bracket left_arrow EXPR    # e.g e1.[e2] <- e3
 
-infix_symbol := [=<>@^\|&~\+-*/$%][!$%&\*\+-./:;<=>\?@^|~]*
-prefix_symbol := [!?][!$%&\*\+-./:;<=>\?@^|~]*
+infix_symbol := [=<>@^\|&~\+\*/$%-][!$%&\*\+./:;<=>\?@^\|~-]*
+prefix_symbol := [!\?][!$%&\*\+./:;<=>\?@^\|~-]*
 
 EXPR -> prefix_symbol EXPR
 EXPR -> EXPR infix_symbol EXPR
@@ -316,7 +317,7 @@ EXPR -> EXPR double_pipe EXPR
 # Our changes to make Caml Light more like modern OCaml (for "seamless" parsing of OCaml programs)
 
 # Character literals with ' instead of `
-modern_char_literal = '([ -\[\]-_a-~]|(\\[\\'ntbr])|(\\[0-9][0-9][0-9]))'
+modern_char_literal := '([ -\[\]-_a-~]|(\\[\\'ntbr])|(\\[0-9][0-9][0-9]))'
 CONSTANT -> modern_char_literal
 
 # Module implementations without required double semicolons
