@@ -2,8 +2,9 @@ open Grammar_grammar
 open Parser
 open Automaton
 open Utils
+open Regex
 
-let automaton = construit_automate_LR1 grammar_rules Grammar Eof
+(* let automaton = construit_automate_LR1 grammar_rules Grammar Eof *)
 
 let string_of_grammar_node_type t =
   match t with
@@ -47,9 +48,31 @@ let string_of_lr1_grammar_state
     (s : (grammar_token_type, grammar_node_type) lr1_automaton_state) : string =
   let strings = List.map string_of_situation s in
   "(" ^ String.concat ", " strings ^ ")"
+
+(* print_automaton string_of_lr1_grammar_symbol string_of_lr1_grammar_state
+  automaton; *)
+
+(* assert (trouve_conflits automaton = None) *)
+
+let f = open_in "../caml_light.grammar"
+let test_grammar = really_input_string f (in_channel_length f)
+let token_rules, rules = parse_grammar test_grammar;;
+
+List.iter
+  (fun (regex, token) ->
+    print_endline (token ^ " := " ^ string_of_regex string_of_char regex))
+  token_rules
 ;;
 
-print_automaton string_of_lr1_grammar_symbol string_of_lr1_grammar_state
-  automaton;
-
-assert (trouve_conflits automaton = None)
+List.iter
+  (fun (rule, derivation) ->
+    print_string (rule ^ " -> ");
+    List.iter
+      (fun c ->
+        (match c with
+        | Terminal t -> print_string t
+        | NonTerminal nt -> print_string nt);
+        print_string " ")
+      derivation;
+    print_newline ())
+  rules
