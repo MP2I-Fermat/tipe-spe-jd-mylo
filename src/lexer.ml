@@ -39,7 +39,7 @@ let tokenize (rules : (char regex * 'a) list) (tok_eof : 'a) (text : string) :
               | e :: _ ->
                   Some
                     ( {
-                        token_type = List.assoc e.automaton automatons;
+                        token_type = List.assq e.automaton automatons;
                         value = implode (List.rev current_lexeme);
                         start;
                       },

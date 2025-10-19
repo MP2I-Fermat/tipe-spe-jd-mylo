@@ -1,3 +1,12 @@
+open Utils
+
+type ('symbol, 'state) deterministic_automaton = {
+  states : 'state Hashset.t;
+  initial_state : 'state;
+  final_states : 'state Hashset.t;
+  transition : 'state -> 'symbol -> 'state option;
+}
+
 type ('symbol, 'state) automaton = {
   states : 'state list;
   initial_states : 'state list;
@@ -11,32 +20,24 @@ type ('symbol, 'state) epsilon_automaton =
   ('symbol or_epsilon, 'state) automaton
 
 type ('symbol, 'state) execution_state = {
-  automaton : ('symbol, 'state) automaton;
+  automaton : ('symbol, 'state) deterministic_automaton;
   current_state : 'state;
 }
 
-exception Not_deterministic
-
-let start_execution (a : ('symbol, 'state) automaton) :
+let start_execution (a : ('symbol, 'state) deterministic_automaton) :
     ('symbol, 'state) execution_state =
-  match a.initial_states with
-  | initial_state :: [] -> { automaton = a; current_state = initial_state }
-  | _ -> raise Not_deterministic
+  { automaton = a; current_state = a.initial_state }
 
 let next_state (e : ('symbol, 'state) execution_state) (s : 'symbol) :
     ('symbol, 'state) execution_state option =
-  match
-    List.find_all
-      (fun (state0, symbol, state1) -> state0 = e.current_state && symbol = s)
-      e.automaton.transitions
-  with
-  | [] -> None
-  | (_, _, state1) :: [] ->
-      Some { automaton = e.automaton; current_state = state1 }
-  | _ -> raise Not_deterministic
+  let next_state = e.automaton.transition e.current_state s in
+  match next_state with
+  | None -> None
+  | Some next_state ->
+      Some { automaton = e.automaton; current_state = next_state }
 
 let is_final_state (e : _ execution_state) : bool =
-  List.mem e.current_state e.automaton.final_states
+  Hashset.mem e.automaton.final_states e.current_state
 
 (** `remove_epsilon_transitions a` returns an automaton equivalent to a with all
     epsilon-transitions removed.
@@ -146,73 +147,127 @@ let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
 (** `determinize a` returns an automaton equivalent to `a` that is deterministic
     and complete. *)
 let determinize (a : ('symbol, 'state) automaton) :
-    ('symbol, 'state list) automaton =
+    ('symbol, 'state list) deterministic_automaton =
   let initial_state = List.sort compare a.initial_states in
-  let alphabet =
-    a.transitions
-    |> List.map (fun (_, symbol, _) -> symbol)
-    |> List.sort_uniq compare
-  in
-  let transitions_for (state : 'state list) =
-    let transition_for_symbol (s : 'symbol) =
-      let end_state =
-        state
-        |> List.map (fun simple_state ->
-               List.filter
-                 (fun (state0, symbol, state1) ->
-                   state0 = simple_state && symbol = s)
-                 a.transitions)
-        |> List.flatten
-        |> List.map (fun (_, _, state1) -> state1)
-        |> List.sort_uniq compare
-      in
-      (state, s, end_state)
-    in
-    List.map transition_for_symbol alphabet
-  in
-  let rec process_remaining_states (states : 'state list list)
-      (remaining_states : 'state list list)
-      (transitions : ('state list * 'symbol * 'state list) list) =
-    match remaining_states with
-    | [] ->
-        {
-          states;
-          initial_states = [ initial_state ];
-          final_states =
-            List.filter
-              (fun state ->
-                List.find_opt
-                  (fun simple_state -> List.mem simple_state a.final_states)
-                  state
-                != None)
-              states;
-          transitions;
-        }
-    | state :: other_states ->
-        let new_transitions = transitions_for state in
-        let new_states =
-          new_transitions
-          |> List.map (fun (_, _, state1) -> state1)
-          |> List.filter (fun state -> not (List.mem state states))
-          |> List.sort_uniq compare
-        in
-        process_remaining_states
-          (List.rev_append new_states states)
-          (List.rev_append new_states other_states)
-          (List.rev_append new_transitions transitions)
-  in
-  process_remaining_states [ initial_state ] [ initial_state ] []
+  let alphabet = Hashset.create () in
+  List.iter (fun (_, s, _) -> Hashset.add alphabet s) a.transitions;
 
-let remove_state (state : 'state) (a : ('symbol, 'state) automaton) :
-    ('symbol, 'state) automaton =
+  (* multi_transitions[state0][symbol] is the set of all states reachable from state0 by reading symbol.
+     This saves us iterating over all transitions for every super-state we create. *)
+  let multi_transitions = Hashtbl.create 2 in
+
+  (* Populate multi_transitions. *)
+  List.iter
+    (fun (state0, symbol, state1) ->
+      let transitions_for_state0 =
+        match Hashtbl.find_opt multi_transitions state0 with
+        | None ->
+            let t = Hashtbl.create 2 in
+            Hashtbl.replace multi_transitions state0 t;
+            t
+        | Some t -> t
+      in
+      let transitions_for_symbol =
+        match Hashtbl.find_opt transitions_for_state0 symbol with
+        | None ->
+            let t = Hashset.create () in
+            Hashtbl.replace transitions_for_state0 symbol t;
+            t
+        | Some t -> t
+      in
+      Hashset.add transitions_for_symbol state1)
+    a.transitions;
+
+  (* transitions_for state0 is a dictionary d such that d[symbol] is the
+     super-state reached by reading symbol from the super-state state0. *)
+  let transitions_for (state : 'state list) : ('symbol, 'state list) Hashtbl.t =
+    (* end_state_for_symbol symbol is the super-state reached by reading symbol from the super-state `state` *)
+    let end_state_for_symbol (s : 'symbol) =
+      state
+      |> List.map (fun simple_state ->
+             match Hashtbl.find_opt multi_transitions simple_state with
+             | None -> []
+             | Some transitions -> (
+                 match Hashtbl.find_opt transitions s with
+                 | None -> []
+                 | Some s -> Hashset.to_list s))
+      |> List.flatten |> List.sort_uniq compare
+    in
+    let res = Hashtbl.create 2 in
+    Hashset.iter
+      (fun s -> Hashtbl.replace res s (end_state_for_symbol s))
+      alphabet;
+    res
+  in
+
+  (* transitions[state0][symbol] is the super-state reached by reading symbol from the super-state state0. *)
+  let transitions = Hashtbl.create 2 in
+  (* A running collection of all super-states we have created. *)
+  let states = Hashset.create () in
+  (* Newly created super-states that have not yet been processed. *)
+  let pending_states = Hashset.create () in
+
+  Hashset.add pending_states initial_state;
+
+  while not (Hashset.is_empty pending_states) do
+    let current_state = Hashset.remove_one pending_states in
+    Hashset.add states current_state;
+    let current_transitions = transitions_for current_state in
+    Hashtbl.replace transitions current_state current_transitions;
+    Hashtbl.iter
+      (fun _ end_state ->
+        if not (Hashset.mem states end_state) then
+          Hashset.add pending_states end_state)
+      current_transitions
+  done;
+
+  (* Compute final states. *)
+  let final_states = Hashset.create () in
+  Hashset.iter
+    (fun state ->
+      if
+        List.exists
+          (fun simple_state -> List.mem simple_state a.final_states)
+          state
+      then Hashset.add final_states state)
+    states;
+
   {
-    states = List.filter (fun s -> not (s = state)) a.states;
-    initial_states = List.filter (fun s -> not (s = state)) a.initial_states;
-    final_states = List.filter (fun s -> not (s = state)) a.final_states;
-    transitions =
-      List.filter
-        (fun (state0, _, state1) -> not (state0 = state || state1 = state))
-        a.transitions;
+    initial_state;
+    states;
+    final_states;
+    transition =
+      (fun state0 symbol ->
+        let state_transitions = Hashtbl.find transitions state0 in
+        Hashtbl.find_opt state_transitions symbol);
+  }
+
+let remove_state (state : 'state)
+    (a : ('symbol, 'state) deterministic_automaton) :
+    ('symbol, 'state) deterministic_automaton =
+  if a.initial_state = state then
+    failwith "Cannot remove the initial state of an automaton";
+
+  let filtered_states = Hashset.create () in
+  Hashset.iter
+    (fun s -> if s <> state then Hashset.add filtered_states s)
+    a.states;
+
+  let filtered_final_states = Hashset.create () in
+  Hashset.iter
+    (fun s -> if s <> state then Hashset.add filtered_final_states s)
+    a.final_states;
+
+  {
+    states = filtered_states;
+    initial_state = a.initial_state;
+    final_states = filtered_final_states;
+    transition =
+      (fun state0 symbol ->
+        match a.transition state0 symbol with
+        | None -> None
+        | Some state1 when state1 = state -> None
+        | Some state1 -> Some state1);
   }
 
 let print_automaton (string_of_symbol : 'symbol -> string)
