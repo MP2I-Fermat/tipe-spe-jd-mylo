@@ -77,7 +77,13 @@ let grammar_of_syntax_tree
     (tree : (grammar_token_type, grammar_node_type) syntax_tree) :
     (char regex * string) list * (string, string) grammar =
   let strip_prefix_from_terminal_pattern (pattern : string) : string =
-    String.sub pattern 2 (String.length pattern - 2)
+    let rec non_space_index (i : int) =
+      if i = String.length pattern - 1 then i
+      else if pattern.[i] <> ' ' then i
+      else non_space_index (i + 1)
+    in
+    let start = non_space_index 2 in
+    String.sub pattern start (String.length pattern - start)
   in
 
   let build_terminal_definition

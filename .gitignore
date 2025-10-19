@@ -4,6 +4,7 @@
 *.cmx
 *.o
 perf.data
+perf.data.*
 
 *.aux
 *.fdb_latexmk
