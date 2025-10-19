@@ -19,6 +19,7 @@ let add_character (c : char) (r : char regex) : char regex =
   Regex.Union (r, Regex.Symbol c)
 
 let rec add_character_range (start : char) (last : char) (r : char regex) =
+  if start > last then failwith "Invalid range";
   if start = last then add_character start r
   else
     add_character_range
