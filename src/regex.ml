@@ -104,3 +104,16 @@ let automaton_of_regex (r : 'symbol regex) : ('symbol, int) epsilon_automaton =
           state_count + 1 )
   in
   fst (automaton_of_regex_with_context r 0)
+
+let rec string_of_regex (string_of_symbol : 'a -> string) (r : 'a regex) =
+  match r with
+  | Empty -> "<empty>"
+  | Epsilon -> "<epsilon>"
+  | Concatenation (r1, r2) ->
+      string_of_regex string_of_symbol r1 ^ string_of_regex string_of_symbol r2
+  | Star r -> string_of_regex string_of_symbol r ^ "*"
+  | Union (r1, r2) ->
+      string_of_regex string_of_symbol r1
+      ^ "|"
+      ^ string_of_regex string_of_symbol r2
+  | Symbol s -> string_of_symbol s
