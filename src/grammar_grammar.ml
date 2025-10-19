@@ -89,8 +89,11 @@ let grammar_of_syntax_tree
           [
             Leaf { token_type = Identifier; value = name };
             Leaf { token_type = Terminal_pattern; value = pattern };
-          ] ) ->
-        (parse_regex (strip_prefix_from_terminal_pattern pattern), name)
+          ] ) -> (
+        let raw_pattern = strip_prefix_from_terminal_pattern pattern in
+        try (parse_regex raw_pattern, name)
+        with Failure s ->
+          failwith ("Failed to parse regex " ^ raw_pattern ^ ": " ^ s))
     | _ -> failwith "Not a terminal definition"
   in
 
