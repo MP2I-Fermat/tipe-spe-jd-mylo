@@ -28,14 +28,3 @@ print_automaton
 let a_simpl = remove_epsilon_transitions a;;
 
 print_automaton (String.make 1) string_of_int a_simpl
-
-let a_det = determinize a_simpl;;
-
-print_automaton (String.make 1)
-  (fun state ->
-    List.fold_left
-      (fun acc el ->
-        acc ^ (if not (acc = "[") then ", " else "") ^ string_of_int el)
-      "[" state
-    ^ "]")
-  a_det

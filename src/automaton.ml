@@ -45,104 +45,138 @@ let is_final_state (e : _ execution_state) : bool =
     The returned automaton may not be deterministic. *)
 let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
     ('symbol, 'state) automaton =
-  let rec build_result_from
-      (remaining_epsilon_transitions : ('state list * 'state) list)
-      (result_transitions : ('state * 'symbol * 'state) list)
-      (result_final_states : 'state list) =
-    match remaining_epsilon_transitions with
-    | [] ->
-        {
-          states = a.states;
-          initial_states = a.initial_states;
-          final_states = result_final_states;
-          transitions = result_transitions;
-        }
-    | (incoming_states, end_state) :: remaining_epsilon_transitions ->
-        let next_final_states =
-          if List.mem end_state result_final_states then
-            let new_final_states =
-              List.filter
-                (fun state -> not (List.mem state result_final_states))
-                incoming_states
-            in
-            List.rev_append new_final_states result_final_states
-          else result_final_states
-        in
+  let incoming_epsilon_transitions = Hashtbl.create 2 in
+  let outgoing_epsilon_transitions = Hashtbl.create 2 in
+  let result_transitions = Hashtbl.create 2 in
+  let result_final_states = Hashset.create () in
 
+  List.iter (Hashset.add result_final_states) a.final_states;
+  List.iter
+    (fun (state0, symbol, state1) ->
+      match symbol with
+      | Epsilon ->
+          let incoming_states =
+            match Hashtbl.find_opt incoming_epsilon_transitions state1 with
+            | None ->
+                let t = Hashset.create () in
+                Hashtbl.replace incoming_epsilon_transitions state1 t;
+                t
+            | Some t -> t
+          in
+          Hashset.add incoming_states state0;
+          let outgoing_states =
+            match Hashtbl.find_opt outgoing_epsilon_transitions state0 with
+            | None ->
+                let t = Hashset.create () in
+                Hashtbl.replace outgoing_epsilon_transitions state0 t;
+                t
+            | Some t -> t
+          in
+          Hashset.add outgoing_states state1
+      | Symbol s ->
+          let outgoing_transitions =
+            match Hashtbl.find_opt result_transitions state0 with
+            | None ->
+                let t = Hashtbl.create 2 in
+                Hashtbl.replace result_transitions state0 t;
+                t
+            | Some t -> t
+          in
+          let transitions_for_symbol =
+            match Hashtbl.find_opt outgoing_transitions s with
+            | None ->
+                let t = Hashset.create () in
+                Hashtbl.replace outgoing_transitions s t;
+                t
+            | Some t -> t
+          in
+          Hashset.add transitions_for_symbol state1)
+    a.transitions;
+
+  while Hashtbl.length incoming_epsilon_transitions > 0 do
+    let state, incoming_states =
+      hashtbl_remove_one incoming_epsilon_transitions
+    in
+
+    if List.mem state a.final_states then
+      Hashset.iter (Hashset.add result_final_states) incoming_states;
+
+    (* Remove outgoing transitions from start states. *)
+    Hashset.iter
+      (fun start_state ->
         let outgoing_transitions =
-          List.filter_map
-            (fun (state0, symbol, state1) ->
-              if state0 = end_state then Some (symbol, state1) else None)
-            result_transitions
+          Hashtbl.find outgoing_epsilon_transitions start_state
         in
-        let new_transitions =
-          incoming_states
-          |> List.map (fun state0 ->
-                 List.map
-                   (fun (symbol, state1) -> (state0, symbol, state1))
-                   outgoing_transitions)
-          |> List.flatten
-          |> List.filter (fun new_transition ->
-                 not (List.mem new_transition result_transitions))
-        in
-        let next_transitions =
-          List.rev_append new_transitions result_transitions
-        in
+        Hashset.remove outgoing_transitions state)
+      incoming_states;
 
-        let outgoing_epsilon_transitions =
-          List.filter_map
-            (fun (incoming_states', end_state') ->
-              if List.mem end_state incoming_states' then Some end_state'
-              else None)
-            remaining_epsilon_transitions
-        in
-        let new_epsilon_transitions =
-          incoming_states
-          |> List.map (fun state0 ->
-                 List.map
-                   (fun state1 -> (state0, state1))
-                   outgoing_epsilon_transitions)
-          |> List.flatten
-          (* Don't introduce any e-loops. *)
-          |> List.filter (fun (state0, state1) -> state0 <> state1)
-        in
-        let next_remaining_epsilon_transitions =
-          List.map
-            (fun (incoming_states, end_state) ->
-              let new_incoming_states =
-                new_epsilon_transitions
-                |> List.filter_map (fun (state0, state1) ->
-                       if state1 = end_state then Some state0 else None)
-                |> List.filter (fun new_incoming_state ->
-                       not (List.mem new_incoming_state incoming_states))
-              in
-              (List.rev_append new_incoming_states incoming_states, end_state))
-            remaining_epsilon_transitions
-        in
+    (* Add transitions from all incoming states to reachable states, bypassing this state. *)
+    match Hashtbl.find_opt result_transitions state with
+    | None -> ()
+    | Some state_transitions -> (
+        Hashtbl.iter
+          (fun symbol end_states ->
+            Hashset.iter
+              (fun start_state ->
+                let start_state_transitions =
+                  match Hashtbl.find_opt result_transitions start_state with
+                  | None ->
+                      let t = Hashtbl.create 2 in
+                      Hashtbl.replace result_transitions start_state t;
+                      t
+                  | Some t -> t
+                in
+                let transitions_for_symbol =
+                  match Hashtbl.find_opt start_state_transitions symbol with
+                  | None ->
+                      let t = Hashset.create () in
+                      Hashtbl.replace start_state_transitions symbol t;
+                      t
+                  | Some t -> t
+                in
+                Hashset.iter (Hashset.add transitions_for_symbol) end_states)
+              incoming_states)
+          state_transitions;
 
-        build_result_from next_remaining_epsilon_transitions next_transitions
-          next_final_states
-  in
-  let epsilon_transitions =
-    a.states
-    |> List.map (fun end_state ->
-           ( List.filter_map
-               (fun (state0, symbol, state1) ->
-                 if state1 = end_state && symbol = Epsilon then Some state0
-                 else None)
-               a.transitions,
-             end_state ))
-    |> List.filter (fun (start_states, _) -> not (start_states = []))
-  in
-  let non_epsilon_transitions =
-    List.filter_map
-      (fun (state0, symbol, state1) ->
-        match symbol with
-        | Epsilon -> None
-        | Symbol actual_symbol -> Some (state0, actual_symbol, state1))
-      a.transitions
-  in
-  build_result_from epsilon_transitions non_epsilon_transitions a.final_states
+        (* Add epsilon transitions from incoming states bypassing this state *)
+        match Hashtbl.find_opt outgoing_epsilon_transitions state with
+        | None -> ()
+        | Some end_states ->
+            (* Don't introduce e-loops. *)
+            Hashset.remove end_states state;
+            Hashset.iter
+              (fun start_state ->
+                let outgoing_transitions =
+                  Hashtbl.find outgoing_epsilon_transitions start_state
+                in
+                Hashset.iter (Hashset.add outgoing_transitions) end_states)
+              incoming_states;
+            Hashset.iter
+              (fun end_state ->
+                let incoming_transitions =
+                  Hashtbl.find incoming_epsilon_transitions end_state
+                in
+                Hashset.iter (Hashset.add incoming_transitions) incoming_states)
+              end_states)
+  done;
+
+  {
+    states = a.states;
+    initial_states = a.initial_states;
+    final_states = Hashset.to_list result_final_states;
+    transitions =
+      Hashtbl.to_seq result_transitions
+      |> List.of_seq
+      |> List.map (fun (state0, transitions) ->
+             Hashtbl.to_seq transitions |> List.of_seq
+             |> List.map (fun (symbol, end_states) ->
+                    (state0, symbol, end_states)))
+      |> List.flatten
+      |> List.map (fun (state0, symbol, end_states) ->
+             Hashset.to_list end_states
+             |> List.map (fun state1 -> (state0, symbol, state1)))
+      |> List.flatten;
+  }
 
 (** `determinize a` returns an automaton equivalent to `a` that is deterministic
     and complete. *)
