@@ -334,18 +334,15 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
               fermer_situations_LR1 nouvel_etat g premier_cache;
               LR1StateMap.replace fermeture_cache (AnyLR1State.Any copy)
                 nouvel_etat;
+              if
+                LR1StateMap.find_opt transitions (AnyLR1State.Any nouvel_etat)
+                = None
+              then
+                LR1StateMap.replace a_traiter (AnyLR1State.Any nouvel_etat) ();
               nouvel_etat
         in
 
-        Hashtbl.replace transitions_etat alpha fermeture_nouvel_etat;
-
-        if
-          LR1StateMap.find_opt transitions
-            (AnyLR1State.Any fermeture_nouvel_etat)
-          = None
-        then
-          LR1StateMap.replace a_traiter (AnyLR1State.Any fermeture_nouvel_etat)
-            ())
+        Hashtbl.replace transitions_etat alpha fermeture_nouvel_etat)
       tnt
   done;
 
