@@ -300,6 +300,8 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
   let a_traiter = LR1StateMap.create 2 in
   LR1StateMap.replace a_traiter (AnyLR1State.Any etat_initial) ();
 
+  let fermeture_cache = LR1StateMap.create 2 in
+
   while LR1StateMap.length a_traiter <> 0 do
     let etat = LR1StateMap.remove_one a_traiter in
     Hashset.add etats etat;
@@ -322,12 +324,28 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
                 (Hashset.copy v))
           etat;
 
-        fermer_situations_LR1 nouvel_etat g premier_cache;
+        let fermeture_nouvel_etat =
+          match
+            LR1StateMap.find_opt fermeture_cache (AnyLR1State.Any nouvel_etat)
+          with
+          | Some fermeture -> fermeture
+          | None ->
+              let copy = Hashtbl.copy nouvel_etat in
+              fermer_situations_LR1 nouvel_etat g premier_cache;
+              LR1StateMap.replace fermeture_cache (AnyLR1State.Any copy)
+                nouvel_etat;
+              nouvel_etat
+        in
 
-        Hashtbl.replace transitions_etat alpha nouvel_etat;
+        Hashtbl.replace transitions_etat alpha fermeture_nouvel_etat;
 
-        if LR1StateMap.find_opt transitions (AnyLR1State.Any nouvel_etat) = None
-        then LR1StateMap.replace a_traiter (AnyLR1State.Any nouvel_etat) ())
+        if
+          LR1StateMap.find_opt transitions
+            (AnyLR1State.Any fermeture_nouvel_etat)
+          = None
+        then
+          LR1StateMap.replace a_traiter (AnyLR1State.Any fermeture_nouvel_etat)
+            ())
       tnt
   done;
 
