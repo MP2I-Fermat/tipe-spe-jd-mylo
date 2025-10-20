@@ -59,7 +59,7 @@ let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
             match Hashtbl.find_opt incoming_epsilon_transitions state1 with
             | None ->
                 let t = Hashset.create () in
-                Hashtbl.replace incoming_epsilon_transitions state1 t;
+                Hashtbl.add incoming_epsilon_transitions state1 t;
                 t
             | Some t -> t
           in
@@ -68,7 +68,7 @@ let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
             match Hashtbl.find_opt outgoing_epsilon_transitions state0 with
             | None ->
                 let t = Hashset.create () in
-                Hashtbl.replace outgoing_epsilon_transitions state0 t;
+                Hashtbl.add outgoing_epsilon_transitions state0 t;
                 t
             | Some t -> t
           in
@@ -78,7 +78,7 @@ let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
             match Hashtbl.find_opt result_transitions state0 with
             | None ->
                 let t = Hashtbl.create 2 in
-                Hashtbl.replace result_transitions state0 t;
+                Hashtbl.add result_transitions state0 t;
                 t
             | Some t -> t
           in
@@ -86,7 +86,7 @@ let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
             match Hashtbl.find_opt outgoing_transitions s with
             | None ->
                 let t = Hashset.create () in
-                Hashtbl.replace outgoing_transitions s t;
+                Hashtbl.add outgoing_transitions s t;
                 t
             | Some t -> t
           in
@@ -122,7 +122,7 @@ let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
                   match Hashtbl.find_opt result_transitions start_state with
                   | None ->
                       let t = Hashtbl.create 2 in
-                      Hashtbl.replace result_transitions start_state t;
+                      Hashtbl.add result_transitions start_state t;
                       t
                   | Some t -> t
                 in
@@ -130,7 +130,7 @@ let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
                   match Hashtbl.find_opt start_state_transitions symbol with
                   | None ->
                       let t = Hashset.create () in
-                      Hashtbl.replace start_state_transitions symbol t;
+                      Hashtbl.add start_state_transitions symbol t;
                       t
                   | Some t -> t
                 in
@@ -197,7 +197,7 @@ let determinize (a : ('symbol, 'state) automaton) :
         match Hashtbl.find_opt multi_transitions state0 with
         | None ->
             let t = Hashtbl.create 2 in
-            Hashtbl.replace multi_transitions state0 t;
+            Hashtbl.add multi_transitions state0 t;
             t
         | Some t -> t
       in
@@ -205,7 +205,7 @@ let determinize (a : ('symbol, 'state) automaton) :
         match Hashtbl.find_opt transitions_for_state0 symbol with
         | None ->
             let t = Hashset.create () in
-            Hashtbl.replace transitions_for_state0 symbol t;
+            Hashtbl.add transitions_for_state0 symbol t;
             t
         | Some t -> t
       in
@@ -228,9 +228,7 @@ let determinize (a : ('symbol, 'state) automaton) :
       |> List.flatten |> List.sort_uniq compare
     in
     let res = Hashtbl.create 2 in
-    Hashset.iter
-      (fun s -> Hashtbl.replace res s (end_state_for_symbol s))
-      alphabet;
+    Hashset.iter (fun s -> Hashtbl.add res s (end_state_for_symbol s)) alphabet;
     res
   in
 
@@ -247,7 +245,7 @@ let determinize (a : ('symbol, 'state) automaton) :
     let current_state = Hashset.remove_one pending_states in
     Hashset.add states current_state;
     let current_transitions = transitions_for current_state in
-    Hashtbl.replace transitions current_state current_transitions;
+    Hashtbl.add transitions current_state current_transitions;
     Hashtbl.iter
       (fun _ end_state ->
         if not (Hashset.mem states end_state) then
