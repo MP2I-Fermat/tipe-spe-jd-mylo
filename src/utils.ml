@@ -96,7 +96,9 @@ module Hashset = struct
     res
 
   let equals (t1 : 'a t) (t2 : 'a t) =
-    length t1 = length t2 && length (intersection t1 t2) = length t1
+    t1.data == t2.data
+    || length t1 = length t2
+       && Hashtbl.to_seq t1.data |> Seq.for_all (fun (k, ()) -> mem t2 k)
 
   let copy (t : 'a t) =
     t.rw <- false;
