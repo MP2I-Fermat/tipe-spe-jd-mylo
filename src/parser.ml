@@ -58,7 +58,7 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
       Hashtbl.t =
     let inclusions = Hashtbl.create 2 in
     let a_traiter = Hashset.create () in
-    Hashtbl.replace inclusions s (Hashset.create ());
+    Hashtbl.add inclusions s (Hashset.create ());
     Hashset.add a_traiter s;
 
     while not (Hashset.is_empty a_traiter) do
@@ -79,8 +79,7 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
                | None ->
                    let sur_derivations = Hashset.create () in
                    Hashset.add sur_derivations derivation;
-                   Hashtbl.replace inclusions derivation_contenue
-                     sur_derivations;
+                   Hashtbl.add inclusions derivation_contenue sur_derivations;
                    (* C'est une derivation jusqu'ici inconnue. *)
                    Hashset.add a_traiter derivation_contenue)
     done;
@@ -97,7 +96,7 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
   Hashtbl.iter
     (fun k v ->
       let premier_k = Hashset.create () in
-      Hashtbl.replace valeurs k premier_k;
+      Hashtbl.add valeurs k premier_k;
       match k with
       | [ Terminal a ] ->
           Hashset.add premier_k a;
@@ -106,6 +105,7 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
           match Hashtbl.find_opt cache k with
           | None -> ()
           | Some premier ->
+              (* Must replace, not add, as we iterate later on. *)
               Hashtbl.replace valeurs k premier;
               Hashset.add a_traiter k))
     inclusions;
@@ -184,7 +184,7 @@ let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
         match Hashtbl.find_opt e nouvelle_situation with
         | None ->
             (* La derivation T -> ^gamma n’était pas présente dans e. *)
-            Hashtbl.replace e nouvelle_situation nouveau_premier;
+            Hashtbl.add e nouvelle_situation nouveau_premier;
             Hashset.add a_traiter nouvelle_situation
         | Some premier ->
             let longueur_init = Hashset.length premier in
@@ -285,7 +285,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
   List.iter
     (fun (nt, derivation) ->
       if nt = axiome then
-        Hashtbl.replace etat_initial
+        Hashtbl.add etat_initial
           ((nt, derivation), 0)
           (Hashset.singleton lexeme_eof))
     g;
@@ -298,7 +298,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
 
   (* Ensemble des états a traiter, sous forme d'un dictionnaires d’états a unit. *)
   let a_traiter = LR1StateMap.create 2 in
-  LR1StateMap.replace a_traiter (AnyLR1State.Any etat_initial) ();
+  LR1StateMap.add a_traiter (AnyLR1State.Any etat_initial) ();
 
   let fermeture_cache = LR1StateMap.create 2 in
 
@@ -307,7 +307,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
     Hashset.add etats etat;
     (* Les transitions sortants de cet état. *)
     let transitions_etat = Hashtbl.create 2 in
-    LR1StateMap.replace transitions (AnyLR1State.Any etat) transitions_etat;
+    LR1StateMap.add transitions (AnyLR1State.Any etat) transitions_etat;
     let tnt = liste_terminaux_et_non_terminaux_a_iterer etat in
     Hashset.iter
       (fun alpha ->
@@ -319,7 +319,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
               curseur <> List.length derivation
               && List.nth derivation curseur = alpha
             then
-              Hashtbl.replace nouvel_etat
+              Hashtbl.add nouvel_etat
                 ((nt, derivation), curseur + 1)
                 (Hashset.copy v))
           etat;
@@ -332,8 +332,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
           | None ->
               let copy = Hashtbl.copy nouvel_etat in
               fermer_situations_LR1 nouvel_etat g premier_cache;
-              LR1StateMap.replace fermeture_cache (AnyLR1State.Any copy)
-                nouvel_etat;
+              LR1StateMap.add fermeture_cache (AnyLR1State.Any copy) nouvel_etat;
               if
                 LR1StateMap.find_opt transitions (AnyLR1State.Any nouvel_etat)
                 = None
@@ -342,7 +341,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
               nouvel_etat
         in
 
-        Hashtbl.replace transitions_etat alpha fermeture_nouvel_etat)
+        Hashtbl.add transitions_etat alpha fermeture_nouvel_etat)
       tnt
   done;
 
