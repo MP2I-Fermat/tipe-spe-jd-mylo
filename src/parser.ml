@@ -143,7 +143,10 @@ let premier_LR1 (s : ('token_type, 'non_terminal) derivation)
 
 (* Sature e jusqu'a que e soit une fermeture des situations LR(1) de e. *)
 let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
-    (g : ('token_type, 'non_terminal) grammar) : unit =
+    (g : ('token_type, 'non_terminal) grammar)
+    (premier_cache :
+      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t) Hashtbl.t)
+    : unit =
   (* Si le non-terminal de regle est nt, renvoie la situation nt->^γ~σ2.
    * Renvoie None sinon *)
   let nouvelle_situation_regle (nt : 'non_terminal)
@@ -153,8 +156,6 @@ let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
       option =
     if fst regle = nt then Some ((regle, 0), Hashset.copy sigma2) else None
   in
-
-  let premier_cache = Hashtbl.create 2 in
 
   (* Sachant une situation s: N -> α^Tβ~σ avec T un non-terminal, renvoie
    * la liste des situations T->^γ~premierLR1(β, σ) pour T->γ règle de g *)
@@ -277,6 +278,8 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
     res
   in
 
+  let premier_cache = Hashtbl.create 2 in
+
   (* On ajoute toutes les règles pour l'axiome, puis on ferme l'ensemble pour obtenir l’état initial. *)
   let etat_initial = Hashtbl.create 2 in
   List.iter
@@ -286,7 +289,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
           ((nt, derivation), 0)
           (Hashset.singleton lexeme_eof))
     g;
-  fermer_situations_LR1 etat_initial g;
+  fermer_situations_LR1 etat_initial g premier_cache;
 
   (* transitions[state0][symbol] est l’état atteint en lisant symbol depuis state0. *)
   let transitions = LR1StateMap.create 2 in
@@ -319,7 +322,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
                 (Hashset.copy v))
           etat;
 
-        fermer_situations_LR1 nouvel_etat g;
+        fermer_situations_LR1 nouvel_etat g premier_cache;
 
         Hashtbl.replace transitions_etat alpha nouvel_etat;
 
