@@ -53,7 +53,7 @@ let string_of_regex_grammar_entry
 
 let string_of_regex_situation
     ((((n, rule), idx), sigma) :
-      (regex_token_type, regex_rule) lr0_situation * regex_token_type Hashset.t)
+      (regex_token_type, regex_rule) lr1_situation)
     : string =
   let ns = string_of_regex_rule n in
   let rule_beginning =
