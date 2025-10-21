@@ -407,7 +407,7 @@ let trouve_conflits (a : ('token_type, 'non_terminal) lr1_automaton) :
 (* À partir d’un état e et d’un terminal t, renvoie une règle que l’on peut
  * réduire (i.e. une situation N->a_1…a_n^ ~ σ où t∈σ) ou None s’il n’y en
  * n’a pas. *)
-let rec trouve_reduction_a_faire
+let trouve_reduction_a_faire
     (e : ('token_type, 'non_terminal) lr1_automaton_state) (t : 'token_type) :
     ('token_type, 'non_terminal) rule option =
   (* Renvoie true si la situation s est une situation à réduction, false sinon *)
