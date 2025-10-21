@@ -50,7 +50,8 @@ type ('token_type, 'non_terminal) lr1_transition =
 let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
     (g : ('token_type, 'non_terminal) grammar)
     (cache :
-      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t) Hashtbl.t)
+      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t)
+       Hashtbl.t)
     : 'token_type Hashset.t =
   (* Crée un dictionnaire d tel que d[s] est l'ensemble des derivations w tels
      que premier(s) est inclus dans premier(w).
@@ -83,7 +84,7 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
                    let sur_derivations = Hashset.create () in
                    Hashset.add sur_derivations derivation;
                    Hashtbl.add inclusions derivation_contenue sur_derivations;
-                   (* C'est une derivation jusqu'ici inconnue. *)
+                   (* C'est une dérivation jusqu'ici inconnue. *)
                    Hashset.add a_traiter derivation_contenue)
     done;
 
@@ -108,7 +109,7 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
           match Hashtbl.find_opt cache k with
           | None -> ()
           | Some premier ->
-              (* Must replace, not add, as we iterate later on. *)
+              (* On doit remplacer et non ajouter, car on itère plus tard *)
               Hashtbl.replace valeurs k premier;
               Hashset.add a_traiter k))
     inclusions;
@@ -124,9 +125,9 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
         let longueur_init = Hashset.length valeur_sur_derivation in
         Hashset.iter (Hashset.add valeur_sur_derivation) valeur_derivation;
 
-        (* Si l'ajout des elements de valeur_derivation a change la
-           valeur de valeur_sur_derivation, alors il faut re-traiter
-           sur_derivation. *)
+        (* Si l'ajout des éléments de valeur_derivation a changé la
+         * valeur de valeur_sur_derivation, alors il faut re-traiter
+         * sur_derivation. *)
         if longueur_init <> Hashset.length valeur_sur_derivation then
           Hashset.add a_traiter sur_derivation)
       sur_derivations
@@ -140,17 +141,19 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
 let premier_LR1 (s : ('token_type, 'non_terminal) derivation)
     (sigma : 'token_type Hashset.t) (g : ('token_type, 'non_terminal) grammar)
     (cache :
-      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t) Hashtbl.t)
+      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t)
+       Hashtbl.t)
     : 'token_type Hashset.t =
   match s with [] -> sigma | _ -> premier_LL1 s g cache
 
-(* Sature e jusqu'a que e soit une fermeture des situations LR(1) de e. *)
+(* Sature e jusqu'à que e soit une fermeture des situations LR(1) de e. *)
 let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
     (g : ('token_type, 'non_terminal) grammar)
     (premier_cache :
-      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t) Hashtbl.t)
+      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t)
+       Hashtbl.t)
     : unit =
-  (* Si le non-terminal de regle est nt, renvoie la situation nt->^γ~σ2.
+  (* Si le non-terminal de règle est nt, renvoie la situation nt->^γ~σ2.
    * Renvoie None sinon *)
   let nouvelle_situation_regle (nt : 'non_terminal)
       (sigma2 : 'token_type Hashset.t)
@@ -160,7 +163,7 @@ let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
     if fst regle = nt then Some ((regle, 0), Hashset.copy sigma2) else None
   in
 
-  (* Sachant une situation s: N -> α^Tβ~σ avec T un non-terminal, renvoie
+  (* Sachant une situation s : N -> α^Tβ~σ avec T un non-terminal, renvoie
    * la liste des situations T->^γ~premierLR1(β, σ) pour T->γ règle de g *)
   let liste_nouvelles_situations
       (((_, derivation), curseur) : ('token_type, 'non_terminal) lr0_situation)
@@ -217,38 +220,38 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
     (axiome : 'non_terminal) (lexeme_eof : 'token_type) :
     ('token_type, 'non_terminal) lr1_automaton =
   (* On veut pouvoir mettre des états de l'automate LR(1) dans un dictionnaire.
-     Cela facilite non seulement la construction de l'automate mais rend aussi
-     son execution plus efficace.
-  
-     Malheureusement, les états LR(1) ne sont pas compatibles avec le module
-     Hashtbl d'OCaml tel quels: ils contiennent des Hashset.t, dont l'egalite
-     (i.e Hashset.equals) n'est pas l’identité structurelle (deux Hashtbl.t
-     peuvent contenir les memes elements mais ne pas avoir le meme nombre de
-     buckets, par exemple).
-  
-     In faut donc nous munir d'un Hashtbl avec une fonction de hachage et
-     d'egalite que nous contrôlons, ce qui est possible via le functor
-     Hashtbl.Make.
-  
-     Deuxième malheur, nos états LR(1) sont génériques, et le type HashedType.t
-     ne peut pas l’être. Nous devons donc masquer les paramètres de type de
-     lr1_automaton_state dans notre Hashtbl.
-  
-     Cela est possible grace a l'usage de GADT.
-  
-     Cela mène a deux problèmes de plus:
-     - Le type de notre Hashtbl doit être un GADT. Il ne peut donc pas directement
-       être un lr1_automaton_state, mais est plutôt un variant d'un type contenant
-       un lr1_automaton_state.
-     - Comme nous masquons les paramètres de type de toutes les clés de notre
-       Hashtbl, OCaml n'apporte aucune garantie quand au type exact des objets
-       extraits de notre Hashtbl: c'est a nous de s'assurer que nous n’insérons et
-       n’extrayons que des objets du meme type. Il faut alors utiliser Obj.magic
-       pour éviter les erreurs de type.
-  
-     Ces modules sont restreints a la fonction construit_automate_LR1 pour ces
-     raisons.
-  *)
+   * Cela facilite non seulement la construction de l'automate mais rend aussi
+   * son exécution plus efficace.
+
+   * Malheureusement, les états LR(1) ne sont pas compatibles avec le module
+   * Hashtbl d'OCaml tel quels : ils contiennent des Hashset.t, dont l'égalité
+   * (i.e Hashset.equals) n'est pas l’identité structurelle (deux Hashtbl.t
+   * peuvent contenir les mêmes elements mais ne pas avoir le meme nombre de
+   * buckets, par exemple).
+
+   * Il faut donc nous munir d'un Hashtbl avec une fonction de hachage et
+   * d'égalite que nous contrôlons, ce qui est possible via le functor
+   * Hashtbl.Make.
+
+   * Deuxième malheur, nos états LR(1) sont génériques, et le type HashedType.t
+   * ne peut pas l’être. Nous devons donc masquer les paramètres de type de
+   * lr1_automaton_state dans notre Hashtbl.
+
+   * Cela est possible grâce a l'usage de GADT.
+
+   * Cela mène a deux problèmes de plus :
+   * - Le type de notre Hashtbl doit être un GADT. Il ne peut donc pas
+   *   directement être un lr1_automaton_state, mais est plutôt un variant d'un
+   *   type contenant un lr1_automaton_state.
+   * - Comme nous masquons les paramètres de type de toutes les clés de notre
+   *   Hashtbl, OCaml n'apporte aucune garantie quand au type exact des objets
+   *   extraits de notre Hashtbl : c'est à nous de s'assurer que nous
+   *   n’insérons et n’extrayons que des objets du même type. Il faut alors
+   *   utiliser Obj.magic pour éviter les erreurs de type.
+
+   * Ces modules sont restreints à la fonction construit_automate_LR1 pour ces
+   * raisons.
+   *)
   let module AnyLR1State = struct
     type t = Any : (_, _) lr1_automaton_state -> t
 
@@ -283,7 +286,8 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
 
   let premier_cache = Hashtbl.create 2 in
 
-  (* On ajoute toutes les règles pour l'axiome, puis on ferme l'ensemble pour obtenir l’état initial. *)
+  (* On ajoute toutes les règles pour l'axiome, puis on ferme l'ensemble pour
+   * obtenir l’état initial. *)
   let etat_initial = Hashtbl.create 2 in
   List.iter
     (fun (nt, derivation) ->
@@ -294,12 +298,14 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
     g;
   fermer_situations_LR1 etat_initial g premier_cache;
 
-  (* transitions[state0][symbol] est l’état atteint en lisant symbol depuis state0. *)
+  (* transitions[state0][symbol] est l’état atteint en lisant symbol depuis
+   * state0. *)
   let transitions = LR1StateMap.create 2 in
   (* Collection des états crées. *)
   let etats = Hashset.create () in
 
-  (* Ensemble des états a traiter, sous forme d'un dictionnaires d’états a unit. *)
+  (* Ensemble des états à traiter, sous forme d'un dictionnaires d’états à
+   * unit. *)
   let a_traiter = LR1StateMap.create 2 in
   LR1StateMap.add a_traiter (AnyLR1State.Any etat_initial) ();
 
@@ -335,7 +341,8 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
           | None ->
               let copy = Hashtbl.copy nouvel_etat in
               fermer_situations_LR1 nouvel_etat g premier_cache;
-              LR1StateMap.add fermeture_cache (AnyLR1State.Any copy) nouvel_etat;
+              LR1StateMap.add
+                fermeture_cache (AnyLR1State.Any copy) nouvel_etat;
               if
                 LR1StateMap.find_opt transitions (AnyLR1State.Any nouvel_etat)
                 = None
@@ -410,7 +417,8 @@ let trouve_conflits (a : ('token_type, 'non_terminal) lr1_automaton) :
 let trouve_reduction_a_faire
     (e : ('token_type, 'non_terminal) lr1_automaton_state) (t : 'token_type) :
     ('token_type, 'non_terminal) rule option =
-  (* Renvoie true si la situation s est une situation à réduction, false sinon *)
+  (* Renvoie true si la situation s est une situation à réduction, false sinon
+   *)
   let a_reduire (((_, rule), idx) : ('token_type, 'non_terminal) lr0_situation)
       : bool =
     idx = List.length rule
