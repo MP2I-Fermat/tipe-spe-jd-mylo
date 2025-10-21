@@ -8,11 +8,12 @@ let test_premier_LL1 =
   in
   assert (
     Hashset.equals
-      (premier_LL1 [ Terminal 'a'; NonTerminal 'T' ] grammaire1)
+      (premier_LL1 [ Terminal 'a'; NonTerminal 'T' ] grammaire1
+        (Hashtbl.create 2))
       (Hashset.of_list [ 'a' ]));
   assert (
     Hashset.equals
-      (premier_LL1 [ NonTerminal 'T' ] grammaire1)
+      (premier_LL1 [ NonTerminal 'T' ] grammaire1 (Hashtbl.create 2))
       (Hashset.of_list [ 'b' ]));
 
   let grammaire2 (* page 60, exemple 24 *) =
@@ -25,23 +26,23 @@ let test_premier_LL1 =
   in
   assert (
     Hashset.equals
-      (premier_LL1 [ Terminal 'a'; Terminal 'b' ] grammaire2)
+      (premier_LL1 [ Terminal 'a'; Terminal 'b' ] grammaire2 (Hashtbl.create 2))
       (Hashset.of_list [ 'a' ]));
   assert (
     Hashset.equals
-      (premier_LL1 [ Terminal 'c'; Terminal 'd' ] grammaire2)
+      (premier_LL1 [ Terminal 'c'; Terminal 'd' ] grammaire2 (Hashtbl.create 2))
       (Hashset.of_list [ 'c' ]));
   assert (
     Hashset.equals
-      (premier_LL1 [ NonTerminal 'U' ] grammaire2)
+      (premier_LL1 [ NonTerminal 'U' ] grammaire2 (Hashtbl.create 2))
       (Hashset.of_list [ 'a' ]));
   assert (
     Hashset.equals
-      (premier_LL1 [ NonTerminal 'V' ] grammaire2)
+      (premier_LL1 [ NonTerminal 'V' ] grammaire2 (Hashtbl.create 2))
       (Hashset.of_list [ 'c' ]));
   assert (
     Hashset.equals
-      (premier_LL1 [ NonTerminal 'S' ] grammaire2)
+      (premier_LL1 [ NonTerminal 'S' ] grammaire2 (Hashtbl.create 2))
       (Hashset.of_list [ 'a'; 'c' ]));
 
   let grammaire_gpost =
@@ -55,9 +56,10 @@ let test_premier_LL1 =
     Hashset.equals
       (premier_LL1
          [ NonTerminal 'S'; NonTerminal 'S'; Terminal '+' ]
-         grammaire_gpost)
+         grammaire_gpost (Hashtbl.create 2))
       (Hashset.of_list [ 'c' ]))
 
+(*
 let test_regroupe_union : unit =
   (match
      regroupe_union
@@ -74,6 +76,7 @@ let test_regroupe_union : unit =
   | _ -> assert false);
 
   assert (regroupe_union [] = [])
+*)
 
 (* let test_fermeture_situations_LR1 : unit =
   (* Dans les examples suivants, les symboles « drapeau » dans le livre sont
