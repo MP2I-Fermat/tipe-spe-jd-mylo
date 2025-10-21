@@ -26,6 +26,9 @@ type ('token_type, 'non_terminal) syntax_tree =
 type ('token_type, 'non_terminal) lr0_situation =
   ('token_type, 'non_terminal) rule * int
 
+type ('token_type, 'non_terminal) lr1_situation =
+  ('token_type, 'non_terminal) lr0_situation * 'token_type Hashset.t
+
 (* Dictionnaire de situations LR(0) a leurs ensembles premiers correspondants.
    On assure de cette façon l’unicité de la situation pour une règle donnee
    dans les états des automates LR(1). *)
@@ -152,7 +155,7 @@ let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
   let nouvelle_situation_regle (nt : 'non_terminal)
       (sigma2 : 'token_type Hashset.t)
       (regle : ('token_type, 'non_terminal) rule) :
-      (('token_type, 'non_terminal) lr0_situation * 'token_type Hashset.t)
+      (('token_type, 'non_terminal) lr1_situation)
       option =
     if fst regle = nt then Some ((regle, 0), Hashset.copy sigma2) else None
   in
@@ -162,7 +165,7 @@ let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
   let liste_nouvelles_situations
       (((_, derivation), curseur) : ('token_type, 'non_terminal) lr0_situation)
       (sigma : 'token_type Hashset.t) :
-      (('token_type, 'non_terminal) lr0_situation * 'token_type Hashset.t) list
+      (('token_type, 'non_terminal) lr1_situation) list
       =
     let regle_fin = list_skip derivation curseur in
     match regle_fin with
@@ -510,7 +513,7 @@ let string_of_symbol (s : (char, char) grammar_entry) : string =
   match s with Terminal c | NonTerminal c -> string_of_char c
 
 let string_of_situation
-    ((((n, rule), idx), sigma) : (char, char) lr0_situation * char Hashset.t) :
+    ((((n, rule), idx), sigma) : (char, char) lr1_situation) :
     string =
   let ns = string_of_char n in
   let rule_chars =
