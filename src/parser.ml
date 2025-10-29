@@ -23,9 +23,11 @@ type ('token_type, 'non_terminal) syntax_tree =
   | Node of 'non_terminal * ('token_type, 'non_terminal) syntax_tree list
   | Leaf of 'token_type token
 
+(* Représente les situations LR(0), du style α₁…αⱼ↑ α₁₊ⱼ…αₙ *)
 type ('token_type, 'non_terminal) lr0_situation =
   ('token_type, 'non_terminal) rule * int
 
+(* Représente les situations LR(1), du style α₁…αⱼ↑ α₁₊ⱼ…αₙ ~ {b₁…bₙ} *)
 type ('token_type, 'non_terminal) lr1_situation =
   ('token_type, 'non_terminal) lr0_situation * 'token_type Hashset.t
 
