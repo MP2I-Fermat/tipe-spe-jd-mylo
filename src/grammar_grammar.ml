@@ -34,11 +34,13 @@ let grammar_token_rules =
         ( Regex.Empty
           |> add_character_range 'A' 'Z'
           |> add_character_range 'a' 'z'
+          |> add_character_range '0' '9'
           |> add_character '_',
           Regex.Star
             (Regex.Empty
             |> add_character_range 'A' 'Z'
             |> add_character_range 'a' 'z'
+            |> add_character_range '0' '9'
             |> add_character '_') ),
       Identifier );
     (Concatenation (Symbol ' ', Star (Symbol ' ')), Whitespace);
