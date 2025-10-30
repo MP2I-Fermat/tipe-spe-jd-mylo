@@ -305,9 +305,9 @@ SIMPLE_MATCHING -> PATTERN right_arrow EXPR_NO_DANGLING_MATCHING pipe SIMPLE_MAT
 MULTIPLE_MATCHING -> PATTERN_LIST_B right_arrow EXPR_NO_DANGLING_MATCHING
 MULTIPLE_MATCHING -> PATTERN_LIST_B right_arrow EXPR_NO_DANGLING_MATCHING pipe MULTIPLE_MATCHING
 
-PATTERN_LIST_B -> PATTERN
-# Unimplemented as it causes conflicts (is ConstructorA ConstructorB, ConstructorA(ConstructorB) or two separate patterns? )
-#PATTERN_LIST_B -> PATTERN PATTERN_LIST_B
+# Must use PATTERN_0 and not PATTERN as it causes conflicts (is ConstructorA ConstructorB, ConstructorA(ConstructorB) or two separate patterns? )
+PATTERN_LIST_B -> PATTERN_0
+PATTERN_LIST_B -> PATTERN_0 PATTERN_LIST_B
 
 LET_BINDING_LIST -> LET_BINDING
 LET_BINDING_LIST -> LET_BINDING and LET_BINDING_LIST
@@ -418,3 +418,7 @@ CONSTR -> open_bracket_bar close_bracket_bar
 
 # begin end as synonym for ()
 CONSTR -> begin end
+
+# Single = for type aliases
+TYPEDEF -> lowercase_ident eq TYP_EXPR
+TYPEDEF -> TYPE_PARAMS lowercase_ident eq TYP_EXPR
