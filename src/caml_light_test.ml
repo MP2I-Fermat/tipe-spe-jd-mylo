@@ -38,4 +38,4 @@ let test_tree = parse_caml_light_syntax_tree test_source;;
 
 print_syntax_tree test_tree
   (fun x -> x)
-  (fun x -> x.value ^ "(" ^ x.token_type ^ ")")
+  (fun x -> x.value ^ " (" ^ x.token_type ^ ")")
