@@ -1,0 +1,6 @@
+(library
+ (name tipe))
+
+(env
+  (dev
+    (flags (:standard -w -9-27-33-39))))

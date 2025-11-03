@@ -19,7 +19,7 @@ let automaton = remove_epsilon_transitions epsilon_automaton
 let _ = print_automaton (String.make 1) string_of_int automaton
 let automaton_det = determinize automaton
 
-let _ =
+(* let _ =
   print_automaton (String.make 1)
     (fun state ->
       List.fold_left
@@ -27,4 +27,4 @@ let _ =
           acc ^ (if not (acc = "[") then ", " else "") ^ string_of_int el)
         "[" state
       ^ "]")
-    automaton_det
+    automaton_det *)
