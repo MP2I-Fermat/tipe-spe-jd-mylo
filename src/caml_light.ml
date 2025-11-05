@@ -1783,3 +1783,6 @@ let string_of_ast (ast : program) =
   let chain = ref [] in
   strifigy_ast_into ast (fun piece -> chain := piece :: !chain);
   String.concat "" (List.rev !chain)
+
+let parse_caml_light_ast (source : string) : program =
+  ast_of_syntax_tree (parse_caml_light_syntax_tree source)
