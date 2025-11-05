@@ -1,3 +1,4 @@
+open Utils
 open Lexer
 open Regex_grammar
 open Parser
@@ -69,9 +70,9 @@ and program = phrase node list node
 
 and phrase =
   | Expression of expression node
-  | Value of value_definition node
-  | Type of type_definition node
-  | Exception of exception_definition node
+  | ValueDefinition of value_definition node
+  | TypeDefinition of type_definition node
+  | ExceptionDefinition of exception_definition node
 
 and parenthesis_style = Parenthesis | BeginEnd
 and for_direction = Up | Down
@@ -410,9 +411,9 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
     | Node ("CONSTANT", [ Leaf { token_type = "float_literal"; value } ]) ->
         FloatLiteral (float_of_string value)
     | Node ("CONSTANT", [ Leaf { token_type = "char_literal"; value } ]) ->
-        CharacterLiteral { value = value.[0]; style = Old }
+        CharacterLiteral { value = value.[1]; style = Old }
     | Node ("CONSTANT", [ Leaf { token_type = "string_literal"; value } ]) ->
-        StringLiteral value
+        StringLiteral (String.sub value 1 (String.length value - 2))
     | Node ("CONSTANT", [ (Node ("CONSTR", _) as constr) ]) ->
         let constr_node = constructor constr in
         Construction constr_node
@@ -1379,13 +1380,13 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         Expression expr_node
     | Node ("IMPL_PHRASE", [ (Node ("VALUE_DEFINITION", _) as val_def) ]) ->
         let val_def_node = value_definition val_def in
-        Value val_def_node
+        ValueDefinition val_def_node
     | Node ("IMPL_PHRASE", [ (Node ("TYPE_DEFINITION", _) as typ_def) ]) ->
         let typ_def_node = type_definition typ_def in
-        Type typ_def_node
+        TypeDefinition typ_def_node
     | Node ("IMPL_PHRASE", [ (Node ("EXCEPTION_DEFINITION", _) as exc_def) ]) ->
         let exc_def_node = exception_definition exc_def in
-        Exception exc_def_node
+        ExceptionDefinition exc_def_node
     | _ -> failwith "Not an implementation phrase"
   in
 
@@ -1405,3 +1406,380 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
       let remaining_node = ast_of_syntax_tree remaining in
       phrase_node :: remaining_node
   | _ -> failwith "Not an implementation"
+
+let strifigy_ast_into (ast : program) (sink : string -> unit) : unit =
+  (* Required so OCaml does not instantiate 'a. *)
+  let rec iter_with_join : 'a. ('a -> unit) -> string -> 'a list -> unit =
+   fun f s l ->
+    match l with
+    | [] -> ()
+    | x :: [] -> f x
+    | x :: q ->
+        f x;
+        sink s;
+        iter_with_join f s q
+  in
+
+  let rec handle_type_expression (e : type_expression) =
+    match e with
+    | Argument n ->
+        sink "'";
+        sink n
+    | Parenthesised e ->
+        sink "(";
+        handle_type_expression e;
+        sink ")"
+    | Construction c ->
+        (match c.arguments with
+        | [] -> ()
+        | [ e ] -> handle_type_expression e
+        | _ ->
+            sink "(";
+            iter_with_join handle_type_expression ", " c.arguments;
+            sink ")");
+        sink " ";
+        sink c.constructor
+    | Tuple t -> iter_with_join handle_type_expression " * " t
+    | Function f ->
+        handle_type_expression f.argument;
+        sink " -> ";
+        handle_type_expression f.result
+  in
+
+  let handle_constructor (c : constructor) =
+    match c with
+    | Named n -> sink n
+    | EmptyList -> sink "[]"
+    | Unit style -> sink (if style = Parenthesis then "()" else "begin end")
+    | EmptyArray -> sink "[||]"
+  in
+
+  let handle_constant (c : constant) =
+    match c with
+    | IntegerLiteral i -> sink (string_of_int i)
+    | FloatLiteral f -> sink (string_of_float f)
+    | CharacterLiteral c ->
+        sink (if c.style = New then "'" else "`");
+        sink (string_of_char c.value);
+        sink (if c.style = New then "'" else "`")
+    | StringLiteral s ->
+        sink "\"";
+        sink s;
+        sink "\""
+    | Construction c -> handle_constructor c
+  in
+
+  let rec handle_pattern (p : pattern) =
+    match p with
+    | Ident e -> sink e
+    | Underscore -> sink "_"
+    | Parenthesised p ->
+        sink "(";
+        handle_pattern p;
+        sink ")"
+    | TypeCoercion c ->
+        sink "(";
+        handle_pattern c.inner;
+        sink " : ";
+        handle_type_expression c.typ;
+        sink ")"
+    | Constant c -> handle_constant c
+    | Record r ->
+        sink "{";
+        iter_with_join
+          (fun (field, pattern) ->
+            sink field;
+            sink " = ";
+            handle_pattern pattern)
+          "; " r;
+        sink "}"
+    | List l ->
+        sink "[";
+        iter_with_join handle_pattern "; " l;
+        sink "]"
+    | Construction c ->
+        handle_constructor c.constructor;
+        sink " ";
+        handle_pattern c.argument
+    | Concatenation c ->
+        handle_pattern c.head;
+        sink " :: ";
+        handle_pattern c.tail
+    | Tuple t -> iter_with_join handle_pattern ", " t
+    | Or o -> iter_with_join handle_pattern " | " o
+    | As a ->
+        handle_pattern a.inner;
+        sink " as ";
+        sink a.name
+  in
+
+  let rec handle_binding (b : binding) =
+    match b with
+    | Variable v ->
+        handle_pattern v.lhs;
+        sink " = ";
+        handle_expression v.value
+    | Function f ->
+        sink f.name;
+        sink " ";
+        iter_with_join handle_pattern " " f.parameters;
+        sink " = ";
+        handle_expression f.value
+  and handle_expression (e : expression) =
+    match e with
+    | Variable v -> sink v
+    | Constant c -> handle_constant c
+    | Parenthesised e ->
+        sink (if e.style = Parenthesis then "(" else "begin");
+        handle_expression e.inner;
+        sink (if e.style = Parenthesis then ")" else "end")
+    | TypeCoercion e ->
+        sink "(";
+        handle_expression e.inner;
+        sink " : ";
+        handle_type_expression e.typ;
+        sink ")"
+    | ListLiteral l ->
+        sink "[";
+        iter_with_join handle_expression ";" l;
+        sink "]"
+    | ArrayLiteral l ->
+        sink "[|";
+        iter_with_join handle_expression ";" l;
+        sink "|]"
+    | RecordLiteral l ->
+        sink "{";
+        iter_with_join
+          (fun (l, e) ->
+            sink l;
+            sink " = ";
+            handle_expression e)
+          ";" l;
+        sink "}"
+    | WhileLoop l ->
+        sink "while ";
+        handle_expression l.condition;
+        sink " do ";
+        handle_expression l.body;
+        sink " done"
+    | ForLoop l ->
+        sink "for ";
+        sink l.variable;
+        sink " = ";
+        handle_expression l.start;
+        sink (if l.direction = Up then " to " else " downto ");
+        handle_expression l.finish;
+        sink " do ";
+        handle_expression l.body;
+        sink " done"
+    | Dereference e ->
+        sink "!";
+        handle_expression e
+    | FieldAccess a ->
+        handle_expression a.receiver;
+        sink ".";
+        sink a.target
+    | ArrayAccess a ->
+        handle_expression a.receiver;
+        sink ".(";
+        handle_expression a.target;
+        sink ")"
+    | FunctionApplication f ->
+        handle_expression f.receiver;
+        sink " ";
+        iter_with_join handle_expression " " f.arguments
+    | PrefixOperation o ->
+        sink (match o.operation with Minus -> "-" | MinusDot -> "-.");
+        handle_expression o.receiver
+    | InfixOperation o ->
+        handle_expression o.lhs;
+        sink
+          (match o.operation with
+          | DoubleStar -> " ** "
+          | Mod -> " mod "
+          | Star -> " * "
+          | StarDot -> " *. "
+          | Slash -> " / "
+          | SlashDot -> " /. "
+          | Plus -> " + "
+          | PlusDot -> " +. "
+          | Minus -> " - "
+          | MinusDot -> " -. "
+          | DoubleColon -> " :: "
+          | At -> " @ "
+          | Caret -> " ^ "
+          | Eq -> " = "
+          | Neq -> " <> "
+          | DoubleEq -> " == "
+          | BangEq -> " != "
+          | Less -> " < "
+          | Leq -> " <= "
+          | Greater -> " > "
+          | Geq -> " >= "
+          | LessDot -> " <. "
+          | LeqDot -> " <=. "
+          | GreaterDot -> " >. "
+          | GeqDot -> " >=. "
+          | Ampersand -> " & "
+          | Or -> " or "
+          | DoubleAmpersand -> " && "
+          | DoublePipe -> " || ");
+        handle_expression o.rhs
+    | Negation n ->
+        sink "not ";
+        handle_expression n
+    | Tuple t -> iter_with_join handle_expression ", " t
+    | FieldAssignment a ->
+        handle_expression a.receiver;
+        sink ".";
+        sink a.target;
+        sink " <- ";
+        handle_expression a.value
+    | ArrayAssignment a ->
+        handle_expression a.receiver;
+        sink ".(";
+        handle_expression a.target;
+        sink ") <- ";
+        handle_expression a.value
+    | ReferenceAssignment a ->
+        handle_expression a.receiver;
+        sink " := ";
+        handle_expression a.value
+    | If i -> (
+        sink "if ";
+        handle_expression i.condition;
+        sink " then ";
+        handle_expression i.body;
+        match i.else_body with
+        | None -> ()
+        | Some b ->
+            sink " else ";
+            handle_expression b)
+    | Sequence s -> iter_with_join handle_expression "; " s
+    | Match m ->
+        sink "match ";
+        handle_expression m.value;
+        sink " with ";
+        iter_with_join
+          (function
+            | [ case ], expr ->
+                handle_pattern case;
+                sink " -> ";
+                handle_expression expr
+            | _ -> failwith "More than one case in match")
+          "|" m.cases
+    | Try t ->
+        sink "try ";
+        handle_expression t.value;
+        sink " with ";
+        iter_with_join
+          (function
+            | [ case ], expr ->
+                handle_pattern case;
+                sink " -> ";
+                handle_expression expr
+            | _ -> failwith "More than one case in match")
+          "|" t.cases
+    | FunctionLiteral f ->
+        sink (if f.style = Fun then "fun " else "function ");
+        iter_with_join
+          (fun (cases, expr) ->
+            iter_with_join handle_pattern " " cases;
+            sink " -> ";
+            handle_expression expr)
+          "|" f.cases
+    | LetBinding l ->
+        sink "let ";
+        if l.is_rec then sink "rec ";
+        iter_with_join handle_binding " and " l.bindings;
+        sink " in ";
+        handle_expression l.inner
+    | StringAccess s ->
+        handle_expression s.target;
+        sink ".[";
+        handle_expression s.target;
+        sink "]"
+    | StringAssignment a ->
+        handle_expression a.target;
+        sink ".[";
+        handle_expression a.target;
+        sink "] <- ";
+        handle_expression a.value
+  in
+
+  let handle_value_definition (v : value_definition) =
+    sink "let ";
+    if v.is_rec then sink "rec ";
+    iter_with_join handle_binding " and " v.bindings
+  in
+
+  let handle_type_parameters (parenthesised : bool) (p : lowercase_ident list) =
+    if parenthesised then sink "(";
+    iter_with_join sink ", " p;
+    if parenthesised then sink ")";
+    sink " "
+  in
+
+  let handle_constructor_declaration (c : type_constructor_declaration) =
+    sink c.name;
+    match c.parameter with
+    | None -> ()
+    | Some p ->
+        sink " of ";
+        handle_type_expression p
+  in
+
+  let handle_field_declaration (f : field_declaration) =
+    if f.is_mutable then sink "mutable ";
+    sink f.name;
+    sink " : ";
+    handle_type_expression f.typ
+  in
+
+  let handle_typedef (t : typedef) =
+    match t with
+    | Constructors c ->
+        handle_type_parameters c.parenthesised_parameters c.parameters;
+        sink c.name;
+        sink " = ";
+        iter_with_join handle_constructor_declaration " | " c.constructors
+    | Record r ->
+        handle_type_parameters r.parenthesised_parameters r.parameters;
+        sink r.name;
+        sink "{";
+        iter_with_join handle_field_declaration "; " r.fields;
+        sink "}"
+    | Alias a ->
+        handle_type_parameters a.parenthesised_parameters a.parameters;
+        sink a.name;
+        sink (if a.style = SingleEq then " = " else " == ");
+        handle_type_expression a.aliased
+    | Anonymous a ->
+        handle_type_parameters a.parenthesised_parameters a.parameters;
+        sink a.name
+  in
+
+  let handle_type_definition (t : type_definition) =
+    sink "type ";
+    iter_with_join handle_typedef " and " t
+  in
+
+  let handle_exception_definition (e : exception_definition) =
+    sink "exception ";
+    iter_with_join handle_constructor_declaration " and " e.exceptions
+  in
+
+  let handle_phrase (phrase : phrase) =
+    (match phrase with
+    | Expression e -> handle_expression e
+    | ValueDefinition v -> handle_value_definition v
+    | TypeDefinition t -> handle_type_definition t
+    | ExceptionDefinition e -> handle_exception_definition e);
+    sink ";;"
+  in
+  List.iter handle_phrase ast
+
+let string_of_ast (ast : program) =
+  let chain = ref [] in
+  strifigy_ast_into ast (fun piece -> chain := piece :: !chain);
+  String.concat "" (List.rev !chain)

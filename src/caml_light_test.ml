@@ -34,10 +34,7 @@ let test_source =
   close_in test_source_fp;
   test_source
 
-let test_tree = parse_caml_light_syntax_tree test_source;;
+let syntax_tree = parse_caml_light_syntax_tree test_source
+let ast = ast_of_syntax_tree syntax_tree;;
 
-print_syntax_tree test_tree
-  (fun x -> x)
-  (fun x -> x.value ^ " (" ^ x.token_type ^ ")")
-
-let ast = ast_of_syntax_tree test_tree
+print_endline (string_of_ast ast)
