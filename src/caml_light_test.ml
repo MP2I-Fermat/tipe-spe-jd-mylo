@@ -9,7 +9,7 @@ let string_of_situation
   in
   let rule_beginning = list_beginning rule_chars idx |> String.concat " " in
   let rule_end = list_skip rule_chars idx |> String.concat " " in
-  let sigma_s = Hashset.to_list sigma |> String.concat ", " in
+  let sigma_s = TerminalSet.to_seq sigma |> List.of_seq |> String.concat ", " in
   n ^ " -> " ^ rule_beginning ^ "^" ^ rule_end ^ " ~ {" ^ sigma_s ^ "}"
 
 let string_of_caml_automaton_state (s : (string, string) lr1_automaton_state) :

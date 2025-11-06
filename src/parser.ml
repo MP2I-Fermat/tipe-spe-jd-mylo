@@ -29,13 +29,13 @@ type ('token_type, 'non_terminal) lr0_situation =
 
 (* Représente les situations LR(1), du style α₁…αⱼ↑ α₁₊ⱼ…αₙ ~ {b₁…bₙ} *)
 type ('token_type, 'non_terminal) lr1_situation =
-  ('token_type, 'non_terminal) lr0_situation * 'token_type Hashset.t
+  ('token_type, 'non_terminal) lr0_situation * 'token_type TerminalSet.t
 
 (* Dictionnaire de situations LR(0) a leurs ensembles premiers correspondants.
    On assure de cette façon l’unicité de la situation pour une règle donnee
    dans les états des automates LR(1). *)
 type ('token_type, 'non_terminal) lr1_automaton_state =
-  (('token_type, 'non_terminal) lr0_situation, 'token_type Hashset.t) Hashtbl.t
+  (('token_type, 'non_terminal) lr0_situation, 'token_type TerminalSet.t) Hashtbl.t
 
 (* Représente un automate LR(1) *)
 type ('token_type, 'non_terminal) lr1_automaton =
@@ -50,20 +50,22 @@ type ('token_type, 'non_terminal) lr1_transition =
 
 let grammar_of_rule_list (l: ('token_type, 'non_terminal) rule list): ('token_type, 'non_terminal) grammar =
   let res = Hashtbl.create 8 in
-  List.iter (fun (nt, derivation) -> 
-    match Hashtbl.find_opt res nt with
-    | Some existing_derivations -> Hashtbl.replace res nt (derivation::existing_derivations)
-    | None -> Hashtbl.add res nt [derivation]
-  ) l;
+  List.iter
+    (fun (nt, derivation) ->
+      match Hashtbl.find_opt res nt with
+      | Some existing_derivations ->
+          Hashtbl.replace res nt (derivation :: existing_derivations)
+      | None -> Hashtbl.add res nt [ derivation ])
+    l;
   res
 
 (* Renvoie l’ensemble Premier_LL(1)(s) dans la grammaire g *)
 let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
     (g : ('token_type, 'non_terminal) grammar)
+    (mapping : 'token_type TerminalSet.mapping)
     (cache :
-      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t)
-       Hashtbl.t)
-    : 'token_type Hashset.t =
+      (('token_type, 'non_terminal) derivation, 'token_type TerminalSet.t)
+       Hashtbl.t): 'token_type TerminalSet.t =
   (* Crée un dictionnaire d tel que d[s] est l'ensemble des derivations w tels
      que premier(s) est inclus dans premier(w).
      cf. 4.2.1.3 Théorème 32 (p 63). *)
@@ -83,9 +85,9 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
           match derivation with
           | [ Terminal _ ] -> []
           | [ NonTerminal n ] -> (
-            match Hashtbl.find_opt g n with
-            | Some derivations -> derivations
-            | None -> [])
+              match Hashtbl.find_opt g n with
+              | Some derivations -> derivations
+              | None -> [])
           | x :: q -> [ [ x ] ]
           | [] -> failwith "Cannot compute premier_LL1 of an empty derivation"
         in
@@ -112,11 +114,11 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
   (* Initialisation *)
   Hashtbl.iter
     (fun k v ->
-      let premier_k = Hashset.create () in
+      let premier_k = TerminalSet.create mapping in
       Hashtbl.add valeurs k premier_k;
       match k with
       | [ Terminal a ] ->
-          Hashset.add premier_k a;
+          TerminalSet.add premier_k a;
           Hashset.add a_traiter k
       | _ -> (
           match Hashtbl.find_opt cache k with
@@ -135,13 +137,13 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
     Hashset.iter
       (fun sur_derivation ->
         let valeur_sur_derivation = Hashtbl.find valeurs sur_derivation in
-        let longueur_init = Hashset.length valeur_sur_derivation in
-        Hashset.iter (Hashset.add valeur_sur_derivation) valeur_derivation;
+        let longueur_init = TerminalSet.length valeur_sur_derivation in
+        TerminalSet.iter (TerminalSet.add valeur_sur_derivation) valeur_derivation;
 
         (* Si l'ajout des éléments de valeur_derivation a changé la
          * valeur de valeur_sur_derivation, alors il faut re-traiter
          * sur_derivation. *)
-        if longueur_init <> Hashset.length valeur_sur_derivation then
+        if longueur_init <> TerminalSet.length valeur_sur_derivation then
           Hashset.add a_traiter sur_derivation)
       sur_derivations
   done;
@@ -152,42 +154,46 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
 
 (* Renvoie l’ensemble Premier_LR(1)(s, σ) dans la grammaire g *)
 let premier_LR1 (s : ('token_type, 'non_terminal) derivation)
-    (sigma : 'token_type Hashset.t) (g : ('token_type, 'non_terminal) grammar)
+    (sigma : 'token_type TerminalSet.t)
+    (g : ('token_type, 'non_terminal) grammar)
+    (mapping : 'token_type TerminalSet.mapping)
     (cache :
-      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t)
-       Hashtbl.t)
-    : 'token_type Hashset.t =
-  match s with [] -> sigma | _ -> premier_LL1 s g cache
+      (('token_type, 'non_terminal) derivation, 'token_type TerminalSet.t) Hashtbl.t)
+      : 'token_type TerminalSet.t =
+  match s with [] -> sigma | _ -> premier_LL1 s g mapping cache
 
 (* Sature e jusqu'à que e soit une fermeture des situations LR(1) de e. *)
 let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
     (g : ('token_type, 'non_terminal) grammar)
+    (mapping : 'token_type TerminalSet.mapping)
     (premier_cache :
-      (('token_type, 'non_terminal) derivation, 'token_type Hashset.t)
+      (('token_type, 'non_terminal) derivation, 'token_type TerminalSet.t )
        Hashtbl.t)
     : unit =
   (* Si le non-terminal de règle est nt, renvoie la situation nt->^γ~σ2.
    * Renvoie None sinon *)
-  let nouvelle_situation_regle
-      (sigma2 : 'token_type Hashset.t)
+  let nouvelle_situation_regle (sigma2 : 'token_type TerminalSet.t)
       (regle : ('token_type, 'non_terminal) rule) :
-      (('token_type, 'non_terminal) lr1_situation) =
-    ((regle, 0), Hashset.copy sigma2)
+      ('token_type, 'non_terminal) lr1_situation =
+    ((regle, 0), TerminalSet.copy sigma2)
   in
 
   (* Sachant une situation s : N -> α^Tβ~σ avec T un non-terminal, renvoie
    * la liste des situations T->^γ~premierLR1(β, σ) pour T->γ règle de g *)
   let liste_nouvelles_situations
       (((_, derivation), curseur) : ('token_type, 'non_terminal) lr0_situation)
-      (sigma : 'token_type Hashset.t) :
-      (('token_type, 'non_terminal) lr1_situation) list
-      =
+      (sigma : 'token_type TerminalSet.t) :
+      ('token_type, 'non_terminal) lr1_situation list =
     let regle_fin = list_skip derivation curseur in
     match regle_fin with
     | NonTerminal nt :: beta -> (
-        let premier = premier_LR1 beta sigma g premier_cache in
+        let premier = premier_LR1 beta sigma g mapping premier_cache in
         match Hashtbl.find_opt g nt with
-        | Some derivations -> List.map (fun derivation -> nouvelle_situation_regle premier (nt, derivation)) derivations
+        | Some derivations ->
+            List.map
+              (fun derivation ->
+                nouvelle_situation_regle premier (nt, derivation))
+              derivations
         | None -> [])
     | _ -> []
   in
@@ -207,9 +213,9 @@ let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
             Hashtbl.add e nouvelle_situation nouveau_premier;
             Hashset.add a_traiter nouvelle_situation
         | Some premier ->
-            let longueur_init = Hashset.length premier in
-            Hashset.iter (Hashset.add premier) nouveau_premier;
-            if longueur_init <> Hashset.length premier then
+            let longueur_init = TerminalSet.length premier in
+            TerminalSet.iter (TerminalSet.add premier) nouveau_premier;
+            if longueur_init <> TerminalSet.length premier then
               (* On a ajouté des elements a l'ensemble sigma de T -> ^gamma *)
               Hashset.add a_traiter nouvelle_situation)
       nouvelles_situations
@@ -225,7 +231,7 @@ let states_equal (a : ('token_type, 'non_terminal) lr1_automaton_state)
     |> Seq.for_all (fun (k, v) ->
            match Hashtbl.find_opt b k with
            | None -> false
-           | Some v' -> Hashset.equals v v')
+           | Some v' -> TerminalSet.equals v v')
 
 (* Construit l’automate LR(1) de la grammaire g. eof_token désigne le lexème
  * de fin de fichier, il ne doit pas être utilisé dans les règles de la
@@ -299,19 +305,29 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
   in
 
   let premier_cache = Hashtbl.create 2 in
+  let mapping =
+    TerminalSet.build_mapping
+      (lexeme_eof
+      :: (Hashtbl.to_seq_values g |> List.of_seq |> List.flatten
+         |> List.map
+              (List.filter_map (fun s ->
+                   match s with NonTerminal _ -> None | Terminal t -> Some t))
+         |> List.flatten))
+  in
 
   (* On ajoute toutes les règles pour l'axiome, puis on ferme l'ensemble pour
    * obtenir l’état initial. *)
   let etat_initial = Hashtbl.create 2 in
   (match Hashtbl.find_opt g axiome with
-  | Some derivations -> List.iter
-    (fun derivation -> 
-      Hashtbl.add etat_initial 
-          ((axiome, derivation), 0)
-          (Hashset.singleton lexeme_eof))
-    derivations
+  | Some derivations ->
+      List.iter
+        (fun derivation ->
+          Hashtbl.add etat_initial
+            ((axiome, derivation), 0)
+            (TerminalSet.singleton mapping lexeme_eof))
+        derivations
   | None -> ());
-  fermer_situations_LR1 etat_initial g premier_cache;
+  fermer_situations_LR1 etat_initial g mapping premier_cache;
 
   (* transitions[state0][symbol] est l’état atteint en lisant symbol depuis
    * state0. *)
@@ -345,7 +361,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
             then
               Hashtbl.add nouvel_etat
                 ((nt, derivation), curseur + 1)
-                (Hashset.copy v))
+                (TerminalSet.copy v))
           etat;
 
         let fermeture_nouvel_etat =
@@ -355,7 +371,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
           | Some fermeture -> fermeture
           | None ->
               let copy = Hashtbl.copy nouvel_etat in
-              fermer_situations_LR1 nouvel_etat g premier_cache;
+              fermer_situations_LR1 nouvel_etat g mapping premier_cache;
               LR1StateMap.add
                 fermeture_cache (AnyLR1State.Any copy) nouvel_etat;
               if
@@ -390,16 +406,18 @@ let trouve_conflits (a : ('token_type, 'non_terminal) lr1_automaton) :
   (* Renvoie true ssi `s` est un état LR(1) présentant un conflit. *)
   let est_conflit (s : ('token_type, 'non_terminal) lr1_automaton_state) : bool
       =
+    let mapping = (List.hd (Hashtbl.to_seq_values s |> List.of_seq)).mapping in
+
     try
-      let suivants_a_reduire = Hashset.create () in
+      let suivants_a_reduire = TerminalSet.create mapping in
       (* Recherche de conflits réduire/réduire *)
       Hashtbl.iter
         (fun ((nt, derivation), curseur) v ->
           if curseur = List.length derivation then (
             if
-              not (Hashset.is_empty (Hashset.intersection v suivants_a_reduire))
+              not (TerminalSet.is_empty (TerminalSet.intersection v suivants_a_reduire))
             then raise Conflit;
-            Hashset.iter (Hashset.add suivants_a_reduire) v))
+            TerminalSet.iter (TerminalSet.add suivants_a_reduire) v))
         s;
 
       (* Recherche de conflits lire/réduire *)
@@ -409,7 +427,7 @@ let trouve_conflits (a : ('token_type, 'non_terminal) lr1_automaton) :
             match List.nth derivation curseur with
             | NonTerminal nt -> ()
             | Terminal t ->
-                if Hashset.mem suivants_a_reduire t then raise Conflit)
+                if TerminalSet.mem suivants_a_reduire t then raise Conflit)
         s;
 
       false
@@ -442,7 +460,7 @@ let trouve_reduction_a_faire
   let situation_a_reduire =
     Hashtbl.to_seq e
     |> seq_find (fun (lr0_situation, sigma) ->
-           a_reduire lr0_situation && Hashset.mem sigma t)
+           a_reduire lr0_situation && TerminalSet.mem sigma t)
   in
   match situation_a_reduire with
   | None -> None
@@ -536,8 +554,8 @@ let string_of_symbol (s : (char, char) grammar_entry) : string =
   match s with Terminal c | NonTerminal c -> string_of_char c
 
 let string_of_situation
-    ((((n, rule), idx), sigma) : (char, char) lr1_situation) :
-    string =
+    ((((n, rule), idx), sigma) : (char, char) lr1_situation)
+    : string =
   let ns = string_of_char n in
   let rule_chars =
     List.map (fun x -> match x with Terminal c | NonTerminal c -> c) rule
@@ -545,7 +563,8 @@ let string_of_situation
   let rule_beginning = implode (list_beginning rule_chars idx) in
   let rule_end = implode (list_skip rule_chars idx) in
   let sigma_s =
-    Hashset.to_list sigma |> List.map string_of_char |> String.concat ", "
+    TerminalSet.to_seq sigma |> List.of_seq |> List.map string_of_char
+    |> String.concat ", "
   in
   ns ^ " -> " ^ rule_beginning ^ "^" ^ rule_end ^ " ~ {" ^ sigma_s ^ "}"
 
