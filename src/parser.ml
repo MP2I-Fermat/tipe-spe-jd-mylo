@@ -17,7 +17,7 @@ type ('token_type, 'non_terminal) rule =
   'non_terminal * ('token_type, 'non_terminal) derivation
 
 type ('token_type, 'non_terminal) grammar =
-  ('token_type, 'non_terminal) rule list
+  ('non_terminal, ('token_type, 'non_terminal) derivation list) Hashtbl.t
 
 type ('token_type, 'non_terminal) syntax_tree =
   | Node of 'non_terminal * ('token_type, 'non_terminal) syntax_tree list
@@ -48,6 +48,15 @@ type ('token_type, 'non_terminal) lr1_transition =
   * ('token_type, 'non_terminal) grammar_entry
   * ('token_type, 'non_terminal) lr1_automaton_state
 
+let grammar_of_rule_list (l: ('token_type, 'non_terminal) rule list): ('token_type, 'non_terminal) grammar =
+  let res = Hashtbl.create 8 in
+  List.iter (fun (nt, derivation) -> 
+    match Hashtbl.find_opt res nt with
+    | Some existing_derivations -> Hashtbl.replace res nt (derivation::existing_derivations)
+    | None -> Hashtbl.add res nt [derivation]
+  ) l;
+  res
+
 (* Renvoie l’ensemble Premier_LL(1)(s) dans la grammaire g *)
 let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
     (g : ('token_type, 'non_terminal) grammar)
@@ -73,8 +82,10 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
         let derivation_contient =
           match derivation with
           | [ Terminal _ ] -> []
-          | [ NonTerminal n ] ->
-              List.filter_map (fun (n', d) -> if n = n' then Some d else None) g
+          | [ NonTerminal n ] -> (
+            match Hashtbl.find_opt g n with
+            | Some derivations -> derivations
+            | None -> [])
           | x :: q -> [ [ x ] ]
           | [] -> failwith "Cannot compute premier_LL1 of an empty derivation"
         in
@@ -157,12 +168,11 @@ let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
     : unit =
   (* Si le non-terminal de règle est nt, renvoie la situation nt->^γ~σ2.
    * Renvoie None sinon *)
-  let nouvelle_situation_regle (nt : 'non_terminal)
+  let nouvelle_situation_regle
       (sigma2 : 'token_type Hashset.t)
       (regle : ('token_type, 'non_terminal) rule) :
-      (('token_type, 'non_terminal) lr1_situation)
-      option =
-    if fst regle = nt then Some ((regle, 0), Hashset.copy sigma2) else None
+      (('token_type, 'non_terminal) lr1_situation) =
+    ((regle, 0), Hashset.copy sigma2)
   in
 
   (* Sachant une situation s : N -> α^Tβ~σ avec T un non-terminal, renvoie
@@ -174,9 +184,11 @@ let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
       =
     let regle_fin = list_skip derivation curseur in
     match regle_fin with
-    | NonTerminal nt :: beta ->
+    | NonTerminal nt :: beta -> (
         let premier = premier_LR1 beta sigma g premier_cache in
-        List.filter_map (nouvelle_situation_regle nt premier) g
+        match Hashtbl.find_opt g nt with
+        | Some derivations -> List.map (fun derivation -> nouvelle_situation_regle premier (nt, derivation)) derivations
+        | None -> [])
     | _ -> []
   in
 
@@ -291,13 +303,14 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
   (* On ajoute toutes les règles pour l'axiome, puis on ferme l'ensemble pour
    * obtenir l’état initial. *)
   let etat_initial = Hashtbl.create 2 in
-  List.iter
-    (fun (nt, derivation) ->
-      if nt = axiome then
-        Hashtbl.add etat_initial
-          ((nt, derivation), 0)
+  (match Hashtbl.find_opt g axiome with
+  | Some derivations -> List.iter
+    (fun derivation -> 
+      Hashtbl.add etat_initial 
+          ((axiome, derivation), 0)
           (Hashset.singleton lexeme_eof))
-    g;
+    derivations
+  | None -> ());
   fermer_situations_LR1 etat_initial g premier_cache;
 
   (* transitions[state0][symbol] est l’état atteint en lisant symbol depuis

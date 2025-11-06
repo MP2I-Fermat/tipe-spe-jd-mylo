@@ -52,28 +52,30 @@ let grammar_token_rules =
   ]
 
 let grammar_rules =
-  [
-    (Grammar, [ NonTerminal Grammar_entry ]);
-    (Grammar, [ NonTerminal Grammar; NonTerminal Grammar_entry ]);
-    (* Allow empty lines *)
-    (Grammar_entry, [ Terminal Newline ]);
-    (Grammar_entry, [ NonTerminal Terminal_definition; Terminal Newline ]);
-    (Grammar_entry, [ NonTerminal NonTerminal_definition; Terminal Newline ]);
-    (Terminal_definition, [ Terminal Identifier; Terminal Terminal_pattern ]);
-    ( NonTerminal_definition,
-      [
-        Terminal Identifier;
-        Terminal Derivation_symbol;
-        NonTerminal Rule_identifier_list;
-      ] );
-    (Rule_identifier_list, [ NonTerminal Rule_identifier_list_entry ]);
-    ( Rule_identifier_list,
-      [
-        NonTerminal Rule_identifier_list_entry; NonTerminal Rule_identifier_list;
-      ] );
-    (Rule_identifier_list_entry, [ Terminal Identifier ]);
-    (Rule_identifier_list_entry, [ Terminal Identifier; Terminal Question ]);
-  ]
+  grammar_of_rule_list
+    [
+      (Grammar, [ NonTerminal Grammar_entry ]);
+      (Grammar, [ NonTerminal Grammar; NonTerminal Grammar_entry ]);
+      (* Allow empty lines *)
+      (Grammar_entry, [ Terminal Newline ]);
+      (Grammar_entry, [ NonTerminal Terminal_definition; Terminal Newline ]);
+      (Grammar_entry, [ NonTerminal NonTerminal_definition; Terminal Newline ]);
+      (Terminal_definition, [ Terminal Identifier; Terminal Terminal_pattern ]);
+      ( NonTerminal_definition,
+        [
+          Terminal Identifier;
+          Terminal Derivation_symbol;
+          NonTerminal Rule_identifier_list;
+        ] );
+      (Rule_identifier_list, [ NonTerminal Rule_identifier_list_entry ]);
+      ( Rule_identifier_list,
+        [
+          NonTerminal Rule_identifier_list_entry;
+          NonTerminal Rule_identifier_list;
+        ] );
+      (Rule_identifier_list_entry, [ Terminal Identifier ]);
+      (Rule_identifier_list_entry, [ Terminal Identifier; Terminal Question ]);
+    ]
 
 let grammar_of_syntax_tree
     (tree : (grammar_token_type, grammar_node_type) syntax_tree) :
@@ -244,7 +246,7 @@ let grammar_of_syntax_tree
       raw_grammar_rules
   in
 
-  (token_rules, grammar_rules)
+  (token_rules, grammar_of_rule_list grammar_rules)
 
 let parse_grammar (s : string) =
   let tokens = tokenize grammar_token_rules Eof s in

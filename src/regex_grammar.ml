@@ -61,33 +61,36 @@ type regex_rule =
   | Character_class_entry
 
 let regex_grammar =
-  [
-    (Regex_union, [ NonTerminal Regex_concatenation ]);
-    ( Regex_union,
-      [ NonTerminal Regex_concatenation; Terminal Or; NonTerminal Regex_union ]
-    );
-    (Regex_concatenation, [ NonTerminal Regex_primitive ]);
-    ( Regex_concatenation,
-      [ NonTerminal Regex_primitive; NonTerminal Regex_concatenation ] );
-    (Regex_primitive, [ NonTerminal Regex_primitive; Terminal Star ]);
-    (Regex_primitive, [ NonTerminal Regex_primitive; Terminal Plus ]);
-    (Regex_primitive, [ NonTerminal Regex_primitive; Terminal Question ]);
-    (Regex_primitive, [ Terminal Character ]);
-    (Regex_primitive, [ Terminal Escape ]);
-    ( Regex_primitive,
-      [ Terminal Open_paren; NonTerminal Regex_union; Terminal Close_paren ] );
-    ( Regex_primitive,
-      [
-        Terminal Open_bracket;
-        NonTerminal Character_class;
-        Terminal Close_bracket;
-      ] );
-    (Character_class, [ NonTerminal Character_class_entry ]);
-    ( Character_class,
-      [ NonTerminal Character_class_entry; NonTerminal Character_class ] );
-    (Character_class_entry, [ Terminal Character ]);
-    (Character_class_entry, [ Terminal Escape ]);
-  ]
+  grammar_of_rule_list
+    [
+      (Regex_union, [ NonTerminal Regex_concatenation ]);
+      ( Regex_union,
+        [
+          NonTerminal Regex_concatenation; Terminal Or; NonTerminal Regex_union;
+        ] );
+      (Regex_concatenation, [ NonTerminal Regex_primitive ]);
+      ( Regex_concatenation,
+        [ NonTerminal Regex_primitive; NonTerminal Regex_concatenation ] );
+      (Regex_primitive, [ NonTerminal Regex_primitive; Terminal Star ]);
+      (Regex_primitive, [ NonTerminal Regex_primitive; Terminal Plus ]);
+      (Regex_primitive, [ NonTerminal Regex_primitive; Terminal Question ]);
+      (Regex_primitive, [ Terminal Character ]);
+      (Regex_primitive, [ Terminal Escape ]);
+      ( Regex_primitive,
+        [ Terminal Open_paren; NonTerminal Regex_union; Terminal Close_paren ]
+      );
+      ( Regex_primitive,
+        [
+          Terminal Open_bracket;
+          NonTerminal Character_class;
+          Terminal Close_bracket;
+        ] );
+      (Character_class, [ NonTerminal Character_class_entry ]);
+      ( Character_class,
+        [ NonTerminal Character_class_entry; NonTerminal Character_class ] );
+      (Character_class_entry, [ Terminal Character ]);
+      (Character_class_entry, [ Terminal Escape ]);
+    ]
 
 let rec regex_of_regex_syntax_tree
     (node : (regex_token_type, regex_rule) syntax_tree) : char regex =
