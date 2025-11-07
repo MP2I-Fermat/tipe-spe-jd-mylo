@@ -8,8 +8,8 @@ let source =
 
 let ast = parse_caml_light_ast source
 
-let next_ident (t : (string, string) Hashtbl.t) =
-  "_" ^ string_of_int (Hashtbl.length t)
+let next_ident (t : (string, string) Hashtbl.t) (prefix : string) =
+  prefix ^ "_" ^ string_of_int (Hashtbl.length t)
 
 (* Obfuscates the program *)
 let transform (ast : program) : program =
@@ -17,26 +17,27 @@ let transform (ast : program) : program =
   let global_type_scope = Hashtbl.create 8 in
   let global_constructor_scope = Hashtbl.create 8 in
 
-  let subst (scope : (string, string) Hashtbl.t) ?(create : bool = false)
+  let subst (scope : (string, string) Hashtbl.t) ?(prefix : string option)
       (s : string) : string =
     match Hashtbl.find_opt scope s with
     | Some s' -> s'
-    | None ->
-        if create then (
-          let res = next_ident scope in
-          Hashtbl.add scope s res;
-          res)
-        else s
+    | None -> (
+        match prefix with
+        | Some prefix ->
+            let res = next_ident scope prefix in
+            Hashtbl.add scope s res;
+            res
+        | None -> s)
   in
 
   let rec transform_type_expression (e : type_expression) =
     match e with
-    | Argument n -> Argument (subst ~create:true global_type_scope n)
+    | Argument n -> Argument (subst ~prefix:"a" global_type_scope n)
     | Parenthesised e -> Parenthesised (transform_type_expression e)
     | Construction c ->
         Construction
           {
-            constructor = subst global_constructor_scope c.constructor;
+            constructor = subst global_type_scope c.constructor;
             arguments = List.map transform_type_expression c.arguments;
           }
     | Tuple t -> Tuple (List.map transform_type_expression t)
@@ -60,7 +61,7 @@ let transform (ast : program) : program =
 
   let rec transform_pattern (p : pattern) =
     match p with
-    | Ident e -> Ident (subst ~create:true global_value_scope e)
+    | Ident e -> Ident (subst ~prefix:"x" global_value_scope e)
     | Underscore -> Underscore
     | Parenthesised p -> Parenthesised (transform_pattern p)
     | TypeCoercion c ->
@@ -92,7 +93,7 @@ let transform (ast : program) : program =
         As
           {
             inner = transform_pattern a.inner;
-            name = subst ~create:true global_value_scope a.name;
+            name = subst ~prefix:"x" global_value_scope a.name;
           }
   in
 
@@ -102,7 +103,7 @@ let transform (ast : program) : program =
         let lhs = transform_pattern v.lhs in
         Variable { lhs; value = transform_expression v.value }
     | Function f ->
-        let name = subst ~create:true global_value_scope f.name in
+        let name = subst ~prefix:"mystere" global_value_scope f.name in
         let parameters = List.map transform_pattern f.parameters in
         Function { name; parameters; value = transform_expression f.value }
   and transform_expression (e : expression) : expression =
@@ -132,7 +133,7 @@ let transform (ast : program) : program =
             body = transform_expression l.body;
           }
     | ForLoop l ->
-        let variable = subst ~create:true global_value_scope l.variable in
+        let variable = subst ~prefix:"x" global_value_scope l.variable in
         ForLoop
           {
             direction = l.direction;
@@ -264,7 +265,7 @@ let transform (ast : program) : program =
 
   let transform_constructor_declaration (c : type_constructor_declaration) =
     {
-      name = subst ~create:true global_constructor_scope c.name;
+      name = subst ~prefix:"C" global_constructor_scope c.name;
       parameter =
         (match c.parameter with
         | None -> None
@@ -274,7 +275,7 @@ let transform (ast : program) : program =
 
   let transform_field_declaration (f : field_declaration) =
     {
-      name = subst ~create:true global_value_scope f.name;
+      name = subst ~prefix:"x" global_value_scope f.name;
       is_mutable = f.is_mutable;
       typ = transform_type_expression f.typ;
     }
@@ -283,41 +284,53 @@ let transform (ast : program) : program =
   let transform_typedef (t : typedef) =
     match t with
     | Constructors c ->
+        let name = subst ~prefix:"typ" global_type_scope c.name in
+        let parameters =
+          List.map (subst ~prefix:"a" global_type_scope) c.parameters
+        in
         Constructors
           {
-            name = subst ~create:true global_type_scope c.name;
+            name;
             parenthesised_parameters = c.parenthesised_parameters;
-            parameters =
-              List.map (subst ~create:true global_type_scope) c.parameters;
+            parameters;
             constructors =
               List.map transform_constructor_declaration c.constructors;
           }
     | Record r ->
+        let name = subst ~prefix:"typ" global_type_scope r.name in
+        let parameters =
+          List.map (subst ~prefix:"a" global_type_scope) r.parameters
+        in
         Record
           {
-            name = subst ~create:true global_type_scope r.name;
+            name;
             parenthesised_parameters = r.parenthesised_parameters;
-            parameters =
-              List.map (subst ~create:true global_type_scope) r.parameters;
+            parameters;
             fields = List.map transform_field_declaration r.fields;
           }
     | Alias a ->
+        let name = subst ~prefix:"typ" global_type_scope a.name in
+        let parameters =
+          List.map (subst ~prefix:"a" global_type_scope) a.parameters
+        in
         Alias
           {
+            name;
             style = a.style;
-            name = subst ~create:true global_type_scope a.name;
             parenthesised_parameters = a.parenthesised_parameters;
-            parameters =
-              List.map (subst ~create:true global_type_scope) a.parameters;
+            parameters;
             aliased = transform_type_expression a.aliased;
           }
     | Anonymous a ->
+        let name = subst ~prefix:"typ" global_type_scope a.name in
+        let parameters =
+          List.map (subst ~prefix:"a" global_type_scope) a.parameters
+        in
         Anonymous
           {
-            name = subst ~create:true global_type_scope a.name;
+            name;
             parenthesised_parameters = a.parenthesised_parameters;
-            parameters =
-              List.map (subst ~create:true global_type_scope) a.parameters;
+            parameters;
           }
   in
 

@@ -1715,7 +1715,7 @@ let strifigy_ast_into (ast : program) (sink : string -> unit) : unit =
 
   let handle_type_parameters (parenthesised : bool) (p : lowercase_ident list) =
     if parenthesised then sink "(";
-    iter_with_join sink ", " p;
+    iter_with_join sink ", " (List.map (fun n -> "'" ^ n) p);
     if parenthesised then sink ")";
     sink " "
   in
