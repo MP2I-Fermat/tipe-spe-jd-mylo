@@ -1,6 +1,8 @@
 (library
- (name tipe))
+ (name tipe)
+ (modules utils automaton regex lexer parser regex_grammar grammar_grammar))
 
 (env
-  (dev
-    (flags (:standard -w -9-27-33-39))))
+ (dev
+  (flags
+   (:standard -w -9-27-33-39))))
