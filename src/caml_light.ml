@@ -1407,7 +1407,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
       phrase_node :: remaining_node
   | _ -> failwith "Not an implementation"
 
-let strifigy_ast_into (ast : program) (sink : string -> unit) : unit =
+let stringify_ast_into (ast : program) (sink : string -> unit) : unit =
   (* Required so OCaml does not instantiate 'a. *)
   let rec iter_with_join : 'a. ('a -> unit) -> string -> 'a list -> unit =
    fun f s l ->
@@ -1781,7 +1781,7 @@ let strifigy_ast_into (ast : program) (sink : string -> unit) : unit =
 
 let string_of_ast (ast : program) =
   let chain = ref [] in
-  strifigy_ast_into ast (fun piece -> chain := piece :: !chain);
+  stringify_ast_into ast (fun piece -> chain := piece :: !chain);
   String.concat "" (List.rev !chain)
 
 let parse_caml_light_ast (source : string) : program =
