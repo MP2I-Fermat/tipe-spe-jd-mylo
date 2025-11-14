@@ -302,8 +302,8 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
     | Node
         ( "CONSTR",
           [
-            Leaf { token_type = "open_brace" };
-            Leaf { token_type = "close_brace" };
+            Leaf { token_type = "open_bracket" };
+            Leaf { token_type = "close_bracket" };
           ] ) ->
         EmptyList
     | Node
@@ -490,13 +490,6 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
             Leaf { token_type = "close_brace" };
           ] ) ->
         Record (field_pattern_list fields)
-    | Node
-        ( "PATTERN",
-          [
-            Leaf { token_type = "open_bracket" };
-            Leaf { token_type = "close_bracket" };
-          ] ) ->
-        List []
     | Node
         ( "PATTERN",
           [

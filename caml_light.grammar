@@ -108,11 +108,11 @@ double_star := \*\*
 VARIABLE -> lowercase_ident
 # C_CONSTR and NC_CONSTR merged into a single CONSTR variant
 #C_CONSTR -> uppercase_ident
-#C_CONSTR -> open_brace close_brace
+#C_CONSTR -> open_bracket close_bracket
 #C_CONSTR -> open_paren close_paren
 #NC_CONSTR -> uppercase_ident
 CONSTR -> uppercase_ident
-CONSTR -> open_brace close_brace
+CONSTR -> open_bracket close_bracket
 CONSTR -> open_paren close_paren
 TYPE_CONSTR -> lowercase_ident
 LABEL -> lowercase_ident
@@ -154,7 +154,8 @@ FIELD_PATTERN -> LABEL eq PATTERN
 FIELD_PATTERN_LIST -> FIELD_PATTERN
 FIELD_PATTERN_LIST -> FIELD_PATTERN semicolon FIELD_PATTERN_LIST
 PATTERN_0 -> open_brace FIELD_PATTERN_LIST close_brace
-PATTERN_0 -> open_bracket close_bracket
+# Covered by PATTERN_0 -> CONSTANT -> CONSTR -> open_bracket close_bracket
+#PATTERN_0 -> open_bracket close_bracket
 A_PATTERN_LIST -> PATTERN
 A_PATTERN_LIST -> PATTERN semicolon A_PATTERN_LIST
 PATTERN_0 -> open_bracket A_PATTERN_LIST close_bracket
