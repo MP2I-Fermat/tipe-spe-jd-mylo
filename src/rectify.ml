@@ -117,7 +117,7 @@ let rec get_variable_pattern (p : pattern) : variable =
 let contains_reference (v : variable) (e : expression) : bool =
   let contains = ref false in
   let _ =
-    map_expression
+    map_expression ~direction:Outwards
       (fun e ->
         (match e with Variable v' when v = v' -> contains := true | _ -> ());
         e)
@@ -134,8 +134,21 @@ let is_rectify_candidate (f : function_) ~(binding_is_rec : bool) : bool =
 let rectify ({ name; parameters; body } as f : function_) : function_ =
   let aux_name = name ^ "_aux" in
 
+  let id_function : expression =
+    Parenthesised
+      {
+        style = Parenthesis;
+        inner =
+          FunctionLiteral
+            {
+              style = Fun;
+              cases = [ ([ Ident "_aux_ret" ], Variable "_aux_ret") ];
+            };
+      }
+  in
+
   let rec replace_invocations (f : function_) (e : expression) : expression =
-    map_expression
+    map_expression ~direction:Outwards
       (fun e ->
         match e with
         | FunctionApplication { receiver = Variable v; arguments }
@@ -143,20 +156,7 @@ let rectify ({ name; parameters; body } as f : function_) : function_ =
             FunctionApplication
               {
                 receiver = Variable aux_name;
-                arguments =
-                  arguments
-                  @ [
-                      Parenthesised
-                        {
-                          style = Parenthesis;
-                          inner =
-                            FunctionLiteral
-                              {
-                                style = Fun;
-                                cases = [ ([ Ident "x" ], Variable "x") ];
-                              };
-                        };
-                    ];
+                arguments = arguments @ [ id_function ];
               }
         | _ -> e)
       e
@@ -212,18 +212,7 @@ let rectify ({ name; parameters; body } as f : function_) : function_ =
                   (parameters
                   |> List.map get_variable_pattern
                   |> List.map (fun v -> (Variable v : expression)))
-                  @ [
-                      Parenthesised
-                        {
-                          style = Parenthesis;
-                          inner =
-                            FunctionLiteral
-                              {
-                                style = Fun;
-                                cases = [ ([ Ident "x" ], Variable "x") ];
-                              };
-                        };
-                    ];
+                  @ [ id_function ];
               };
         };
   }
