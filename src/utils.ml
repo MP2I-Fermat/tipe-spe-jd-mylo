@@ -296,6 +296,10 @@ module TerminalSet = struct
 
   let to_seq (s : 'a t) : 'a Seq.t =
     let res = ref (fun () -> Seq.Nil) in
-    iter (fun item -> res := fun () -> Seq.Cons (item, !res)) s;
+    iter
+      (fun item ->
+        let res' = !res in
+        res := fun () -> Seq.Cons (item, res'))
+      s;
     !res
 end
