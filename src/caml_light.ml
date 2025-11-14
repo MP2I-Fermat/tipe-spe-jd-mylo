@@ -124,13 +124,15 @@ and constructor =
   | Unit of parenthesis_style
   | EmptyArray
 
+and function_ = {
+  name : variable node;
+  parameters : pattern node list;
+  body : expression node;
+}
+
 and binding =
   | Variable of { lhs : pattern node; value : expression node }
-  | Function of {
-      name : variable node;
-      parameters : pattern node list;
-      value : expression node;
-    }
+  | Function of function_
 
 and expression =
   | Variable of variable node
@@ -591,7 +593,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         let expr_node = expression expr in
 
         Function
-          { name = name_node; parameters = argument_nodes; value = expr_node }
+          { name = name_node; parameters = argument_nodes; body = expr_node }
     | _ -> failwith "Not a let binding"
   and let_binding_list (tree : (string, string) syntax_tree) : binding node list
       =
@@ -1525,7 +1527,7 @@ let stringify_ast_into (ast : program) (sink : string -> unit) : unit =
         sink " ";
         iter_with_join handle_pattern " " f.parameters;
         sink " = ";
-        handle_expression f.value
+        handle_expression f.body
   and handle_expression (e : expression) =
     match e with
     | Variable v -> sink v
