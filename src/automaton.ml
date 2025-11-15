@@ -111,9 +111,9 @@ let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
       incoming_states;
 
     (* Add transitions from all incoming states to reachable states, bypassing this state. *)
-    match Hashtbl.find_opt result_transitions state with
+    (match Hashtbl.find_opt result_transitions state with
     | None -> ()
-    | Some state_transitions -> (
+    | Some state_transitions ->
         Hashtbl.iter
           (fun symbol end_states ->
             Hashset.iter
@@ -136,28 +136,28 @@ let remove_epsilon_transitions (a : ('symbol, 'state) epsilon_automaton) :
                 in
                 Hashset.iter (Hashset.add transitions_for_symbol) end_states)
               incoming_states)
-          state_transitions;
+          state_transitions);
 
-        (* Add epsilon transitions from incoming states bypassing this state *)
-        match Hashtbl.find_opt outgoing_epsilon_transitions state with
-        | None -> ()
-        | Some end_states ->
-            (* Don't introduce e-loops. *)
-            Hashset.remove end_states state;
-            Hashset.iter
-              (fun start_state ->
-                let outgoing_transitions =
-                  Hashtbl.find outgoing_epsilon_transitions start_state
-                in
-                Hashset.iter (Hashset.add outgoing_transitions) end_states)
-              incoming_states;
-            Hashset.iter
-              (fun end_state ->
-                let incoming_transitions =
-                  Hashtbl.find incoming_epsilon_transitions end_state
-                in
-                Hashset.iter (Hashset.add incoming_transitions) incoming_states)
-              end_states)
+    (* Add epsilon transitions from incoming states bypassing this state *)
+    match Hashtbl.find_opt outgoing_epsilon_transitions state with
+    | None -> ()
+    | Some end_states ->
+        (* Don't introduce e-loops. *)
+        Hashset.remove end_states state;
+        Hashset.iter
+          (fun start_state ->
+            let outgoing_transitions =
+              Hashtbl.find outgoing_epsilon_transitions start_state
+            in
+            Hashset.iter (Hashset.add outgoing_transitions) end_states)
+          incoming_states;
+        Hashset.iter
+          (fun end_state ->
+            let incoming_transitions =
+              Hashtbl.find incoming_epsilon_transitions end_state
+            in
+            Hashset.iter (Hashset.add incoming_transitions) incoming_states)
+          end_states
   done;
 
   {
