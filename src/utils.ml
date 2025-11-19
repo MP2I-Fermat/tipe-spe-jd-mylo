@@ -47,10 +47,12 @@ module Hashset = struct
 
     Hashtbl.replace t.data a ()
 
-  let mem_add (t : 'a t) a =
-    let added = not (mem t a) in
-    if added then add t a;
-    added
+  let add_absent (t : 'a t) a =
+    if not t.rw then (
+      t.data <- Hashtbl.copy t.data;
+      t.rw <- true);
+
+    Hashtbl.add t.data a ()
 
   let remove (t : 'a t) a =
     if not t.rw then (
@@ -113,103 +115,86 @@ let hashtbl_remove_one (t : ('k, 'v) Hashtbl.t) =
       Hashtbl.remove t key;
       (key, value)
 
-module TerminalSet = struct
+module BitSet = struct
   let available_bits_per_int = 31
 
-  type 'a mapping = {
-    direct : ('a, int) Hashtbl.t;
-    reverse : 'a array;
-    item_count : int;
-  }
+  type t = { data : int array; mutable length : int }
 
-  type 'a t = { mapping : 'a mapping; mutable length : int; data : int array }
+  let create (n : int) : t =
+    let required_ints = ((n - 1) / available_bits_per_int) + 1 in
+    { data = Array.make required_ints 0; length = 0 }
 
-  let build_mapping (token_types : 'a list) : 'a mapping =
-    let direct = Hashtbl.create 8 in
-    List.iter
-      (fun token_type ->
-        if not (Hashtbl.mem direct token_type) then
-          Hashtbl.add direct token_type (Hashtbl.length direct))
-      token_types;
+  let _deconstruct (n : int) : int * int =
+    (n / available_bits_per_int, n mod available_bits_per_int)
 
-    let reverse =
-      Array.init (Hashtbl.length direct) (fun _ -> List.hd token_types)
-    in
+  let _reconstruct (i : int) (o : int) : int = (i * available_bits_per_int) + o
 
-    Hashtbl.iter (fun k v -> reverse.(v) <- k) direct;
+  let add (s : t) (n : int) : unit =
+    let i, o = _deconstruct n in
+    let prev = s.data.(i) in
+    let curr = prev lor (1 lsl o) in
+    s.data.(i) <- curr;
+    if curr <> prev then s.length <- s.length + 1
 
-    { direct; item_count = Hashtbl.length direct; reverse }
-
-  let create (mapping : 'a mapping) =
-    let data_length =
-      int_of_float
-        (ceil
-           (float_of_int mapping.item_count
-           /. float_of_int available_bits_per_int))
-    in
-    { mapping; length = 0; data = Array.make data_length 0 }
-
-  let add (s : 'a t) (item : 'a) : unit =
-    let i = Hashtbl.find s.mapping.direct item in
-    let prev = s.data.(i / available_bits_per_int) in
-    s.data.(i / available_bits_per_int) <-
-      s.data.(i / available_bits_per_int)
-      lor (1 lsl (i mod available_bits_per_int));
-    if prev <> s.data.(i / available_bits_per_int) then s.length <- s.length + 1
-
-  let length (s : 'a t) = s.length
-
-  let iter (f : 'a -> unit) (s : 'a t) =
+  let add_all (s : t) (s' : t) : unit =
     for i = 0 to Array.length s.data - 1 do
-      if s.data.(i) <> 0 then
-        for j = 0 to available_bits_per_int - 1 do
-          if s.data.(i) land (1 lsl j) <> 0 then
-            f s.mapping.reverse.(j + (i * available_bits_per_int))
-        done
+      let new_value = s.data.(i) lor s'.data.(i) in
+      if new_value <> s.data.(i) then (
+        let added = ref (s.data.(i) lxor new_value) in
+        while !added <> 0 do
+          if !added land 1 <> 0 then s.length <- s.length + 1;
+          added := !added lsr 1
+        done;
+        s.data.(i) <- new_value)
     done
 
-  let copy (s : 'a t) =
-    { mapping = s.mapping; length = s.length; data = Array.copy s.data }
+  let mem (s : t) (n : int) : bool =
+    let i, o = _deconstruct n in
+    s.data.(i) land (1 lsl o) <> 0
 
-  let equals (s1 : 'a t) (s2 : 'a t) =
-    if s1.length != s2.length || s1.mapping != s2.mapping then false
-    else
-      let equal_so_far = ref true in
-      let i = ref 0 in
-      while !equal_so_far && !i < Array.length s1.data do
-        equal_so_far := s1.data.(!i) = s2.data.(!i);
-        incr i
-      done;
-      !equal_so_far
+  let length (s : t) : int = s.length
+  let is_empty (s : t) : bool = length s = 0
 
-  let singleton (mapping : 'a mapping) (item : 'a) : 'a t =
-    let res = create mapping in
-    add res item;
-    res
+  let remove (s : t) (n : int) : unit =
+    let i, o = _deconstruct n in
+    let prev = s.data.(i) in
+    let curr = prev land lnot (1 lsl o) in
+    s.data.(i) <- curr;
+    if prev <> curr then s.length <- s.length - 1
 
-  let is_empty (s : 'a t) = s.length = 0
-
-  let intersection (s1 : 'a t) (s2 : 'a t) : 'a t =
-    let res =
-      {
-        mapping = s1.mapping;
-        data =
-          Array.init (Array.length s1.data) (fun i ->
-              s1.data.(i) land s2.data.(i));
-        length = 0;
-      }
+  let remove_one (s : t) : int =
+    let rec remove_one_from (i : int) : int =
+      if s.data.(i) <> 0 then (
+        let o = ref 0 in
+        while s.data.(i) land (1 lsl !o) = 0 do
+          incr o
+        done;
+        let res = _reconstruct i !o in
+        remove s res;
+        res)
+      else remove_one_from (i + 1)
     in
-    iter (fun _ -> res.length <- res.length + 1) res;
+    remove_one_from 0
+
+  let iter (f : int -> unit) (s : t) : unit =
+    for i = 0 to Array.length s.data - 1 do
+      let base = i * available_bits_per_int in
+      let value = ref s.data.(i) in
+      let o = ref 0 in
+      while !value <> 0 do
+        if !value land 1 <> 0 then f (base + !o);
+        value := !value lsr 1;
+        incr o
+      done
+    done
+
+  let copy (s : t) : t = { data = Array.copy s.data; length = s.length }
+
+  let equals (s1 : t) (s2 : t) : bool =
+    s1.length = s2.length && s1.data = s2.data
+
+  let intersection (s1 : t) (s2 : t) : t =
+    let res = create (Array.length s1.data * available_bits_per_int) in
+    iter (fun n -> if mem s2 n then add res n) s1;
     res
-
-  let mem (s : 'a t) (item : 'a) =
-    let idx = Hashtbl.find s.mapping.direct item in
-    s.data.(idx / available_bits_per_int)
-    land (1 lsl (idx mod available_bits_per_int))
-    <> 0
-
-  let to_seq (s : 'a t) : 'a Seq.t =
-    let res = ref (fun () -> Seq.Nil) in
-    iter (fun item -> res := fun () -> Seq.Cons (item, !res)) s;
-    !res
 end
