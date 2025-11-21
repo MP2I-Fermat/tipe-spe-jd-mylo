@@ -2,12 +2,14 @@ open Lexer
 open Automaton
 open Utils
 
+exception SyntaxError of string * int
+
 type ('token_type, 'non_terminal) grammar_entry =
   | NonTerminal of 'non_terminal
   | Terminal of 'token_type
 
 type ('token_type, 'non_terminal) non_terminal_or_token =
-  | NonTerminalRepr of 'non_terminal
+  | NonTerminalRepr of 'non_terminal * int
   | Token of 'token_type token
 
 type ('token_type, 'non_terminal) derivation =
@@ -471,7 +473,7 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
     (axiome : 'non_terminal) : ('token_type, 'non_terminal) syntax_tree =
   if trouve_conflits a <> None then
     failwith "L'automate présente des conflits – la grammaire n'est pas LR(1)";
-  let pile_arbres : ('token_type, 'non_terminal) syntax_tree Stack.t =
+  let pile_arbres : (('token_type, 'non_terminal) syntax_tree * int) Stack.t =
     Stack.create ()
   in
   let pile_etats = Stack.create () in
@@ -485,10 +487,13 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
       (text : ('token_type, 'non_terminal) non_terminal_or_token list) :
       ('token_type, 'non_terminal) syntax_tree =
     match text with
-    | [] -> failwith "Le token EOF n'aurait pas du être lu"
+    | [] -> raise (SyntaxError (
+        "Le token EOF n'aurait pas dû être lu (ou abscence de token EOF)",
+        0
+      ))
     | x :: q -> (
         match x with
-        | NonTerminalRepr nt ->
+        | NonTerminalRepr (nt, pos_nt) ->
             let est_a_eof =
               match q with
               | [ Token { token_type } ] when token_type = eof_symbol -> true
@@ -498,14 +503,19 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
               states_equal !etat_courant a.initial_state
               && nt = axiome && est_a_eof
             then
-              let racine = Stack.pop_opt pile_arbres in
-              match racine with
-              | None ->
-                  failwith
-                    "État invalide : absence de racine apres lecture du texte"
-              | Some racine ->
+              let racine_opt = Stack.pop_opt pile_arbres in
+              match racine_opt with
+              | None -> raise (SyntaxError (
+                  "État invalide : absence de racine apres lecture du texte",
+                  pos_nt
+                ))
+              | Some (racine, _) ->
                   if not (Stack.is_empty pile_arbres) then
-                    failwith "Axiome lu alors qu'il restait des arbres"
+                    let pos_start = snd (Stack.pop pile_arbres) in
+                    raise (SyntaxError (
+                      "Axiome lu alors qu'il restait des arbres",
+                      pos_start
+                    ))
                   else racine
             else
               let nouvel_etat = a.transition !etat_courant (NonTerminal nt) in
@@ -513,7 +523,8 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
               (etat_courant :=
                  match nouvel_etat with
                  | Some e -> e
-                 | _ -> failwith "Impossible de lire !");
+                 | None -> raise (SyntaxError ("Impossible de lire !", pos_nt))
+              );
               Stack.push !etat_courant pile_etats;
               parse_a_partir q
         | Token t -> (
@@ -528,24 +539,28 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
                    | Some e -> e
                    | _ ->
                        if t.token_type <> eof_symbol then
-                         failwith
-                           ("Impossible de lire " ^ t.value ^ " ("
-                          ^ string_of_int t.start ^ ")")
+                         raise (SyntaxError (
+                           ("Impossible de lire " ^ t.value), t.start))
                        else
-                         failwith
+                         raise (SyntaxError (
                            ("Lecture du texte terminée sans que l'analyse "
-                          ^ "syntaxique n'ait abouti"));
+                          ^ "syntaxique n'ait abouti"), t.start)));
                 Stack.push !etat_courant pile_etats;
                 (* La ligne suivante ne figure pas dans l’algo du livre *)
-                Stack.push (Leaf t) pile_arbres;
+                Stack.push (Leaf t, t.start) pile_arbres;
                 parse_a_partir q
             | Some (nt, regle) ->
                 let n = List.length regle in
-                let n_arbres = pop_n pile_arbres n |> List.rev in
-                Stack.push (Node (nt, n_arbres)) pile_arbres;
+                let n_arbres_pos = pop_n pile_arbres n |> List.rev in
+                let pos_start = begin match n_arbres_pos with
+                  | (_, pos)::_ -> pos
+                  | _ -> 0
+                end in
+                let n_arbres = List.map fst n_arbres_pos in
+                Stack.push (Node (nt, n_arbres), pos_start) pile_arbres;
                 let _ = pop_n pile_etats n in
                 etat_courant := Stack.top pile_etats;
-                parse_a_partir (NonTerminalRepr nt :: text)))
+                parse_a_partir ((NonTerminalRepr (nt, pos_start)) :: text)))
   in
   parse_a_partir nouveau_texte
 
