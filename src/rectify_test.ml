@@ -2,7 +2,7 @@ open Caml_light
 open Rectify
 
 let test_source =
-  let test_source_fp = open_in "../test.ml" in
+  let test_source_fp = open_in Sys.argv.(1) in
   let test_source =
     really_input_string test_source_fp (in_channel_length test_source_fp)
   in
