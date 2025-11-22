@@ -4,6 +4,7 @@ open Regex_grammar
 open Parser
 open Grammar_grammar
 
+(** The token rules and grammar rules for parsing Caml Light. *)
 let caml_light_tokens, caml_light_grammar =
   let caml_light_grammar_definition_fp = open_in "../caml_light.grammar" in
   let caml_light_grammar_definition =
@@ -13,9 +14,23 @@ let caml_light_tokens, caml_light_grammar =
   close_in caml_light_grammar_definition_fp;
   parse_grammar caml_light_grammar_definition
 
+(** The LR(1) automaton built from the Caml Light grammar. *)
 let caml_light_automaton =
   construit_automate_LR1 caml_light_grammar "IMPLEMENTATION" "<eof>"
 
+(** Collapses precedence rules for target in tree.
+
+    Parsing ambiguities in grammars are resolved by introducing precedence
+    levels that indicate which groupings should be preferred.
+
+    However, such a solution leads to the syntax tree containing many variants
+    of what is semantically only one rule.
+
+    This method collapses all occurrences of variants of a rule into a single
+    node type.
+
+    The resulting node type is defined by target. A node is considered to be a
+    variant of target if its node type is prefixed by target, *)
 let rec collapse_precedence (target : string)
     (tree : (string, string) syntax_tree) : (string, string) syntax_tree =
   match tree with
@@ -29,7 +44,11 @@ let rec collapse_precedence (target : string)
       Node (nt, List.map (collapse_precedence target) children)
   | _ -> tree
 
+(** Parses Caml Light source into a syntax tree. *)
 let parse_caml_light_syntax_tree (source : string) =
+  (* Additional token rules for separating syntax elements (whitespace) and
+     parsing comments (comment_start, comment_end, unrecognizable - which
+     is allowed within a comment).  *)
   let enhanced_token_rules =
     List.rev_append caml_light_tokens
       [
@@ -284,6 +303,7 @@ and exception_definition = {
   exceptions : type_constructor_declaration node list;
 }
 
+(** Converts a Caml Light syntax_tree to a Caml Light AST. *)
 let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
   let rec label (tree : (string, string) syntax_tree) : label node =
     match tree with
@@ -1403,6 +1423,9 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
       phrase_node :: remaining_node
   | _ -> failwith "Not an implementation"
 
+(** Converts a Caml Light AST back into Caml Light source. sink is called with
+    string fragments which, when concatenated in the order they are passed to
+    sink, form the program source. *)
 let stringify_ast_into (ast : program) (sink : string -> unit) : unit =
   (* Required so OCaml does not instantiate 'a. *)
   let rec iter_with_join : 'a. ('a -> unit) -> string -> 'a list -> unit =
@@ -1775,10 +1798,12 @@ let stringify_ast_into (ast : program) (sink : string -> unit) : unit =
   in
   List.iter handle_phrase ast
 
+(** Converts a Caml Light AST to Caml Light source code. *)
 let string_of_ast (ast : program) =
   let chain = ref [] in
   stringify_ast_into ast (fun piece -> chain := piece :: !chain);
   String.concat "" (List.rev !chain)
 
+(** Parses a Caml Light AST from Caml Light source code. *)
 let parse_caml_light_ast (source : string) : program =
   ast_of_syntax_tree (parse_caml_light_syntax_tree source)

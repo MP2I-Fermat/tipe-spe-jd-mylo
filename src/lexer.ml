@@ -6,6 +6,8 @@ type 'a token = { token_type : 'a; value : string; start : int; length : int }
 
 exception Tokenize_failure of { current_pos : int }
 
+(** Converts text to a list of tokens (including an EOF token) according to the
+    specified rules. *)
 let tokenize (rules : (uchar regex * 'a) list) (tok_eof : 'a) (tok_unknown : 'a)
     (text : string) : 'a token list =
   if List.find_opt (fun (_, token_type) -> token_type = tok_eof) rules <> None

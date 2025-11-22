@@ -79,6 +79,7 @@ let grammar_rules =
       (Rule_identifier_list_entry, [ Terminal Identifier; Terminal Question ]);
     ]
 
+(** Converts a grammar syntax tree to a set of token rules and grammar rules. *)
 let grammar_of_syntax_tree
     (tree : (grammar_token_type, grammar_node_type) syntax_tree) :
     (uchar regex * string) list * (string, string) grammar =
@@ -250,6 +251,7 @@ let grammar_of_syntax_tree
 
   (token_rules, grammar_of_rule_list grammar_rules)
 
+(** Parses a set of token rules and grammar rules from grammar source code. *)
 let parse_grammar (s : string) =
   let tokens = tokenize grammar_token_rules Eof Unrecognizable s in
   let tokens_no_whitespace =
