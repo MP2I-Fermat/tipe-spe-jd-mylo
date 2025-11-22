@@ -575,7 +575,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
     match tree with
     | Node
         ( "MULTIPLE_MATCHING",
-          [ patterns; Leaf { token_type = "right_arow" }; expr ] ) ->
+          [ patterns; Leaf { token_type = "right_arrow" }; expr ] ) ->
         let pattern_nodes = b_pattern_list patterns in
         let expr_node = expression expr in
         [ (pattern_nodes, expr_node) ]
@@ -583,7 +583,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         ( "MULTIPLE_MATCHING",
           [
             patterns;
-            Leaf { token_type = "right_arow" };
+            Leaf { token_type = "right_arrow" };
             expr;
             Leaf { token_type = "pipe" };
             rest;
