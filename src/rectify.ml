@@ -456,6 +456,7 @@ let linearize (e : expression) : (pattern * expression) list * string =
           value_items
           @ [ (Ident match_name, Try { value = Variable value_name; cases }) ],
           match_name )
+    (* Branching expression *)
     | FunctionLiteral { style; cases } ->
         let function_name = var_name count in
         ( count + 1,
@@ -544,7 +545,8 @@ let rec delinearize ((items, root) : (pattern * expression) list * string) :
                  match e with
                  | Variable v
                    when String.starts_with ~prefix:"_lin_" v
-                        || v = "_aux_continue" || v = "_new_aux_continue" -> (
+                        || String.starts_with ~prefix:"_aux_continue" v
+                        || String.starts_with ~prefix:"_new_aux_continue" v -> (
                      match List.assoc_opt (Ident v) so_far with
                      | Some def ->
                          substituted := v :: !substituted;
@@ -595,6 +597,9 @@ let rec delinearize ((items, root) : (pattern * expression) list * string) :
 let rectify ({ name = function_name; parameters; body } : function_) : function_
     =
   let aux_name = function_name ^ "_aux" in
+  let aux_continue_name =
+    "_aux_continue" ^ string_of_int (List.length parameters)
+  in
 
   let id_function : expression =
     Parenthesised
@@ -618,7 +623,7 @@ let rectify ({ name = function_name; parameters; body } : function_) : function_
             ( Ident "_lin_ret",
               FunctionApplication
                 {
-                  receiver = Variable "_aux_continue";
+                  receiver = Variable aux_continue_name;
                   arguments = [ Variable root ];
                 } );
           ],
@@ -630,13 +635,13 @@ let rectify ({ name = function_name; parameters; body } : function_) : function_
               rectify_expression (delinearize (q, root))
             in
             ( [
-                ( Ident "_new_aux_continue",
+                ( Ident ("_new" ^ aux_continue_name),
                   FunctionLiteral
                     {
                       style = Fun;
                       cases = [ ([ name ], new_continuation_body) ];
                     } );
-                (Ident "_aux_continue", Variable "_new_aux_continue");
+                (Ident aux_continue_name, Variable ("_new" ^ aux_continue_name));
                 (Ident "_lin_ret", push_rectification_down value);
               ],
               "_lin_ret" )
@@ -657,7 +662,7 @@ let rectify ({ name = function_name; parameters; body } : function_) : function_
         FunctionApplication
           {
             receiver = Variable aux_name;
-            arguments = arguments @ [ Variable "_aux_continue" ];
+            arguments = arguments @ [ Variable aux_continue_name ];
           }
     | Match { value; cases } ->
         Match
@@ -687,6 +692,10 @@ let rectify ({ name = function_name; parameters; body } : function_) : function_
                 (fun (patterns, value) -> (patterns, rectify_expression value))
                 cases;
           }
+    | FunctionLiteral { style; cases } ->
+        failwith
+          "Cannot push rectification into a function (mutually recursive \
+           functions are not implemented yet)"
     | _ -> e
   in
 
@@ -714,7 +723,7 @@ let rectify ({ name = function_name; parameters; body } : function_) : function_
                         Parenthesised
                           (TypeCoercion
                              {
-                               inner = Ident "_aux_continue";
+                               inner = Ident aux_continue_name;
                                typ =
                                  Function
                                    {
