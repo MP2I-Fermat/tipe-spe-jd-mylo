@@ -9,18 +9,21 @@ type value_declaration =
       body : expression node;
     }
 
-type scope = {
-  parent_scope : scope option;
-  value_declarations : (string, value_declaration) Hashtbl.t;
-}
-
-let rec scope_lookup (s : scope) (name : string) : value_declaration =
-  match Hashtbl.find_opt s.value_declarations name with
-  | Some d -> d
-  | None -> (
-      match s.parent_scope with
-      | None -> failwith "Declaration not found in scope"
-      | Some p -> scope_lookup p name)
+let rec introduced_variables (p : pattern) =
+  match p with
+  | Ident i -> [ i ]
+  | Underscore -> []
+  | Parenthesised e -> introduced_variables e
+  | TypeCoercion { inner } -> introduced_variables inner
+  | Constant _ -> []
+  | Record r -> List.concat_map (fun (_, p) -> introduced_variables p) r
+  | List l -> List.concat_map introduced_variables l
+  | Construction { argument } -> introduced_variables argument
+  | Concatenation { head; tail } ->
+      List.concat [ introduced_variables head; introduced_variables tail ]
+  | Tuple t -> List.concat_map introduced_variables t
+  | Or o -> List.concat_map introduced_variables o
+  | As { inner } -> introduced_variables inner
 
 let rec contains_only_full_applications (f : function_) (e : expression) : bool
     =
@@ -76,21 +79,42 @@ let rec contains_only_full_applications (f : function_) (e : expression) : bool
       | None -> true
       | Some else_body -> contains_only_full_applications f else_body)
   | Sequence s -> List.for_all (contains_only_full_applications f) s
-  (* TODO: Check if any patterns shadow the function *)
   | Match { value; cases } ->
       contains_only_full_applications f value
-      && List.for_all (fun (_, e) -> contains_only_full_applications f e) cases
+      && List.for_all
+           (fun (p, e) ->
+             p
+             |> List.map introduced_variables
+             |> List.flatten |> List.mem f.name
+             || contains_only_full_applications f e)
+           cases
   | Try { value; cases } ->
       contains_only_full_applications f value
-      && List.for_all (fun (_, e) -> contains_only_full_applications f e) cases
+      && List.for_all
+           (fun (p, e) ->
+             p
+             |> List.map introduced_variables
+             |> List.flatten |> List.mem f.name
+             || contains_only_full_applications f e)
+           cases
   | FunctionLiteral { cases } ->
-      List.for_all (fun (_, e) -> contains_only_full_applications f e) cases
-  (* TODO: Check if any bindings shadow the function *)
+      List.for_all
+        (fun (p, e) ->
+          p |> List.map introduced_variables |> List.flatten |> List.mem f.name
+          || contains_only_full_applications f e)
+        cases
   | LetBinding { bindings; inner } ->
       let check_binding (b : binding) : bool =
         match b with
-        | Variable { value } -> contains_only_full_applications f value
-        | Function f2 -> contains_only_full_applications f f2.body
+        | Variable { lhs; value } ->
+            List.mem f.name (introduced_variables lhs)
+            || contains_only_full_applications f value
+        | Function f2 ->
+            f2.name = f.name
+            || f2.parameters
+               |> List.map introduced_variables
+               |> List.flatten |> List.mem f.name
+            || contains_only_full_applications f f2.body
       in
       contains_only_full_applications f inner
       && List.for_all check_binding bindings
@@ -101,18 +125,6 @@ let rec contains_only_full_applications (f : function_) (e : expression) : bool
       contains_only_full_applications f receiver
       && contains_only_full_applications f target
       && contains_only_full_applications f value
-
-let rec is_variable_pattern (p : pattern) : bool =
-  match p with
-  | Ident _ | As _ -> true
-  | TypeCoercion { inner } | Parenthesised inner -> is_variable_pattern inner
-  | _ -> false
-
-let rec get_variable_pattern (p : pattern) : variable =
-  match p with
-  | Ident name | As { name } -> name
-  | TypeCoercion { inner } | Parenthesised inner -> get_variable_pattern inner
-  | _ -> failwith "Not a variable pattern"
 
 let contains_reference (v : variable) (e : expression) : bool =
   let contains = ref false in
@@ -129,7 +141,6 @@ let is_rectify_candidate (f : function_) ~(binding_is_rec : bool) : bool =
   binding_is_rec
   && contains_reference f.name f.body
   && contains_only_full_applications f f.body
-  && List.for_all is_variable_pattern f.parameters
 
 let is_simple_expression (e : expression) : bool =
   let res = ref true in
@@ -407,9 +418,16 @@ let rectify ({ name = function_name; parameters; body } : function_) : function_
     | _ -> e
   in
 
+  let new_parameters =
+    List.mapi
+      (fun i pattern ->
+        match pattern with Ident v -> v | _ -> "_arg_" ^ string_of_int i)
+      parameters
+  in
+
   {
     name = function_name;
-    parameters;
+    parameters = List.map (fun name -> Ident name) new_parameters;
     body =
       LetBinding
         {
@@ -442,8 +460,7 @@ let rectify ({ name = function_name; parameters; body } : function_) : function_
               {
                 receiver = Variable aux_name;
                 arguments =
-                  (parameters
-                  |> List.map get_variable_pattern
+                  (new_parameters
                   |> List.map (fun v -> (Variable v : expression)))
                   @ [ id_function ];
               };
@@ -479,16 +496,10 @@ let rectify_program (p : program) : program =
     match p with
     | Expression e -> Expression (rectify_expression e)
     | ValueDefinition { bindings; is_rec } ->
-        let unable_to_check_for_rec (b : binding) : bool =
+        let binding_names (b : binding) : variable list =
           match b with
-          | Variable { lhs } -> not (is_variable_pattern lhs)
-          | Function _ -> false
-        in
-
-        let binding_name (b : binding) : variable =
-          match b with
-          | Variable { lhs } -> get_variable_pattern lhs
-          | Function { name } -> name
+          | Variable { lhs } -> introduced_variables lhs
+          | Function { name } -> [ name ]
         in
 
         let binding_body (b : binding) : expression =
@@ -505,12 +516,13 @@ let rectify_program (p : program) : program =
               is_rec
               && List.exists
                    (fun binding ->
-                     unable_to_check_for_rec binding
-                     ||
-                     let name = binding_name binding in
+                     let names = binding_names binding in
                      List.exists
                        (fun binding' ->
-                         contains_reference name (binding_body binding'))
+                         List.exists
+                           (fun name ->
+                             contains_reference name (binding_body binding'))
+                           names)
                        new_bindings)
                    new_bindings;
           }
