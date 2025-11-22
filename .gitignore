@@ -12,3 +12,5 @@ perf.data.*
 *.log
 *.pdf
 *.synctex.gz
+
+*.g.ml
