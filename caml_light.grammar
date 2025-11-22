@@ -2,7 +2,7 @@
 # The axiom for this grammar is IMPLEMENTATION
 
 # P11
-lowercase_ident := [a-z][A-Za-z0-9_]*
+lowercase_ident := _?[a-z][A-Za-z0-9_]*
 uppercase_ident := [A-Z][A-Za-z0-9_]*
 
 integer_literal := -?([0-9]+|(0[xX][0-9A-Fa-f]+)|(0[oO][0-7]+)|(0[bB][0-1]+))
