@@ -24,10 +24,13 @@ type ('symbol, 'state) execution_state = {
   current_state : 'state;
 }
 
+(** Returns an execution of a starting in a's initial_state *)
 let start_execution (a : ('symbol, 'state) deterministic_automaton) :
     ('symbol, 'state) execution_state =
   { automaton = a; current_state = a.initial_state }
 
+(** Returns the state following e after reading s. Returns None if the automaton
+    has no such state. *)
 let next_state (e : ('symbol, 'state) execution_state) (s : 'symbol) :
     ('symbol, 'state) execution_state option =
   let next_state = e.automaton.transition e.current_state s in
@@ -36,6 +39,7 @@ let next_state (e : ('symbol, 'state) execution_state) (s : 'symbol) :
   | Some next_state ->
       Some { automaton = e.automaton; current_state = next_state }
 
+(** Returns true if e is a final state. *)
 let is_final_state (e : _ execution_state) : bool =
   Hashset.mem e.automaton.final_states e.current_state
 
@@ -274,6 +278,11 @@ let determinize (a : ('symbol, 'state) automaton) :
         Hashtbl.find_opt state_transitions symbol);
   }
 
+(** Returns an automaton identical to a but with state and all transitions
+    leading to state removed.
+
+    This is primarily used to preemptively end executions of a if they get stuck
+    in a sinkhole. *)
 let remove_state (state : 'state)
     (a : ('symbol, 'state) deterministic_automaton) :
     ('symbol, 'state) deterministic_automaton =
