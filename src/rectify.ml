@@ -160,13 +160,6 @@ let linearize (e : expression) : (pattern * expression) list * string =
       int * (pattern * expression) list * string =
     match e with
     | Variable v -> (count, [], v)
-    | Match { value; cases } ->
-        let count, value_items, value_name = linearize_items_from value count in
-        let match_name = var_name count in
-        ( count + 1,
-          value_items
-          @ [ (Ident match_name, Match { value = Variable value_name; cases }) ],
-          match_name )
     | InfixOperation { lhs; operation; rhs } ->
         let count, lhs_items, lhs_name = linearize_items_from lhs count in
         let count, rhs_items, rhs_name = linearize_items_from rhs count in
@@ -197,14 +190,108 @@ let linearize (e : expression) : (pattern * expression) list * string =
                 TypeCoercion { inner = Variable inner_name; typ } );
             ],
           coercion_name )
-    | ListLiteral _ -> failwith "Unimplemented: linearize ListLiteral"
-    | ArrayLiteral _ -> failwith "Unimplemented: linearize ArrayLiteral"
-    | RecordLiteral _ -> failwith "Unimplemented: linearize RecordLiteral"
+    | ListLiteral l ->
+        let count, content_items, content_names =
+          List.fold_left
+            (fun (count, prev_literals, prev_names) element ->
+              let count, element_literals, element_name =
+                linearize_items_from element count
+              in
+              ( count,
+                prev_literals @ element_literals,
+                element_name :: prev_names ))
+            (count, [], []) l
+        in
+        let list_name = var_name count in
+        ( count + 1,
+          content_items
+          @ [
+              ( Ident list_name,
+                ListLiteral
+                  (content_names
+                  |> List.map (fun n -> (Variable n : expression))
+                  |> List.rev) );
+            ],
+          list_name )
+    | ArrayLiteral l ->
+        let count, content_items, content_names =
+          List.fold_left
+            (fun (count, prev_literals, prev_names) element ->
+              let count, element_literals, element_name =
+                linearize_items_from element count
+              in
+              ( count,
+                prev_literals @ element_literals,
+                element_name :: prev_names ))
+            (count, [], []) l
+        in
+        let array_name = var_name count in
+        ( count + 1,
+          content_items
+          @ [
+              ( Ident array_name,
+                ArrayLiteral
+                  (content_names
+                  |> List.map (fun n -> (Variable n : expression))
+                  |> List.rev) );
+            ],
+          array_name )
+    | RecordLiteral r ->
+        let count, content_items, contents =
+          List.fold_left
+            (fun (count, prev_literals, prev_names) (label, element) ->
+              let count, element_literals, element_name =
+                linearize_items_from element count
+              in
+              ( count,
+                prev_literals @ element_literals,
+                (label, (Variable element_name : expression)) :: prev_names ))
+            (count, [], []) r
+        in
+        let record_name = var_name count in
+        ( count + 1,
+          content_items
+          @ [ (Ident record_name, RecordLiteral (List.rev contents)) ],
+          record_name )
     | WhileLoop _ -> failwith "Unimplemented: linearize WhileLoop"
     | ForLoop _ -> failwith "Unimplemented: linearize ForLoop"
-    | Dereference _ -> failwith "Unimplemented: linearize Dereference"
-    | FieldAccess _ -> failwith "Unimplemented: linearize FieldAccess"
-    | ArrayAccess _ -> failwith "Unimplemented: linearize ArrayAccess"
+    | Dereference e ->
+        let count, e_items, e_name = linearize_items_from e count in
+        let dereference_name = var_name count in
+        ( count + 1,
+          e_items @ [ (Ident dereference_name, Dereference (Variable e_name)) ],
+          dereference_name )
+    | FieldAccess { receiver; target } ->
+        let count, receiver_items, receiver_name =
+          linearize_items_from receiver count
+        in
+        let access_name = var_name count in
+        ( count + 1,
+          receiver_items
+          @ [
+              ( Ident access_name,
+                FieldAccess { receiver = Variable receiver_name; target } );
+            ],
+          access_name )
+    | ArrayAccess { receiver; target } ->
+        let count, receiver_items, receiver_name =
+          linearize_items_from receiver count
+        in
+        let target, target_items, target_name =
+          linearize_items_from target count
+        in
+        let access_name = var_name count in
+        ( count + 1,
+          receiver_items @ target_items
+          @ [
+              ( Ident access_name,
+                ArrayAccess
+                  {
+                    receiver = Variable receiver_name;
+                    target = Variable target_name;
+                  } );
+            ],
+          access_name )
     | FunctionApplication { receiver; arguments } ->
         let count, receiver_items, receiver_name =
           linearize_items_from receiver count
@@ -233,16 +320,142 @@ let linearize (e : expression) : (pattern * expression) list * string =
                   } );
             ],
           application_name )
-    | PrefixOperation _ -> failwith "Unimplemented: linearize PrefixOperation"
-    | Negation _ -> failwith "Unimplemented: linearize Negation"
-    | Tuple _ -> failwith "Unimplemented: linearize Tuple"
-    | FieldAssignment _ -> failwith "Unimplemented: linearize FieldAssignment"
-    | ArrayAssignment _ -> failwith "Unimplemented: linearize ArrayAssignment"
-    | ReferenceAssignment _ ->
-        failwith "Unimplemented: linearize ReferenceAssignment"
-    | If _ -> failwith "Unimplemented: linearize If"
-    | Sequence _ -> failwith "Unimplemented: linearize Sequence"
-    | Try _ -> failwith "Unimplemented: linearize Try"
+    | PrefixOperation { receiver; operation } ->
+        let count, receiver_items, receiver_name =
+          linearize_items_from receiver count
+        in
+        let operation_name = var_name count in
+        ( count + 1,
+          receiver_items
+          @ [
+              ( Ident operation_name,
+                PrefixOperation { operation; receiver = Variable receiver_name }
+              );
+            ],
+          operation_name )
+    | Negation receiver ->
+        let count, receiver_items, receiver_name =
+          linearize_items_from receiver count
+        in
+        let operation_name = var_name count in
+        ( count + 1,
+          receiver_items
+          @ [ (Ident operation_name, Negation (Variable receiver_name)) ],
+          operation_name )
+    | Tuple t ->
+        let count, content_literals, content_names =
+          List.fold_left
+            (fun (count, prev_literals, prev_names) element ->
+              let count, element_literals, element_name =
+                linearize_items_from element count
+              in
+              ( count,
+                prev_literals @ element_literals,
+                element_name :: prev_names ))
+            (count, [], []) t
+        in
+        let list_name = var_name count in
+        ( count + 1,
+          content_literals
+          @ [
+              ( Ident list_name,
+                Tuple
+                  (content_names
+                  |> List.map (fun n -> (Variable n : expression))
+                  |> List.rev) );
+            ],
+          list_name )
+    | FieldAssignment { receiver; target; value } ->
+        let count, receiver_items, receiver_name =
+          linearize_items_from receiver count
+        in
+        let count, value_items, value_name = linearize_items_from value count in
+        let access_name = var_name count in
+        ( count + 1,
+          receiver_items @ value_items
+          @ [
+              ( Ident access_name,
+                FieldAssignment
+                  {
+                    receiver = Variable receiver_name;
+                    target;
+                    value = Variable value_name;
+                  } );
+            ],
+          access_name )
+    | ArrayAssignment { receiver; target; value } ->
+        let count, receiver_items, receiver_name =
+          linearize_items_from receiver count
+        in
+        let target, target_items, target_name =
+          linearize_items_from target count
+        in
+        let count, value_items, value_name = linearize_items_from value count in
+        let access_name = var_name count in
+        ( count + 1,
+          receiver_items @ target_items
+          @ [
+              ( Ident access_name,
+                ArrayAssignment
+                  {
+                    receiver = Variable receiver_name;
+                    target = Variable target_name;
+                    value = Variable value_name;
+                  } );
+            ],
+          access_name )
+    | ReferenceAssignment { receiver; value } ->
+        let count, receiver_items, receiver_name =
+          linearize_items_from receiver count
+        in
+        let count, value_items, value_name = linearize_items_from value count in
+        let access_name = var_name count in
+        ( count + 1,
+          receiver_items @ value_items
+          @ [
+              ( Ident access_name,
+                ReferenceAssignment
+                  {
+                    receiver = Variable receiver_name;
+                    value = Variable value_name;
+                  } );
+            ],
+          access_name )
+    (* Branching expression *)
+    | If { condition; body; else_body } ->
+        let count, condition_items, condition_name =
+          linearize_items_from condition count
+        in
+        let if_name = var_name count in
+        ( count + 1,
+          condition_items
+          @ [
+              ( Ident if_name,
+                If { condition = Variable condition_name; body; else_body } );
+            ],
+          if_name )
+    | Sequence l ->
+        List.fold_left
+          (fun (count, items, root) e ->
+            let count, e_items, e_root = linearize_items_from e count in
+            (count, items @ e_items, e_root))
+          (count, [], "_") l
+    (* Branching expression *)
+    | Match { value; cases } ->
+        let count, value_items, value_name = linearize_items_from value count in
+        let match_name = var_name count in
+        ( count + 1,
+          value_items
+          @ [ (Ident match_name, Match { value = Variable value_name; cases }) ],
+          match_name )
+    (* Branching expression *)
+    | Try { value; cases } ->
+        let count, value_items, value_name = linearize_items_from value count in
+        let match_name = var_name count in
+        ( count + 1,
+          value_items
+          @ [ (Ident match_name, Try { value = Variable value_name; cases }) ],
+          match_name )
     | FunctionLiteral { style; cases } ->
         let function_name = var_name count in
         ( count + 1,
@@ -274,8 +487,46 @@ let linearize (e : expression) : (pattern * expression) list * string =
         in
         let count, inner_items, inner_name = linearize_items_from inner count in
         (count, bindings_items @ inner_items, inner_name)
-    | StringAccess _ -> failwith "Unimplemented: linearize StringAccess"
-    | StringAssignment _ -> failwith "Unimplemented: linearize StringAssignment"
+    | StringAccess { target; receiver } ->
+        let count, receiver_items, receiver_name =
+          linearize_items_from receiver count
+        in
+        let target, target_items, target_name =
+          linearize_items_from target count
+        in
+        let access_name = var_name count in
+        ( count + 1,
+          receiver_items @ target_items
+          @ [
+              ( Ident access_name,
+                StringAccess
+                  {
+                    receiver = Variable receiver_name;
+                    target = Variable target_name;
+                  } );
+            ],
+          access_name )
+    | StringAssignment { receiver; target; value } ->
+        let count, receiver_items, receiver_name =
+          linearize_items_from receiver count
+        in
+        let target, target_items, target_name =
+          linearize_items_from target count
+        in
+        let count, value_items, value_name = linearize_items_from value count in
+        let access_name = var_name count in
+        ( count + 1,
+          receiver_items @ target_items
+          @ [
+              ( Ident access_name,
+                StringAssignment
+                  {
+                    receiver = Variable receiver_name;
+                    target = Variable target_name;
+                    value = Variable value_name;
+                  } );
+            ],
+          access_name )
   in
   let count, items, root = linearize_items_from e 0 in
   (items, root)
@@ -396,8 +647,18 @@ let rectify ({ name = function_name; parameters; body } : function_) : function_
           ((name, value) :: inner_items, inner_root)
   and rectify_expression (e : expression) : expression =
     delinearize (rectify_linear (linearize e))
+  (* Pushes rectification down into branching expressions that cannot be linearized. *)
   and push_rectification_down (e : expression) : expression =
     match e with
+    (* Substitute calls to original function with calls to auxiliary function here. *)
+    | FunctionApplication
+        { receiver = Caml_light.Variable receiver_name; arguments }
+      when receiver_name = function_name ->
+        FunctionApplication
+          {
+            receiver = Variable aux_name;
+            arguments = arguments @ [ Variable "_aux_continue" ];
+          }
     | Match { value; cases } ->
         Match
           {
@@ -407,13 +668,24 @@ let rectify ({ name = function_name; parameters; body } : function_) : function_
                 (fun (patterns, value) -> (patterns, rectify_expression value))
                 cases;
           }
-    | FunctionApplication
-        { receiver = Caml_light.Variable receiver_name; arguments }
-      when receiver_name = function_name ->
-        FunctionApplication
+    | If { condition; body; else_body } ->
+        If
           {
-            receiver = Variable aux_name;
-            arguments = arguments @ [ Variable "_aux_continue" ];
+            condition;
+            body = rectify_expression body;
+            else_body =
+              (match else_body with
+              | None -> None
+              | Some e -> Some (rectify_expression e));
+          }
+    | Try { value; cases } ->
+        Try
+          {
+            value;
+            cases =
+              List.map
+                (fun (patterns, value) -> (patterns, rectify_expression value))
+                cases;
           }
     | _ -> e
   in
