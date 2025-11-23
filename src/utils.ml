@@ -203,10 +203,13 @@ module TerminalSet = struct
     res
 
   let mem (s : 'a t) (item : 'a) =
-    let idx = Hashtbl.find s.mapping.direct item in
-    s.data.(idx / available_bits_per_int)
-    land (1 lsl (idx mod available_bits_per_int))
-    <> 0
+    let idx = Hashtbl.find_opt s.mapping.direct item in
+    match idx with
+    | None -> false
+    | Some idx ->
+        s.data.(idx / available_bits_per_int)
+        land (1 lsl (idx mod available_bits_per_int))
+        <> 0
 
   let to_seq (s : 'a t) : 'a Seq.t =
     let res = ref (fun () -> Seq.Nil) in
