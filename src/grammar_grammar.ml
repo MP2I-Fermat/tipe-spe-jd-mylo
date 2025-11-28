@@ -2,6 +2,7 @@ open Regex
 open Lexer
 open Parser
 open Regex_grammar
+open Utils
 
 type grammar_token_type =
   | Terminal_pattern
@@ -25,29 +26,30 @@ type grammar_node_type =
 let grammar_token_rules =
   [
     ( Concatenation
-        ( Concatenation (Symbol ':', Symbol '='),
-          Regex.Star (Empty |> add_character_range ' ' '~') ),
+        ( Concatenation (Symbol (u ':'), Symbol (u '=')),
+          Regex.Star (Empty |> add_character_range_c ' ' '~') ),
       Terminal_pattern );
-    ( Concatenation (Concatenation (Symbol '-', Symbol '>'), Symbol ' '),
+    ( Concatenation (Concatenation (Symbol (u '-'), Symbol (u '>')),
+                     Symbol (u ' ')),
       Derivation_symbol );
     ( Regex.Concatenation
         ( Regex.Empty
-          |> add_character_range 'A' 'Z'
-          |> add_character_range 'a' 'z'
-          |> add_character_range '0' '9'
-          |> add_character '_',
+          |> add_character_range_c 'A' 'Z'
+          |> add_character_range_c 'a' 'z'
+          |> add_character_range_c '0' '9'
+          |> add_character_c '_',
           Regex.Star
             (Regex.Empty
-            |> add_character_range 'A' 'Z'
-            |> add_character_range 'a' 'z'
-            |> add_character_range '0' '9'
-            |> add_character '_') ),
+            |> add_character_range_c 'A' 'Z'
+            |> add_character_range_c 'a' 'z'
+            |> add_character_range_c '0' '9'
+            |> add_character_c '_') ),
       Identifier );
-    (Concatenation (Symbol ' ', Star (Symbol ' ')), Whitespace);
-    (Symbol '\n', Newline);
-    (Symbol '?', Question);
-    (Symbol '#', Comment_start);
-    ( Regex.Empty |> add_character_range (char_of_int 0) (char_of_int 255),
+    (Concatenation (Symbol (u ' '), Star (Symbol (u ' '))), Whitespace);
+    (Symbol (u '\n'), Newline);
+    (Symbol (u '?'), Question);
+    (Symbol (u '#'), Comment_start);
+    ( Regex.Empty |> add_character_range_c (char_of_int 0) (char_of_int 255),
       Unrecognizable );
   ]
 
@@ -79,7 +81,7 @@ let grammar_rules =
 
 let grammar_of_syntax_tree
     (tree : (grammar_token_type, grammar_node_type) syntax_tree) :
-    (char regex * string) list * (string, string) grammar =
+    (uchar regex * string) list * (string, string) grammar =
   let strip_prefix_from_terminal_pattern (pattern : string) : string =
     let rec non_space_index (i : int) =
       if i = String.length pattern - 1 then i
@@ -92,7 +94,7 @@ let grammar_of_syntax_tree
 
   let build_terminal_definition
       (definition : (grammar_token_type, grammar_node_type) syntax_tree) :
-      char regex * string =
+      uchar regex * string =
     match definition with
     | Node
         ( Terminal_definition,
@@ -177,7 +179,7 @@ let grammar_of_syntax_tree
 
   let process_entry
       (entry : (grammar_token_type, grammar_node_type) syntax_tree)
-      (token_rules : (char regex * string) list)
+      (token_rules : (uchar regex * string) list)
       (grammar_rules : (string * string list) list) =
     match entry with
     | Node (Grammar_entry, [ Leaf { token_type = Newline } ]) ->
@@ -214,7 +216,7 @@ let grammar_of_syntax_tree
 
   let rec build_result_from
       (tree : (grammar_token_type, grammar_node_type) syntax_tree)
-      (token_rules : (char regex * string) list)
+      (token_rules : (uchar regex * string) list)
       (grammar_rules : (string * string list) list) =
     match tree with
     | Node (Grammar, [ entry ]) -> process_entry entry token_rules grammar_rules

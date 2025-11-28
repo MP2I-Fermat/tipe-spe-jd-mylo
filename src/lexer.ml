@@ -6,7 +6,7 @@ type 'a token = { token_type : 'a; value : string; start : int }
 
 exception Tokenize_failure of { current_pos : int }
 
-let tokenize (rules : (char regex * 'a) list) (tok_eof : 'a) (text : string) :
+let tokenize (rules : (uchar regex * 'a) list) (tok_eof : 'a) (text : string) :
     'a token list =
   if List.find_opt (fun (_, token_type) -> token_type = tok_eof) rules <> None
   then failwith "EOF token had production rule"
@@ -19,17 +19,17 @@ let tokenize (rules : (char regex * 'a) list) (tok_eof : 'a) (text : string) :
             t ))
         rules
     in
-    let rec tokenize_from (global_offset : int) (remaining_text : char list)
+    let rec tokenize_from (global_offset : int) (remaining_text : uchar list)
         (reversed_result : 'a token list) : 'a token list =
       if remaining_text = [] then
         { token_type = tok_eof; value = ""; start = global_offset }
         :: reversed_result
       else
         let rec read_longest_token_from (start : int)
-            (alive_states : (char, _) execution_state list)
-            (current_result : ('a token * char list) option)
-            (current_lexeme : char list) (remaining_text : char list) :
-            ('a token * char list) option =
+            (alive_states : (uchar, _) execution_state list)
+            (current_result : ('a token * uchar list) option)
+            (current_lexeme : uchar list) (remaining_text : uchar list) :
+            ('a token * uchar list) option =
           if List.length alive_states = 0 then current_result
           else
             let final_states = List.filter is_final_state alive_states in
@@ -40,7 +40,7 @@ let tokenize (rules : (char regex * 'a) list) (tok_eof : 'a) (text : string) :
                   Some
                     ( {
                         token_type = List.assq e.automaton automatons;
-                        value = implode (List.rev current_lexeme);
+                        value = implode_uchar (List.rev current_lexeme);
                         start;
                       },
                       remaining_text )
@@ -66,7 +66,7 @@ let tokenize (rules : (char regex * 'a) list) (tok_eof : 'a) (text : string) :
               (global_offset + String.length token.value)
               remaining_text (token :: reversed_result)
     in
-    List.rev (tokenize_from 0 (explode text) [])
+    List.rev (tokenize_from 0 (uchar_list_of_string text) [])
 
 let string_of_token (string_of_type : 'a -> string) (token : 'a token) =
   "Token("

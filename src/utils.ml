@@ -36,6 +36,7 @@ let rec seq_find (f : 'a -> bool) (s : 'a Seq.t) : 'a option =
 
 (* Fonctions pour gérer correctement des Uchar.t *)
 type uchar = Uchar.t
+let u = Uchar.of_char
 
 let uchar_list_of_string (s: string) : uchar list =
   let n = String.length s in
@@ -102,9 +103,13 @@ let int_list_of_uchar (u: uchar) : int list =
 let char_list_of_uchar (u: uchar) : char list =
   List.map char_of_int (int_list_of_uchar u)
 
-
 let string_of_uchar (u: uchar) : string =
   implode (char_list_of_uchar u)
+
+let implode_uchar (l: uchar list) : string =
+  let char_list_list = List.map char_list_of_uchar l in
+  let char_list = List.concat char_list_list in
+  implode char_list
 
 
 module Hashset = struct

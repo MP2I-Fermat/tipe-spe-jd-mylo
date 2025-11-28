@@ -16,22 +16,22 @@ let string_of_token_type (t : token_type) =
 
 let epsilon_regex =
   List.fold_left
-    (fun acc c -> Concatenation (acc, Symbol c))
+    (fun acc c -> Concatenation (acc, Symbol (u c)))
     Epsilon (explode "EPSILON")
 
 let special_rules =
   [
-    (Regex.Symbol '|', Or);
-    (Regex.Symbol '*', Star);
-    (Regex.Symbol '(', Open_Paren);
-    (Regex.Symbol ')', Close_Paren);
-    (Regex.Symbol ')', Close_Paren);
+    (Regex.Symbol (u '|'), Or);
+    (Regex.Symbol (u '*'), Star);
+    (Regex.Symbol (u '('), Open_Paren);
+    (Regex.Symbol (u ')'), Close_Paren);
+    (Regex.Symbol (u ')'), Close_Paren);
     (epsilon_regex, Epsilon);
   ]
 
 let symbol_rules =
   explode "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  |> List.map (fun c -> (Regex.Symbol c, Symbol))
+  |> List.map (fun c -> (Regex.Symbol (u c), Symbol))
 
 let regex_rules = special_rules @ symbol_rules
 let text_regex_source = "abc|(123)*|EPSILON"

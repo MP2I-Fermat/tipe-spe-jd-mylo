@@ -1,6 +1,7 @@
 open Regex
 open Lexer
 open Parser
+open Utils
 
 type regex_token_type =
   | Open_paren
@@ -15,41 +16,50 @@ type regex_token_type =
   | Character
   | Eof
 
-let add_character (c : char) (r : char regex) : char regex =
+
+let add_character (c : uchar) (r : uchar regex) : uchar regex =
   Regex.Union (r, Regex.Symbol c)
 
-let rec add_character_range (start : char) (last : char) (r : char regex) =
+let add_character_c (c : char) (r: uchar regex) : uchar regex =
+  add_character (u c) r
+
+
+let rec add_character_range (start : uchar) (last : uchar) (r : uchar regex) =
   if start > last then failwith "Invalid range";
   if start = last then add_character start r
   else
     add_character_range
-      (char_of_int (int_of_char start + 1))
+      (Uchar.of_int (Uchar.to_int start + 1))
       last (add_character start r)
+
+let add_character_range_c (start: char) (last: char) (r: uchar regex) =
+  add_character_range (u start) (u last) r
+
 
 let regex_token_rules =
   [
-    (Regex.Symbol '(', Open_paren);
-    (Regex.Symbol ')', Close_paren);
-    (Regex.Symbol '[', Open_bracket);
-    (Regex.Symbol ']', Close_bracket);
-    (Regex.Symbol '|', Or);
-    (Regex.Symbol '*', Star);
-    (Regex.Symbol '+', Plus);
-    (Regex.Symbol '?', Question);
+    (Regex.Symbol (u '('), Open_paren);
+    (Regex.Symbol (u ')'), Close_paren);
+    (Regex.Symbol (u '['), Open_bracket);
+    (Regex.Symbol (u ']'), Close_bracket);
+    (Regex.Symbol (u '|'), Or);
+    (Regex.Symbol (u '*'), Star);
+    (Regex.Symbol (u '+'), Plus);
+    (Regex.Symbol (u '?'), Question);
     ( Regex.Concatenation
-        ( Regex.Symbol '\\',
-          Regex.Empty |> add_character '(' |> add_character ')'
-          |> add_character '|' |> add_character '*' |> add_character '\\'
-          |> add_character 'n' |> add_character 't' |> add_character 'r'
-          |> add_character '[' |> add_character ']' |> add_character '+'
-          |> add_character '?' ),
+        ( Regex.Symbol (u '\\'),
+          Regex.Empty |> add_character_c '(' |> add_character_c ')'
+          |> add_character_c '|' |> add_character_c '*' |> add_character_c '\\'
+          |> add_character_c 'n' |> add_character_c 't' |> add_character_c 'r'
+          |> add_character_c '[' |> add_character_c ']' |> add_character_c '+'
+          |> add_character_c '?' ),
       Escape );
     ( Regex.Empty
-      |> add_character_range ' ' '\''
+      |> add_character_range_c ' ' '\''
       (* (, ), * *)
-      |> add_character_range '+' '{'
+      |> add_character_range_c '+' '{'
       (* | *)
-      |> add_character_range '}' '~',
+      |> add_character_range_c '}' '~',
       Character );
   ]
 
@@ -93,32 +103,33 @@ let regex_grammar =
     ]
 
 let rec regex_of_regex_syntax_tree
-    (node : (regex_token_type, regex_rule) syntax_tree) : char regex =
-  let expand_escape (value : string) : char =
+    (node : (regex_token_type, regex_rule) syntax_tree) : uchar regex =
+  let expand_escape (value : string) : uchar =
     let escaped_char = value.[1] in
-    match escaped_char with
+    (match escaped_char with
     | 'n' -> '\n'
     | 't' -> '\t'
     | 'r' -> '\r'
-    | _ -> escaped_char
+    | _ -> escaped_char)
+    |> u
   in
 
   let flatten_character_class
-      (node : (regex_token_type, regex_rule) syntax_tree) : char list =
+      (node : (regex_token_type, regex_rule) syntax_tree) : uchar list =
     let extract_character (node : (regex_token_type, regex_rule) syntax_tree) :
-        char =
+        uchar =
       match node with
       | Node (Character_class_entry, [ Leaf { token_type = Character; value } ])
         ->
-          value.[0]
+          u value.[0]
       | Node (Character_class_entry, [ Leaf { token_type = Escape; value } ]) ->
           expand_escape value
       | _ -> failwith "Not a member of a character class"
     in
 
     let rec flatten_character_class_into_rev
-        (node : (regex_token_type, regex_rule) syntax_tree) (res : char list) :
-        char list =
+        (node : (regex_token_type, regex_rule) syntax_tree) (res : uchar list) :
+        uchar list =
       match node with
       | Node (Character_class, [ entry; q ]) ->
           flatten_character_class_into_rev q (extract_character entry :: res)
@@ -128,11 +139,11 @@ let rec regex_of_regex_syntax_tree
     List.rev (flatten_character_class_into_rev node [])
   in
 
-  let build_character_class (c : char list) : char regex =
-    let rec build_character_class_into (c : char list) (r : char regex) =
+  let build_character_class (c : uchar list) : uchar regex =
+    let rec build_character_class_into (c : uchar list) (r : uchar regex) =
       match c with
       | [] -> r
-      | a :: '-' :: b :: q ->
+      | a :: dash :: b :: q when dash = u '-' ->
           build_character_class_into q (add_character_range a b r)
       | a :: q -> build_character_class_into q (add_character a r)
     in
@@ -156,7 +167,7 @@ let rec regex_of_regex_syntax_tree
   | Node (Regex_primitive, [ node; Leaf { token_type = Question } ]) ->
       Regex.Union (Regex.Epsilon, Regex.Star (regex_of_regex_syntax_tree node))
   | Node (Regex_primitive, [ Leaf { token_type = Character; value } ]) ->
-      Regex.Symbol value.[0]
+      Regex.Symbol (u value.[0])
   | Node (Regex_primitive, [ Leaf { token_type = Escape; value } ]) ->
       Regex.Symbol (expand_escape value)
   | Node
@@ -178,7 +189,7 @@ let rec regex_of_regex_syntax_tree
       build_character_class character_class
   | _ -> failwith "Invalid rule"
 
-let parse_regex (src : string) : char regex =
+let parse_regex (src : string) : uchar regex =
   let tokens = tokenize regex_token_rules Eof src in
   let automaton = construit_automate_LR1 regex_grammar Regex_union Eof in
   let tree = parse automaton Eof tokens Regex_union in
