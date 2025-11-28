@@ -1,14 +1,6 @@
 open Caml_light
 open Caml_light_utils
 
-type value_declaration =
-  | Variable of expression node
-  | Function of {
-      name : variable node;
-      parameters : pattern node list;
-      body : expression node;
-    }
-
 let rec introduced_variables (p : pattern) =
   match p with
   | Ident i -> [ i ]
