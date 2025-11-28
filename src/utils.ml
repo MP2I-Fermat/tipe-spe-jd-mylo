@@ -34,6 +34,79 @@ let rec seq_find (f : 'a -> bool) (s : 'a Seq.t) : 'a option =
   | Seq.Nil -> None
   | Seq.Cons (e, t) -> if f e then Some e else seq_find f t
 
+(* Fonctions pour gérer correctement des Uchar.t *)
+type uchar = Uchar.t
+
+let uchar_list_of_string (s: string) : uchar list =
+  let n = String.length s in
+  (* Fais uchar_list_of_string à partir de l’indice i. Concatène le résultat
+   * après List.rev accu *)
+  let rec aux (i: int) (accu: uchar list) =
+    if i = n then
+      List.rev accu
+    else
+      let utf_decode_next_uchar = String.get_utf_8_uchar s i in
+      (* Récupère la longueur en char de ce utf_decode ^ *)
+      let k = Uchar.utf_decode_length utf_decode_next_uchar in
+      (* Récupère le uchar de ce utf_decode *)
+      let next_char = Uchar.utf_decode_uchar utf_decode_next_uchar in
+      (* Note : si le caractère était invalide, on a next_char = U+FFFD et
+       * k = 1 *)
+      aux (i+k) (next_char::accu)
+  in
+  aux 0 []
+
+
+(* Cette fonction NE renvoie PAS Uchar.to_int u. En réalité, elle renvoie la
+ * représentation interne de u (i.e. les 1, 2, 3 ou 4 octets UTF-8) *)
+let int_list_of_uchar (u: uchar) : int list =
+  let codepoint = Uchar.to_int u in
+  if codepoint <= 0x7F then
+    [codepoint]
+  else if codepoint <= 0x7FF then
+    (* bbb bbbb bbbb -> 110. .... 10.. .... *)
+    let first_5_bits = codepoint lsr 6 in
+    let last_6_bits = codepoint mod 64 in
+    [0b1100_0000 lor first_5_bits; 0b1000_0000 lor last_6_bits]
+  else if codepoint <= 0xFFFF then
+    (* bbbb bbbb bbbb bbbb -> 1110 .... 10.. .... 10.. .... *)
+    let first_4_bits = codepoint lsr 12 in
+    let next_6_bits = (codepoint lsr 6) mod 64 in
+    let last_6_bits = codepoint mod 64 in
+    [
+      0b1110_0000 lor first_4_bits;
+      0b1000_0000 lor next_6_bits;
+      0b1000_0000 lor last_6_bits
+    ]
+  else if codepoint <= 0xFFFFFF then
+    (* bbbb bbbb bbbb bbbb bbbb bbbb -> 1111 0... 10.. .... 10.. .... 10.. ....
+     *)
+    let first_3_bits = codepoint lsr 18 in
+    let next_6_bits = (codepoint lsr 12) mod 64 in
+    let next_next_6_bits = (codepoint lsr 6) mod 64 in
+    let last_6_bits = codepoint mod 64 in
+    [
+      0b1111_0000 lor first_3_bits;
+      0b1000_0000 lor next_6_bits;
+      0b1000_0000 lor next_next_6_bits;
+      0b1000_0000 lor last_6_bits
+    ]
+  else
+    failwith (
+      "int_of_char: " ^
+      (string_of_int codepoint) ^
+      " n’est pas un caractère Unicode valide..."
+    )
+
+
+let char_list_of_uchar (u: uchar) : char list =
+  List.map char_of_int (int_list_of_uchar u)
+
+
+let string_of_uchar (u: uchar) : string =
+  implode (char_list_of_uchar u)
+
+
 module Hashset = struct
   type 'a t = { mutable data : ('a, unit) Hashtbl.t; mutable rw : bool }
 
