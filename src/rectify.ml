@@ -17,6 +17,14 @@ let rec introduced_variables (p : pattern) =
   | Or o -> List.concat_map introduced_variables o
   | As { inner } -> introduced_variables inner
 
+let binding_names (b : binding) : variable list =
+  match b with
+  | Variable { lhs } -> introduced_variables lhs
+  | Function { name } -> [ name ]
+
+let binding_body (b : binding) : expression =
+  match b with Variable { value } -> value | Function { body } -> body
+
 let rec contains_only_full_applications (f : function_) (e : expression) : bool
     =
   match e with
@@ -129,6 +137,80 @@ let contains_reference (v : variable) (e : expression) : bool =
   in
   !contains
 
+let rec contains_direct_access (f : string) (e : expression) : bool =
+  match e with
+  | Variable v -> v = f
+  | Constant _ -> false
+  | Parenthesised { inner } -> contains_direct_access f inner
+  | TypeCoercion { inner } -> contains_direct_access f inner
+  | ListLiteral l -> List.exists (contains_direct_access f) l
+  | ArrayLiteral l -> List.exists (contains_direct_access f) l
+  | RecordLiteral l -> List.exists (fun (_, e) -> contains_direct_access f e) l
+  | WhileLoop { condition; body } ->
+      contains_direct_access f condition || contains_direct_access f body
+  | ForLoop { start; finish; body } ->
+      contains_direct_access f start
+      || contains_direct_access f finish
+      || contains_direct_access f body
+  | Dereference e -> contains_direct_access f e
+  | FieldAccess { receiver } -> contains_direct_access f receiver
+  | ArrayAccess { receiver; target } ->
+      contains_direct_access f receiver || contains_direct_access f target
+  | FunctionApplication { receiver; arguments } ->
+      contains_direct_access f receiver
+      || List.exists (contains_direct_access f) arguments
+  | PrefixOperation { receiver } -> contains_direct_access f receiver
+  | InfixOperation { lhs; rhs } ->
+      contains_direct_access f lhs || contains_direct_access f rhs
+  | Negation e -> contains_direct_access f e
+  | Tuple l -> List.exists (contains_direct_access f) l
+  | FieldAssignment { receiver; value } ->
+      contains_direct_access f receiver || contains_direct_access f value
+  | ArrayAssignment { receiver; target; value } ->
+      contains_direct_access f receiver
+      || contains_direct_access f target
+      || contains_direct_access f value
+  | ReferenceAssignment { receiver; value } ->
+      contains_direct_access f receiver || contains_direct_access f value
+  | If { condition; body; else_body } -> (
+      contains_direct_access f condition
+      || contains_direct_access f body
+      ||
+      match else_body with
+      | None -> true
+      | Some else_body -> contains_direct_access f else_body)
+  | Sequence s -> List.exists (contains_direct_access f) s
+  | Match { value; cases } ->
+      contains_direct_access f value
+      || List.exists
+           (fun (p, e) ->
+             p |> List.map introduced_variables |> List.flatten |> List.mem f
+             || contains_direct_access f e)
+           cases
+  | Try { value; cases } ->
+      contains_direct_access f value
+      || List.exists
+           (fun (p, e) ->
+             p |> List.map introduced_variables |> List.flatten |> List.mem f
+             || contains_direct_access f e)
+           cases
+  | FunctionLiteral _ -> false
+  | LetBinding { bindings; inner } ->
+      let check_binding (b : binding) : bool =
+        match b with
+        | Variable { lhs; value } ->
+            List.mem f (introduced_variables lhs)
+            || contains_direct_access f value
+        | Function _ -> false
+      in
+      contains_direct_access f inner || List.exists check_binding bindings
+  | StringAccess { receiver; target } ->
+      contains_direct_access f receiver || contains_direct_access f target
+  | StringAssignment { receiver; target; value } ->
+      contains_direct_access f receiver
+      || contains_direct_access f target
+      || contains_direct_access f value
+
 let is_rectify_candidate (f : function_) ~(binding_is_rec : bool) : bool =
   binding_is_rec
   && contains_reference f.name f.body
@@ -145,11 +227,11 @@ let is_simple_expression (e : expression) : bool =
   in
   !res
 
-let linearize (e : expression) : (pattern * expression) list * string =
-  let var_name (count : int) : string = "_lin_" ^ string_of_int count in
+let linearize (e : expression) : binding list list * variable =
+  let var_name (count : int) : variable = "_lin_" ^ string_of_int count in
 
   let rec linearize_items_from (e : expression) (count : int) :
-      int * (pattern * expression) list * string =
+      int * binding list list * variable =
     match e with
     | Variable v -> (count, [], v)
     | InfixOperation { lhs; operation; rhs } ->
@@ -159,18 +241,26 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           lhs_items @ rhs_items
           @ [
-              ( Ident op_name,
-                InfixOperation
+              [
+                Variable
                   {
-                    lhs = Variable lhs_name;
-                    operation;
-                    rhs = Variable rhs_name;
-                  } );
+                    lhs = Ident op_name;
+                    value =
+                      InfixOperation
+                        {
+                          lhs = Variable lhs_name;
+                          operation;
+                          rhs = Variable rhs_name;
+                        };
+                  };
+              ];
             ],
           op_name )
     | Constant c ->
         let constant_name = var_name count in
-        (count + 1, [ (Ident constant_name, Constant c) ], constant_name)
+        ( count + 1,
+          [ [ Variable { lhs = Ident constant_name; value = Constant c } ] ],
+          constant_name )
     | Parenthesised { inner } -> linearize_items_from inner count
     | TypeCoercion { inner; typ } ->
         let count, inner_items, inner_name = linearize_items_from inner count in
@@ -178,8 +268,13 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           inner_items
           @ [
-              ( Ident coercion_name,
-                TypeCoercion { inner = Variable inner_name; typ } );
+              [
+                Variable
+                  {
+                    lhs = Ident coercion_name;
+                    value = TypeCoercion { inner = Variable inner_name; typ };
+                  };
+              ];
             ],
           coercion_name )
     | ListLiteral l ->
@@ -198,11 +293,17 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           content_items
           @ [
-              ( Ident list_name,
-                ListLiteral
-                  (content_names
-                  |> List.map (fun n -> (Variable n : expression))
-                  |> List.rev) );
+              [
+                Variable
+                  {
+                    lhs = Ident list_name;
+                    value =
+                      ListLiteral
+                        (content_names
+                        |> List.map (fun n -> (Variable n : expression))
+                        |> List.rev);
+                  };
+              ];
             ],
           list_name )
     | ArrayLiteral l ->
@@ -221,11 +322,17 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           content_items
           @ [
-              ( Ident array_name,
-                ArrayLiteral
-                  (content_names
-                  |> List.map (fun n -> (Variable n : expression))
-                  |> List.rev) );
+              [
+                Variable
+                  {
+                    lhs = Ident array_name;
+                    value =
+                      ArrayLiteral
+                        (content_names
+                        |> List.map (fun n -> (Variable n : expression))
+                        |> List.rev);
+                  };
+              ];
             ],
           array_name )
     | RecordLiteral r ->
@@ -243,7 +350,15 @@ let linearize (e : expression) : (pattern * expression) list * string =
         let record_name = var_name count in
         ( count + 1,
           content_items
-          @ [ (Ident record_name, RecordLiteral (List.rev contents)) ],
+          @ [
+              [
+                Variable
+                  {
+                    lhs = Ident record_name;
+                    value = RecordLiteral (List.rev contents);
+                  };
+              ];
+            ],
           record_name )
     | WhileLoop _ -> failwith "Unimplemented: linearize WhileLoop"
     | ForLoop _ -> failwith "Unimplemented: linearize ForLoop"
@@ -251,7 +366,16 @@ let linearize (e : expression) : (pattern * expression) list * string =
         let count, e_items, e_name = linearize_items_from e count in
         let dereference_name = var_name count in
         ( count + 1,
-          e_items @ [ (Ident dereference_name, Dereference (Variable e_name)) ],
+          e_items
+          @ [
+              [
+                Variable
+                  {
+                    lhs = Ident dereference_name;
+                    value = Dereference (Variable e_name);
+                  };
+              ];
+            ],
           dereference_name )
     | FieldAccess { receiver; target } ->
         let count, receiver_items, receiver_name =
@@ -261,8 +385,14 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           receiver_items
           @ [
-              ( Ident access_name,
-                FieldAccess { receiver = Variable receiver_name; target } );
+              [
+                Variable
+                  {
+                    lhs = Ident access_name;
+                    value =
+                      FieldAccess { receiver = Variable receiver_name; target };
+                  };
+              ];
             ],
           access_name )
     | ArrayAccess { receiver; target } ->
@@ -276,12 +406,18 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           receiver_items @ target_items
           @ [
-              ( Ident access_name,
-                ArrayAccess
+              [
+                Variable
                   {
-                    receiver = Variable receiver_name;
-                    target = Variable target_name;
-                  } );
+                    lhs = Ident access_name;
+                    value =
+                      ArrayAccess
+                        {
+                          receiver = Variable receiver_name;
+                          target = Variable target_name;
+                        };
+                  };
+              ];
             ],
           access_name )
     | FunctionApplication { receiver; arguments } ->
@@ -303,13 +439,21 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           receiver_items @ arguments_items
           @ [
-              ( Ident application_name,
-                FunctionApplication
+              [
+                Variable
                   {
-                    receiver = Variable receiver_name;
-                    arguments =
-                      List.map (fun v -> Caml_light.Variable v) arguments_name;
-                  } );
+                    lhs = Ident application_name;
+                    value =
+                      FunctionApplication
+                        {
+                          receiver = Variable receiver_name;
+                          arguments =
+                            List.map
+                              (fun v -> Caml_light.Variable v)
+                              arguments_name;
+                        };
+                  };
+              ];
             ],
           application_name )
     | PrefixOperation { receiver; operation } ->
@@ -320,9 +464,15 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           receiver_items
           @ [
-              ( Ident operation_name,
-                PrefixOperation { operation; receiver = Variable receiver_name }
-              );
+              [
+                Variable
+                  {
+                    lhs = Ident operation_name;
+                    value =
+                      PrefixOperation
+                        { operation; receiver = Variable receiver_name };
+                  };
+              ];
             ],
           operation_name )
     | Negation receiver ->
@@ -332,7 +482,15 @@ let linearize (e : expression) : (pattern * expression) list * string =
         let operation_name = var_name count in
         ( count + 1,
           receiver_items
-          @ [ (Ident operation_name, Negation (Variable receiver_name)) ],
+          @ [
+              [
+                Variable
+                  {
+                    lhs = Ident operation_name;
+                    value = Negation (Variable receiver_name);
+                  };
+              ];
+            ],
           operation_name )
     | Tuple t ->
         let count, content_literals, content_names =
@@ -350,11 +508,17 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           content_literals
           @ [
-              ( Ident list_name,
-                Tuple
-                  (content_names
-                  |> List.map (fun n -> (Variable n : expression))
-                  |> List.rev) );
+              [
+                Variable
+                  {
+                    lhs = Ident list_name;
+                    value =
+                      Tuple
+                        (content_names
+                        |> List.map (fun n -> (Variable n : expression))
+                        |> List.rev);
+                  };
+              ];
             ],
           list_name )
     | FieldAssignment { receiver; target; value } ->
@@ -366,13 +530,19 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           receiver_items @ value_items
           @ [
-              ( Ident access_name,
-                FieldAssignment
+              [
+                Variable
                   {
-                    receiver = Variable receiver_name;
-                    target;
-                    value = Variable value_name;
-                  } );
+                    lhs = Ident access_name;
+                    value =
+                      FieldAssignment
+                        {
+                          receiver = Variable receiver_name;
+                          target;
+                          value = Variable value_name;
+                        };
+                  };
+              ];
             ],
           access_name )
     | ArrayAssignment { receiver; target; value } ->
@@ -387,13 +557,19 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           receiver_items @ target_items
           @ [
-              ( Ident access_name,
-                ArrayAssignment
+              [
+                Variable
                   {
-                    receiver = Variable receiver_name;
-                    target = Variable target_name;
-                    value = Variable value_name;
-                  } );
+                    lhs = Ident access_name;
+                    value =
+                      ArrayAssignment
+                        {
+                          receiver = Variable receiver_name;
+                          target = Variable target_name;
+                          value = Variable value_name;
+                        };
+                  };
+              ];
             ],
           access_name )
     | ReferenceAssignment { receiver; value } ->
@@ -405,12 +581,18 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           receiver_items @ value_items
           @ [
-              ( Ident access_name,
-                ReferenceAssignment
+              [
+                Variable
                   {
-                    receiver = Variable receiver_name;
-                    value = Variable value_name;
-                  } );
+                    lhs = Ident access_name;
+                    value =
+                      ReferenceAssignment
+                        {
+                          receiver = Variable receiver_name;
+                          value = Variable value_name;
+                        };
+                  };
+              ];
             ],
           access_name )
     (* Branching expression *)
@@ -422,8 +604,15 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           condition_items
           @ [
-              ( Ident if_name,
-                If { condition = Variable condition_name; body; else_body } );
+              [
+                Variable
+                  {
+                    lhs = Ident if_name;
+                    value =
+                      If
+                        { condition = Variable condition_name; body; else_body };
+                  };
+              ];
             ],
           if_name )
     | Sequence l ->
@@ -438,7 +627,15 @@ let linearize (e : expression) : (pattern * expression) list * string =
         let match_name = var_name count in
         ( count + 1,
           value_items
-          @ [ (Ident match_name, Match { value = Variable value_name; cases }) ],
+          @ [
+              [
+                Variable
+                  {
+                    lhs = Ident match_name;
+                    value = Match { value = Variable value_name; cases };
+                  };
+              ];
+            ],
           match_name )
     (* Branching expression *)
     | Try { value; cases } ->
@@ -446,40 +643,52 @@ let linearize (e : expression) : (pattern * expression) list * string =
         let match_name = var_name count in
         ( count + 1,
           value_items
-          @ [ (Ident match_name, Try { value = Variable value_name; cases }) ],
+          @ [
+              [
+                Variable
+                  {
+                    lhs = Ident match_name;
+                    value = Try { value = Variable value_name; cases };
+                  };
+              ];
+            ],
           match_name )
     (* Branching expression *)
     | FunctionLiteral { style; cases } ->
         let function_name = var_name count in
         ( count + 1,
-          [ (Ident function_name, FunctionLiteral { style; cases }) ],
+          [
+            [
+              Variable
+                {
+                  lhs = Ident function_name;
+                  value = FunctionLiteral { style; cases };
+                };
+            ];
+          ],
           function_name )
     | LetBinding { bindings; is_rec; inner } ->
-        let count, bindings_items =
+        let count, bindings_items, bindings =
           List.fold_left
-            (fun (count, bindings_items) binding ->
+            (fun (count, bindings_items, bindings) binding ->
               match binding with
-              | (Caml_light.Variable { lhs; value } : binding) ->
+              | (Variable { lhs; value } : binding) ->
                   if is_simple_expression value then
-                    (count, bindings_items @ [ (lhs, value) ])
+                    (count, bindings_items, bindings @ [ binding ])
                   else
-                    let count, value_items, value_name =
+                    let count, items, value_name =
                       linearize_items_from value count
                     in
                     ( count,
-                      bindings_items @ value_items
-                      @ [ (lhs, Variable value_name) ] )
-              | Function { name; parameters; body } ->
-                  ( count,
-                    [
-                      ( Ident name,
-                        FunctionLiteral
-                          { style = Fun; cases = [ (parameters, body) ] } );
-                    ] ))
-            (count, []) bindings
+                      bindings_items @ items,
+                      bindings
+                      @ [ Variable { lhs; value = Variable value_name } ] )
+              (* Branching expression *)
+              | Function _ -> (count, bindings_items, bindings @ [ binding ]))
+            (count, [], []) bindings
         in
         let count, inner_items, inner_name = linearize_items_from inner count in
-        (count, bindings_items @ inner_items, inner_name)
+        (count, bindings_items @ [ bindings ] @ inner_items, inner_name)
     | StringAccess { target; receiver } ->
         let count, receiver_items, receiver_name =
           linearize_items_from receiver count
@@ -491,12 +700,18 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           receiver_items @ target_items
           @ [
-              ( Ident access_name,
-                StringAccess
+              [
+                Variable
                   {
-                    receiver = Variable receiver_name;
-                    target = Variable target_name;
-                  } );
+                    lhs = Ident access_name;
+                    value =
+                      StringAccess
+                        {
+                          receiver = Variable receiver_name;
+                          target = Variable target_name;
+                        };
+                  };
+              ];
             ],
           access_name )
     | StringAssignment { receiver; target; value } ->
@@ -511,27 +726,45 @@ let linearize (e : expression) : (pattern * expression) list * string =
         ( count + 1,
           receiver_items @ target_items
           @ [
-              ( Ident access_name,
-                StringAssignment
+              [
+                Variable
                   {
-                    receiver = Variable receiver_name;
-                    target = Variable target_name;
-                    value = Variable value_name;
-                  } );
+                    lhs = Ident access_name;
+                    value =
+                      StringAssignment
+                        {
+                          receiver = Variable receiver_name;
+                          target = Variable target_name;
+                          value = Variable value_name;
+                        };
+                  };
+              ];
             ],
           access_name )
   in
   let count, items, root = linearize_items_from e 0 in
   (items, root)
 
-let rec delinearize ((items, root) : (pattern * expression) list * string) :
-    expression =
+let rec delinearize ((items, root) : binding list list * string) : expression =
+  let find_binding_definition (l : binding list list) (v : variable) :
+      expression option =
+    let flat = List.flatten l in
+    let rec find_definition (l : binding list) : expression option =
+      match l with
+      | [] -> None
+      | Variable { lhs; value } :: q when lhs = Ident v -> Some value
+      | _ :: q -> find_definition q
+    in
+    find_definition flat
+  in
+
   let collapsed_items =
-    List.rev
-      (List.fold_left
-         (fun so_far (pattern, def) ->
+    items
+    |> List.fold_left
+         (fun so_far bindings ->
            let substituted = ref [] in
-           let linearized_def =
+
+           let substitute_linear_variables (e : expression) : expression =
              map_expression ~direction:Outwards
                (fun e ->
                  match e with
@@ -539,48 +772,73 @@ let rec delinearize ((items, root) : (pattern * expression) list * string) :
                    when String.starts_with ~prefix:"_lin_" v
                         || String.starts_with ~prefix:"_aux_continue" v
                         || String.starts_with ~prefix:"_new_aux_continue" v -> (
-                     match List.assoc_opt (Ident v) so_far with
+                     match find_binding_definition so_far v with
                      | Some def ->
                          substituted := v :: !substituted;
                          Parenthesised { inner = def; style = Parenthesis }
                      | None -> Variable v)
                  | _ -> e)
-               def
+               e
            in
+
+           let linearized_bindings =
+             bindings
+             |> List.map (fun binding ->
+                    match binding with
+                    | (Variable { lhs; value } : binding) ->
+                        (Variable
+                           { lhs; value = substitute_linear_variables value }
+                          : binding)
+                    | Function { name; parameters; body } ->
+                        Function
+                          {
+                            name;
+                            parameters;
+                            body = substitute_linear_variables body;
+                          })
+           in
+
            let filtered_decls =
-             List.filter
-               (fun (pattern, _) ->
-                 match pattern with
-                 | Ident v -> not (List.mem v !substituted)
-                 | _ -> true)
-               so_far
+             so_far
+             |> List.map (fun bindings ->
+                    bindings
+                    |> List.filter (fun binding ->
+                           match binding with
+                           | (Variable { lhs = Ident v } : binding) ->
+                               not (List.mem v !substituted)
+                           | _ -> true))
+             |> List.filter (fun bindings -> bindings <> [])
            in
-           (pattern, linearized_def) :: filtered_decls)
-         [] items)
+           linearized_bindings :: filtered_decls)
+         []
+    |> List.rev
   in
 
-  let rec delinearize_items (items : (pattern * expression) list)
-      (root : expression) : expression =
+  let rec delinearize_items (items : binding list list) (root : expression) :
+      expression =
     match items with
-    | (pattern, def) :: q -> (
+    | bindings :: q -> (
         let q_expression = delinearize_items q root in
-        match q_expression with
-        | Variable v when Ident v = pattern -> def
+
+        match (bindings, q_expression) with
+        | [ Variable { lhs = Ident v1; value } ], Variable v2 when v1 = v2 ->
+            value
         | _ ->
             let is_rec =
-              match pattern with
-              | Ident v -> (
-                  match def with
-                  | FunctionLiteral _ -> contains_reference v def
-                  | _ -> false)
-              | _ -> false
+              List.exists
+                (fun binding ->
+                  let names = binding_names binding in
+                  List.exists
+                    (fun binding' ->
+                      List.exists
+                        (fun name ->
+                          contains_reference name (binding_body binding'))
+                        names)
+                    bindings)
+                bindings
             in
-            LetBinding
-              {
-                is_rec;
-                bindings = [ Variable { lhs = pattern; value = def } ];
-                inner = q_expression;
-              })
+
+            LetBinding { is_rec; bindings; inner = q_expression })
     | [] -> root
   in
 
@@ -606,89 +864,128 @@ let rectify ({ name = function_name; parameters; body } : function_) : function_
       }
   in
 
-  let rec rectify_linear
-      ((items, root) : (pattern * expression) list * variable) :
-      (pattern * expression) list * variable =
+  let rec rectify_linear ((items, root) : binding list list * variable) :
+      binding list list * variable =
     match items with
     | [] ->
         ( [
-            ( Ident "_lin_ret",
-              FunctionApplication
+            [
+              Variable
                 {
-                  receiver = Variable aux_continue_name;
-                  arguments = [ Variable root ];
-                } );
+                  lhs = Ident "_lin_ret";
+                  value =
+                    FunctionApplication
+                      {
+                        receiver = Variable aux_continue_name;
+                        arguments = [ Variable root ];
+                      };
+                };
+            ];
           ],
           "_lin_ret" )
-    | (name, value) :: q ->
-        if contains_reference function_name value then
-          if q <> [] || Ident root <> name then
-            let new_continuation_body =
-              rectify_expression (delinearize (q, root))
-            in
-            ( [
-                ( Ident ("_new" ^ aux_continue_name),
-                  FunctionLiteral
-                    {
-                      style = Fun;
-                      cases = [ ([ name ], new_continuation_body) ];
-                    } );
-                (Ident aux_continue_name, Variable ("_new" ^ aux_continue_name));
-                (Ident "_lin_ret", push_rectification_down value);
-              ],
-              "_lin_ret" )
-          else
-            ([ (Ident "_lin_ret", push_rectification_down value) ], "_lin_ret")
-        else
-          let inner_items, inner_root = rectify_linear (q, root) in
-          ((name, value) :: inner_items, inner_root)
+    | bindings :: q -> (
+        (* Bindings is either:
+           - A single binding containing a recursive call either directly or indirectly (i.e a function application or a match statement).
+           - A set of indirectly self-referential bindings that can only contain recursive calls in their lazily evaluated code (i.e function bodies).
+        *)
+        match bindings with
+        | [ (Variable { lhs; value } as binding) ]
+          when contains_direct_access function_name value ->
+            if introduced_variables lhs = [ root ] then
+              ([ [ push_rectification_down binding ] ], root)
+            else
+              let new_continuation_body =
+                rectify_expression (delinearize (q, root))
+              in
+
+              ( [
+                  [
+                    Variable
+                      {
+                        lhs = Ident ("_new" ^ aux_continue_name);
+                        value =
+                          FunctionLiteral
+                            {
+                              style = Fun;
+                              cases = [ ([ lhs ], new_continuation_body) ];
+                            };
+                      };
+                  ];
+                  [
+                    Variable
+                      {
+                        lhs = Ident aux_continue_name;
+                        value = Variable ("_new" ^ aux_continue_name);
+                      };
+                  ];
+                  [
+                    push_rectification_down
+                      (Variable { lhs = Ident "_lin_ret"; value });
+                  ];
+                ],
+                "_lin_ret" )
+        | _ ->
+            let inner_items, inner_root = rectify_linear (q, root) in
+            ( List.map push_rectification_down bindings :: inner_items,
+              inner_root ))
   and rectify_expression (e : expression) : expression =
     delinearize (rectify_linear (linearize e))
   (* Pushes rectification down into branching expressions that cannot be linearized. *)
-  and push_rectification_down (e : expression) : expression =
-    match e with
-    (* Substitute calls to original function with calls to auxiliary function here. *)
-    | FunctionApplication
-        { receiver = Caml_light.Variable receiver_name; arguments }
-      when receiver_name = function_name ->
-        FunctionApplication
-          {
-            receiver = Variable aux_name;
-            arguments = arguments @ [ Variable aux_continue_name ];
-          }
-    | Match { value; cases } ->
-        Match
-          {
-            value;
-            cases =
-              List.map
-                (fun (patterns, value) -> (patterns, rectify_expression value))
-                cases;
-          }
-    | If { condition; body; else_body } ->
-        If
-          {
-            condition;
-            body = rectify_expression body;
-            else_body =
-              (match else_body with
-              | None -> None
-              | Some e -> Some (rectify_expression e));
-          }
-    | Try { value; cases } ->
-        Try
-          {
-            value;
-            cases =
-              List.map
-                (fun (patterns, value) -> (patterns, rectify_expression value))
-                cases;
-          }
-    | FunctionLiteral { style; cases } ->
+  and push_rectification_down (b : binding) : binding =
+    match b with
+    | Variable { lhs; value } ->
+        let new_value =
+          match value with
+          (* Substitute calls to original function with calls to auxiliary function here. *)
+          | FunctionApplication
+              { receiver = Caml_light.Variable receiver_name; arguments }
+            when receiver_name = function_name ->
+              FunctionApplication
+                {
+                  receiver = Variable aux_name;
+                  arguments = arguments @ [ Variable aux_continue_name ];
+                }
+          | Match { value; cases } ->
+              Match
+                {
+                  value;
+                  cases =
+                    List.map
+                      (fun (patterns, value) ->
+                        (patterns, rectify_expression value))
+                      cases;
+                }
+          | If { condition; body; else_body } ->
+              If
+                {
+                  condition;
+                  body = rectify_expression body;
+                  else_body =
+                    (match else_body with
+                    | None -> None
+                    | Some e -> Some (rectify_expression e));
+                }
+          | Try { value; cases } ->
+              Try
+                {
+                  value;
+                  cases =
+                    List.map
+                      (fun (patterns, value) ->
+                        (patterns, rectify_expression value))
+                      cases;
+                }
+          | FunctionLiteral { style; cases } ->
+              failwith
+                "Cannot push rectification into a function (mutually recursive \
+                 functions are not implemented yet)"
+          | _ -> value
+        in
+        Variable { lhs; value = new_value }
+    | Function _ ->
         failwith
           "Cannot push rectification into a function (mutually recursive \
            functions are not implemented yet)"
-    | _ -> e
   in
 
   let new_parameters =
@@ -769,16 +1066,6 @@ let rectify_program (p : program) : program =
     match p with
     | Expression e -> Expression (rectify_expression e)
     | ValueDefinition { bindings; is_rec } ->
-        let binding_names (b : binding) : variable list =
-          match b with
-          | Variable { lhs } -> introduced_variables lhs
-          | Function { name } -> [ name ]
-        in
-
-        let binding_body (b : binding) : expression =
-          match b with Variable { value } -> value | Function { body } -> body
-        in
-
         let new_bindings =
           List.map (rectify_binding ~binding_is_rec:is_rec) bindings
         in
