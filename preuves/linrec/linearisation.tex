@@ -1,0 +1,497 @@
+\section{Lin\'earisation}
+
+\subsection{Formes lin\'eaires}
+
+\textit{
+    On suppose dans la suite que les ensembles des expressions et des motifs
+    (patterns) \texttt{OCaml} sont d\'efinis par induction.
+}
+
+\begin{definition}
+    Formes lin\'eaires et \'el\'ements lin\'eaires
+    \newline
+    On d\'efinit par \hl{induction double} les ensembles des formes lin\'eaires
+    et des \'el\'ements lin\'eaires.
+
+    \medbreak
+
+    L'ensemble des \textit{\'el\'ements lin\'eaires} est d\'efini par les
+    r\`egles suivantes:
+
+    \begin{enumerate}
+        \item Tout constructeur d'arit\'e nulle des expressions \texttt{OCaml}
+              est un constructeur des \'el\'ements lin\'eaires.
+        \item Si $C$ est un constructeur d'arit\'e $n$ et de param\`etre dans
+              $P$ des expressions \texttt{OCaml}, alors on introduit un
+              constructeur de m\^eme nom $C$, de m\^eme param\`etre $P$, et
+              \hl{d'arit\'e $n$ sur les formes lin\'eaires}.
+
+              \textit{
+                  C'est a dire que on cr\'ee un constructeur qui prend en
+                  param\`etre un \'el\'ement de $P$ et $n$ formes lin\'eaires.
+              }
+    \end{enumerate}
+
+    On appelle alors \textit{forme lin\'eaire} une liste \textbf{non vide} de
+    couples $(p, e)$ o\`u $p$ est un motif \texttt{OCaml} et $e$ est un
+    \'el\'ement lin\'eaire.
+\end{definition}
+
+Si $[(a_1, e_1), (a_2, e_2), (a_3, e_3), ...]$ est une forme lin\'eaire on
+notera plut\^ot:
+\footnote{On justifiera cette notation \hyperref[justification_notation_forme_lineaire_simple]{plus tard}.}
+\begin{align*}
+     & a_1 := e_1 \\
+     & a_2 := e_2 \\
+     & a_3 := e_3 \\
+     & ...
+\end{align*}
+
+\begin{example}
+    Quelques formes lin\'eaires
+    \begin{align*}
+         & a_1 := [(\_, 1)] + [(\_, 2)]     \\
+         & a_2 := [(\_, 3)] - [(\_, 4)]     \\
+         & a_3 := [(\_, a_1)] * [(\_, a_3)] \\
+    \end{align*}
+
+    Intuitivement, cette forme lin\'eaire correspond \footnote{
+        On donnera une d\'efinition de la correspondance entre formes
+        lin\'eaires et expressions lin\'eaires \hyperref[definition_correspondance]{plus tard}.
+    } \`a l'expression
+    \texttt{OCaml} \texttt{(1 + 2) * (3 - 4)}. Comme l'expression est assez
+    lourde, lorsqu'on rencontre une forme linéaire réduite \`a un \'el\'ement
+    $(p, e)$ et lorsqu'il n'y a pas d'ambiguit\'e, on \'ecrira $e$ a la place de
+    $[(p, e)]$. Ainsi, l'exemple precedent s'\'ecrit aussi :
+    \begin{align*}
+         & a_1 := 1 + 2     \\
+         & a_2 := 3 - 4     \\
+         & a_3 := a_1 * a_2 \\
+    \end{align*}
+
+    On pourra aussi repr\'esenter les \'el\'ements lin\'eaires par des arbres:
+
+    $$
+        \left[
+            \left(a_1, \Tree [.+ 1 2 ] \right),
+            \left(a_2, \Tree [.- 3 4 ] \right),
+            \left(a_3, \Tree [.* a_1 a_2 ] \right)
+            \right]
+    $$
+
+    \bigbreak
+
+    On rencontrera parfois des formes lin\'eaires un peu plus complexes. Par
+    exemple:
+
+    \begin{align*}
+         & a_1 := \texttt{if} \  [(a_2, 1 + 2), (\_, a_2 = 3)] \  \texttt{then} \  [(\_, 1)] \  \texttt{else} \  [(\_, 2)] \\
+         & a_3 := a_1 * 5
+    \end{align*}
+
+    Cette forme lin\'eaire correspond \`a \texttt{(if 1 + 2 = 3 then 1 else 2)
+        * 5}. On m\'elange ici la notation explicite et la notation raccourcie des
+    formes lin\'eaires pour plus de clart\'e.
+
+\end{example}
+
+\begin{remark}
+    Puisque les \'el\'ements lin\'eaires peuvent \^etre vus comme des arbres, on
+    utilisera librement toute la terminologie des arbres pour d\'ecrire des
+    \'el\'ements lin\'eaires, \`a ce pr\`es qu'il faut modifier les
+    d\'efinitions en consid\'erant que les enfants d'un noeud sont des listes
+    d'arbres et non des arbres eux-m\^emes.
+\end{remark}
+
+\subsection{\'Evaluation}
+
+\begin{definition}
+    Contexte d'\'evaluation
+    \newline
+    On appelle \textit{contexte d'\'evaluation} (ou \textit{contexte}) toute
+    % Ce ne sont pas des fonctions mathématiques.
+    % Par exemple, on pourrait imaginer un contexte ou une premiere lecture
+    % depuis stdin renvoie une valeur, et une deuxieme lecture une autre valeur,
+    % meme si la meme fonction a ete appellee avec les memes arguments.
+    \hl{fonction} de $V$ dans $E$ o\`u $V$ est un ensemble de noms de variables et
+    $E$ est l'ensemble de valeurs \texttt{OCaml}.
+\end{definition}
+
+On introduit alors deux algorithmes nous permettant de d\'ecrire
+l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
+
+\bigbreak
+
+\begin{algorithm}[H]
+    \caption{Eval\_\'el\'ement}
+    \Entree{$e$ un \'el\'ement lin\'eaire, $c$ un contexte}
+    \Sortie{La valeur \texttt{OCaml} r\'esultant de l'\'evaluation de $e$, et
+        potentiellement des effets de bord.}
+
+    \uSi{$e$ est une constante}{
+        Renvoyer la valeur de $e$
+    }\uSinonSi{$e$ est une variable}{
+        Renvoyer $c(e)$
+    }\uSinonSi{$e$ est une addition $l_1 + l_2$}{
+        $v_1 \leftarrow$ Eval($l_1$, $c$) \\
+        $v_2 \leftarrow$ Eval($l_2$, $c$) \\
+        Renvoyer $v_1 + v_2$
+    }\uSinonSi{$e$ est une conditionnelle $\textnormal{\texttt{if}} \  l_1 \  \textnormal{\texttt{then}} \  l_2 \  \textnormal{\texttt{else}} \  l_3$}{
+        $v_1 \leftarrow$ Eval($l_1$, $c$)
+        \uSi{$v_1$}{
+            Renvoyer Eval($l_2$, $c$)
+        }\uSinon{
+            Renvoyer Eval($l_3$, $c$)
+        }
+    }\uSinonSi{$e$ est une assignation $\textnormal{\texttt{let}} \  p = l_1 \  \textnormal{\texttt{in}} \  l_2$}{
+        $v_1 \leftarrow$ Eval($l_1$, $c$) \\
+        $c' \leftarrow c$ compl\'et\'e avec les variables r\'esultant
+        de l'\'ex\'ecution du motif $p$ sur $v_1$ \\
+        Renvoyer Eval($l_2$, $c'$)
+    }\Sinon{
+        \bigskip
+        \ldots
+    }
+\end{algorithm}
+
+\begin{algorithm}[H]
+    \caption{Eval}
+    \Entree{$l$ une forme lin\'eaire, $c$ un contexte}
+    \Sortie{La valeur \texttt{OCaml} r\'esultant de l'\'evaluation de $l$, et
+        potentiellement des effets de bord.}
+
+    \uSi{$l$ est r\'eduit \`a un seul couple $(p, e)$}{
+        Renvoyer Eval\_\'el\'ement($e$, $c$)
+    }\Sinon{
+        $(p, e) \leftarrow$ premier \'el\'ement de $l$ \\
+        $q \leftarrow$ reste de $l$ \\
+
+        $v \leftarrow$ Eval\_\'el\'ement($e$, $c$) \\
+        $c' \leftarrow c$ compl\'et\'e avec les variables r\'esultant
+        de l'\'ex\'ecution du motif $p$ sur $v$ \\
+        Renvoyer Eval($q$, $c'$)
+    }
+\end{algorithm}
+
+\begin{remark}
+    \label{justification_notation_forme_lineaire_simple}
+    Le motif $p$ du dernier couple $(p, e)$ de toute forme lin\'eaire
+    n'intervient pas dans l'\'evaluation de cette forme lin\'eaire, ce qui
+    justifie r\'etroactivement la notation $e$ pour d\'esigner $[(p, e)]$.
+\end{remark}
+
+\begin{definition}
+    \hl{Ordre d'\'execution}
+    \newline
+    \textit{L'ordre d'\'execution} d'une forme lin\'eaire $l$ dans un contexte
+    $c$ est la liste $o$ de formes lin\'eaires o\`u $o[i]$ est la forme
+    lin\'eaire pass\'ee au $i$\`eme appel \`a la fonction Eval lors de l'appel
+    Eval($l$, $c$).
+\end{definition}
+
+\begin{example}
+    Consid\'erons la forme lin\'eaire suivante :
+    \begin{align*}
+         & a_1 := 1 + 2     \\
+         & a_2 := 3 - 4     \\
+         & a_3 := a_1 * a_2 \\
+    \end{align*}
+
+    Cette forme lin\'eaire ne fait pas apparaître de variables qu'elle ne
+    d\'efinit pas elle-m\^eme. On peut alors l'\'evaluer dans le contexte vide
+    (i.e la fonction de $\emptyset$ dans $E$) et on obtient l'arbre d'appels
+    r\'ecursifs suivant :
+
+    \begin{center}
+        \maxsizebox{\textwidth}{\textheight}{
+            \Tree [.{Eval($[(a_1, 1 + 2), (a_2, 3 - 4), (a_3, a_1 * a_2)]$, $\emptyset$)}
+                    [.{Eval\_el\'ement($1 + 2$, $\emptyset$)}
+                            [.{Eval($1$, $\emptyset$)}
+                                    {Eval\_\'el\'ement($1$, $\emptyset$)}
+                            ]
+                            [.{Eval($2$, $\emptyset$)}
+                                    {Eval\_\'el\'ement($2$, $\emptyset$)}
+                            ]
+                    ]
+                    [.{Eval($[(a_2, 3 - 4), (a_3, a_1 * a_2)]$, $[a_1 \rightarrow 3]$)}
+                            [.{Eval\_el\'ement($3 - 4$, $[a_1 \rightarrow 3]$)}
+                                    [.{Eval($3$, $[a_1 \rightarrow 3]$)}
+                                            {Eval\_\'el\'ement($3$, $[a_1 \rightarrow 3]$)}
+                                    ]
+                                    [.{Eval($4$, $[a_1 \rightarrow 3]$)}
+                                            {Eval\_\'el\'ement($4$, $[a_1 \rightarrow 3]$)}
+                                    ]
+                            ]
+                            [.{Eval($[(a_3, a_1 * a_2)]$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
+                                    [.{Eval\_el\'ement($a_1 * a_3$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
+                                            [.{Eval($a_1$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
+                                                    {Eval\_\'el\'ement($a_1$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
+                                            ]
+                                            [.{Eval($a_2$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
+                                                    {Eval\_\'el\'ement($a_2$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
+                                            ]
+                                    ]
+                            ]
+                    ]
+            ]
+        }
+    \end{center}
+
+    L'ordre d'\'ex\'ecution est alors:
+    $$
+        \Bigl[ [(a_1, 1 + 2), (a_2, 3 - 4), (a_3, a_1 * a_2)], 1, 2, [(a_2, 3 - 4), (a_3, a_1 * a_2)], 3, 4, [(a_3, a_1 * a_2)], a_1, a_2 \Bigr]
+    $$
+
+    Il existe aussi des formes lin\'eaires dont l'ordre d'\'ex\'ecution d\'epend
+    du contexte. Par exemple:
+
+    \begin{align*}
+         & a_1 := \texttt{if} \  v \  \texttt{then} \ l_1 \  \texttt{else} \  l_2
+    \end{align*}
+
+    L'ordre d'\'ex\'ecution de cette forme lin\'eaire dans le contexte
+    $[v \rightarrow vrai]$ est:
+    $$
+        \lbrack (a_1, \texttt{if} \  v \  \texttt{then} \ l_1 \  \texttt{else} \  l_2),\ v,\ l_1 \rbrack
+    $$
+
+    Cependant, son ordre d'\'ex\'ecution dans le contexte
+    $[v \rightarrow false]$ est:
+    $$
+        \lbrack (a_1, \texttt{if} \  v \  \texttt{then} \ l_1 \  \texttt{else} \  l_2),\ v,\ l_2 \rbrack
+    $$
+\end{example}
+
+\subsection{Formes et \'el\'ements terminaux}
+
+\begin{definition}
+    Formes lin\'eaires localement terminales
+    \newline
+    Soit $e$ un \'el\'ement lin\'eaire et $(l_1, \ldots, l_n)$ ses fils (ce
+    sont des formes lin\'eaires). Pour $i \in \lBrack 1; n \rBrack$, on dit que
+    $l_i$ est \textit{localement terminale} lorsque pour tout contexte $c$, si
+    $l_i$ apparaît dans l'ordre d'\'execution, alors aucun des
+    $(l_j)_{j \in \lBrack 1; n \rBrack}$ n'apparaît apres $l_i$ dans l'ordre
+    d'\'ex\'ecution (y compris $l_i$ lui-m\^eme).
+\end{definition}
+
+\begin{definition}
+    \'El\'ements lin\'eaires terminaux
+    \newline
+    On dit qu'un \'el\'ement lin\'eaire $e$ est terminal dans une forme
+    lin\'eaire $l$ lorsque :
+    \begin{enumerate}
+        \item Toute forme lin\'eaire strictement contenue (au sens des arbres)
+              dans $l$ contenant $e$ est localement terminale.
+        \item Tout \'el\'ement lin\'eaire contenant $e$ (y compris $e$ lui-meme)
+              apparaît en dernier dans la forme lin\'eaire qui le contient.
+    \end{enumerate}
+\end{definition}
+
+\begin{remark}
+    Lorsqu'il n'y a pas d'ambiguit\'e, on dira simplement que $e$ est terminal.
+\end{remark}
+
+\begin{remark}
+    On v\'erifie bien que cette d\'efinition correspond \`a la notion intuitive
+    de "derni\`ere instruction ex\'ecut\'ee".
+\end{remark}
+
+\begin{example}
+    Consid\'erons la forme lin\'eaire
+    \begin{align*}
+         & a_1 := \texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]   \\
+         & a_2 := \texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ [(b_2, e_2)] \\
+    \end{align*}
+
+    On a que :
+    \begin{itemize}
+        \item $v$ n'est pas localement terminal car il apparaît toujours avant
+              l'un de $l_1$ ou $[(b_1, e_1)]$ dans l'ordre d'\'ex\'ecution de
+              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$
+        \item $l_1$ et $[(b_1, e_1)]$ sont localement terminaux car $v$ apparaît
+              toujours avant eux dans l'ordre d'\'ex\'ecution de
+              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$ et cet
+              ordre fait apparaitre au plus un de $l_1$ et $[(b_1, e_1)]$.
+        \item $e_1$ n'est pas terminal car
+              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$
+              n'apparait pas en dernier dans la forme lin\'eaire le contenant.
+        \item $\texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ [(b_2, e_2)]$ est terminal car
+              la forme lin\'eaire consid\'er\'ee est la racine de l'arbre et
+              $\texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ [(b_2, e_2)]$ est
+              bien le dernier \'el\'ement lin\'eaire de cette forme lin\'eaire.
+        \item $e_2$ est terminal car $[(b_2, e_2)]$ est localement terminal,
+              $e_2$ apparait bien en dernier dans $[(b_2, e_2)]$ et
+              $\texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ [(b_2, e_2)]$
+              est bien le dernier \'el\'ement de la forme lin\'eaire consid\'er\'ee.
+    \end{itemize}
+\end{example}
+
+
+
+\subsection{Formes lin\'eaires correctes}
+
+\begin{definition}
+    \'El\'ement lin\'eaire correct
+    \newline
+    On dit qu'un \'el\'ement lin\'eaire $e$ est \textit{correct} lorsque tous
+    ses fils $l$ v\'erifient au moins une des deux propri\'et\'es suivantes:
+    \begin{itemize}
+        \item $l$ est localement terminal.
+        \item $l$ est r\'eduit \`a un seul couple $[(p, e)]$ o\`u $e$ est un
+              constructeur d'arit\'e nulle.
+    \end{itemize}
+\end{definition}
+
+\begin{remark}
+    La deuxi\`eme propri\'et\'e correspond \`a l'id\'ee que l'\'evaluation de
+    $l$ est "facile" et se fait "d'un coup".
+\end{remark}
+
+\begin{definition}
+    Forme lin\'eaire correcte
+    \newline
+    Une forme lin\'eaire $l$ est dite \textit{correcte} lorsque tout \'el\'ement
+    lin\'eaire $e$ contenu (au sens des arbres, pas des listes) dans $l$ est
+    correct.
+\end{definition}
+
+\begin{example}
+    Consid\'erons la forme lin\'eaire suivante:
+    \begin{align*}
+         & a_1 := 1 + 2                           \\
+         & a_2 := a_1 + (3 - 4)                   \\
+         & a_3 :=
+        \begin{aligned}
+             & \texttt{if}\ a_2 = 2  \\
+             & \texttt{then} \left(
+            \begin{aligned}
+                    a_4 := \texttt{print\_endline "Vrai!"}
+                \end{aligned}
+            \right)\                 \\
+             & \texttt{else}\ \left(
+            \begin{aligned}
+                     & a_5 := \texttt{print\_endline (string\_of\_int}\ a_2\ \texttt{)}
+                \end{aligned}
+            \right)
+        \end{aligned}                 \\
+         & a_6 := \texttt{print\_endline "Fini!"}
+    \end{align*}
+
+    Cette forme lin\'eaire n'est pas correcte car:
+    \begin{itemize}
+        \item $3 - 4$ n'est pas un constructeur d'arit\'e nulle et n'appartient
+              pas \`a une forme lin\'eaire localement terminale.
+        \item De m\^eme pour $a_2 = 2$.
+        \item De m\^eme pour $\texttt{print\_endline (string\_of\_int}\ a_2\ \texttt{)}$
+    \end{itemize}
+
+    \bigbreak
+
+    On peut cependant cr\'eer une forme lin\'eaire correcte qui a le m\^eme
+    comportement que celle-ci:
+    \begin{align*}
+         & a_1 := 1 + 2                           \\
+         & a_2 := 3 - 4                           \\
+         & a_3 := a_1 + a_2                       \\
+         & a_4 := a_3 = 2                         \\
+         & a_5 :=
+        \begin{aligned}
+             & \texttt{if}\ a_4      \\
+             & \texttt{then} \left(
+            \begin{aligned}
+                    a_6 := \texttt{print\_endline "Vrai!"}
+                \end{aligned}
+            \right)\                 \\
+             & \texttt{else}\ \left(
+            \begin{aligned}
+                     & a_7 := \texttt{string\_of\_int}\ a_3 \\
+                     & a_8 := \texttt{print\_endline}\ a_8
+                \end{aligned}
+            \right)
+        \end{aligned}                 \\
+         & a_9 := \texttt{print\_endline "Fini!"}
+    \end{align*}
+
+    On peut v\'erifier que cette forme lin\'eaire est en effet correcte.
+\end{example}
+
+\subsection{Lin\'earisation}
+
+\textit{
+    On suppose d\'efini un algorithme \textnormal{Eval\_OCaml} prenant en
+    entr\'ee une expression \texttt{OCaml} $e$ et un contexte $c$ et qui
+    \'evalue l'expression $e$ dans $c$, de mani\`ere analogue \`a l'evaluation
+    des formes lin\'eaires.
+}
+
+\begin{definition}
+    \label{definition_correspondance}
+    Forme lin\'eaire correspondant \`a une expression \texttt{OCaml}
+    \newline
+    On dit qu'une forme lin\'eaire $l$ \textit{correspond} \`a une expression
+    \texttt{OCaml} $e$ lorsque Eval($l$, $c$) a le m\^eme r\'esultat (c'est a
+    dire renvoie la m\^eme valeur et a les m\^emes effets de bord) que
+    Eval\_OCaml($e$, $c$) pour tout contexte $c$.
+
+    On dira de m\^eme que $e$ correspond \`a $l$ dans ce cas.
+\end{definition}
+
+\begin{remark}
+    On n'a ni unicit\'e des formes lin\'eaires correspondant \`a une expression
+    $e$, ni unicit\'e des expressions auxquelles une forme lin\'eaire $l$
+    correspond.
+\end{remark}
+
+\begin{definition}
+    Expression lin\'earisable
+    \newline
+    Une expression \texttt{OCaml} $e$ est dite \textit{lin\'earisable} lorsque
+    il existe une forme lin\'eaire correspondant \`a $e$.
+\end{definition}
+
+\begin{proposition}
+    Les expressions \textnormal{\texttt{while}}, \textnormal{\texttt{for}} et \textnormal{\texttt{try}} ne sont pas
+    lin\'earisables.
+\end{proposition}
+
+\begin{proof}
+    \hl{TODO: Par l'absurde.}
+    Peut etre plutot dire "simplement" lin\'earisables?
+    Il est en effet possible de lineariser for et while, mais c'est complique et
+    il faut introduire des fonctions auxiliaires.
+\end{proof}
+
+On introduit alors l'algorithme suivant pour lin\'eariser les expressions
+\texttt{OCaml}:
+
+\begin{algorithm}
+    \caption{Lin\'eariser}
+    \Entree{Une expression \texttt{OCaml} $e$ lin\'earisable}
+    \Sortie{Une forme lin\'eaire $l$ correcte correspondant \`a $e$}
+
+    \hl{TODO}
+\end{algorithm}
+
+Montrons la correction de cet algorithme. Soit alors $e$ une expression
+\texttt{OCaml} et $l = \textnormal{Lin\'eariser}(e)$.
+
+\begin{proposition}
+    $l$ est correcte
+\end{proposition}
+
+\begin{proof}
+    \hl{TODO: Par induction sur $e$}
+\end{proof}
+
+\begin{proposition}
+    $l$ correspond \`a $e$
+\end{proposition}
+
+\begin{proof}
+    \hl{TODO: Par induction sur $e$}
+\end{proof}
+
+\subsection{D\'elin\'earisation}
+
+\hl{TODO}

@@ -1,0 +1,116 @@
+\section{Rectification}
+
+\subsection{R\'ecursivit\'e terminale}
+
+\begin{definition}
+    R\'ecursitivit\'e terminale
+    \newline
+    % Encore une fois ce ne sont pas vraiment des fonctions au sens math\'ematique.
+    Soit $f$ une \hl{fonction} r\'ecursive d\'efinie par
+    $f: x_1, \ldots, x_n \rightarrowtail \textnormal{Eval}(l, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
+    (c'est a dire qu'un appel \`a $f$ \'evalue $l$ en mettant les variables
+    $x_1$ \`a $x_n$ aux valeurs donn\'ees en argument \`a la fonction).
+
+    On dit que $f$ est \textit{r\'ecursive terminale} si tout \'el\'ement
+    lin\'eaire dont l'\'evaluation conduit \`a un appel de $f$ est terminal.
+\end{definition}
+
+\begin{example}
+    \begin{align*}
+        f : l \rightarrowtail \textnormal{Eval} \left(
+        \begin{aligned}
+             & a_1 := \texttt{List.is\_empty}\ l                                                     \\
+             & a_2 := \texttt{if}\ a_1\ \texttt{then true else}\ \left(\begin{aligned}
+                                                                                & a_3 := \texttt{List.tl}\ l \\
+                                                                                & a_4 := \texttt{f}\ a_3     \\
+                                                                                & a_5 := \texttt{not}\ a_4
+                                                                           \end{aligned}\right)
+        \end{aligned}, [l \rightarrow l] \right)
+    \end{align*}
+
+    Cette fonction calcule si son argument $l$ est une liste de longueur paire.
+    Elle n'est pas r\'ecursive terminale car l'appel $\texttt{f}\ a_3$ n'est pas
+    terminal.
+
+    \begin{align*}
+        g : l \rightarrowtail \textnormal{Eval} \left(
+        \begin{aligned}
+             & a_1 := \texttt{List.length}\ l                                     \\
+             & a_2 := a_1 = 0                                                     \\
+             & a_3 := \texttt{if}\ a_2\ \texttt{then failwith "Liste vide"}       \\
+             & a_4 := a_1 = 1                                                     \\
+             & a_5 := \texttt{List.hd}\ l                                         \\
+             & a_6 := \texttt{List.tl}\ l                                         \\
+             & a_5 := \texttt{if}\ a_4\ \texttt{then}\ a_5\ \texttt{else g} \ a_6
+        \end{aligned}, [l \rightarrow l]
+        \right)
+    \end{align*}
+
+    Cette fonction renvoie le dernier \'el\'ement de la liste $l$ donn\'ee en
+    argument. Elle est r\'ecursive terminale car l'appel $\texttt{g} \ a_6$ est
+    terminal.
+\end{example}
+
+\begin{definition}
+    Fonctions mutuellement r\'ecursives terminales
+    \newline
+    On dit qu'un ensemble de fonctions $\{f_1, \ldots, f_n\}$ toutes d\'efinies
+    comme ci-dessus sont mutuellement r\'ecursives terminales si, pour toute
+    fonction $f_i$ d\'efinie par un appel \`a Eval($l_i$, $c$) et pour toute fonction
+    $f_j$, tout \'el\'ement lin\'eaire contenu (au sens des arbres) dans $l_i$
+    dont l'\'evaluation conduit \`a un appel de $f_j$ est terminal dans $l_i$.
+\end{definition}
+
+\subsection{Rectification}
+
+\begin{definition}
+    Formes lin\'eaires \'equivalentes
+    \newline
+    On dit que deux formes lin\'eaires $l_1$ et $l_2$ sont
+    \textit{\'equivalentes} lorsque Eval($l_1$, $c$) a le m\^eme r\'esultat que
+    Eval($l_2$, $c$) pour tout contexte $c$.
+\end{definition}
+
+On introduit alors un algorithme permettant de \textit{rectifier} une forme
+lin\'eaire $l$, c'est \`a dire de calculer une forme lin\'eaire r\'ecursive
+terminale \'equivalente \`a $l$.
+
+\begin{algorithm}
+    \caption{Rectifier}
+    \Entree{
+        Une forme lin\'eaire correcte $l$ et un ensemble de fonctions
+        $\{f_1, \ldots, f_n\}$ tels que pour tout $f \in \{f_1, \ldots, f_i\}$,
+        toute r\'ef\'erence \`a $f$ contenue (au sens des arbres) dans $l$ est
+        une application \textbf{compl\`ete} de $f$
+    }
+    \Sortie{
+        Une forme lin\'eaire $l'$ \'equivalente \`a $l$ telle que pour tout
+        $f \in \{f_1, \ldots, f_i\}$, tout \'el\'ement lin\'eaire contenu (au
+        sens des arbres) dans $l'$ dont l'\'evaluation conduit \`a un appel de
+        $f$ est terminale dans $l'$
+    }
+    \hl{TODO}
+\end{algorithm}
+
+Montrons alors la correction de cet algorithme. Soient $l$ et
+$\{f_1, \ldots, f_n\}$ une entr\'ee valide et
+$l' = \textnormal{Rectifier}(l, \{f_1, \ldots, f_n\})$.
+
+\begin{proposition}
+    $l'$ est \'equivalente \`a $l$
+\end{proposition}
+
+\begin{proof}
+    \hl{TODO}
+\end{proof}
+
+
+\begin{proposition}
+    Pour tout $f \in \{f_1, \ldots, f_i\}$, tout \'el\'ement lin\'eaire contenu
+    (au sens des arbres) dans $l'$ dont l'\'evaluation conduit \`a un appel de
+    $f$ est terminale dans $l'$
+\end{proposition}
+
+\begin{proof}
+    \hl{TODO}
+\end{proof}

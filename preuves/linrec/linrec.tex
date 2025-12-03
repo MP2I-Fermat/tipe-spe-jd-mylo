@@ -1,0 +1,61 @@
+\documentclass[french, 12pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+
+\title{Lin\'earisation et Rectification de programmes \texttt{OCaml}}
+\author{Mylo FAWCETT}
+\date{}
+
+\usepackage{geometry}
+\geometry{
+    a4paper,
+    top=2cm,
+    bottom=2cm,
+    right=2cm,
+    left=2cm
+}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{fdsymbol}
+
+\usepackage{adjustbox}
+
+\usepackage{color,soul}
+\usepackage{qtree}
+
+\usepackage{hyperref}
+\makeatletter
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=blue,
+    citecolor=olive,
+    pdftitle={\@title},
+    pdfauthor={\@author}
+}
+\makeatother
+
+\usepackage[ruled,lined,french]{algorithm2e}
+
+\theoremstyle{definition}
+\newtheorem{definition}{D\'efinition}
+\theoremstyle{plain}
+\newtheorem{proposition}{Proposition}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remarque}
+\newtheorem*{example}{Exemple}
+
+
+\begin{document}
+\maketitle
+\tableofcontents
+\pagebreak
+
+\include{linearisation}
+\include{rectification}
+\end{document}
