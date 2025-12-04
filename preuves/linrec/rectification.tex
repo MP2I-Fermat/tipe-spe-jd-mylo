@@ -5,7 +5,6 @@
 \begin{definition}
     R\'ecursitivit\'e terminale
     \newline
-    % Encore une fois ce ne sont pas vraiment des fonctions au sens math\'ematique.
     Soit $f$ une \hl{fonction} r\'ecursive d\'efinie par
     $f: x_1, \ldots, x_n \rightarrowtail \textnormal{Eval}(l, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
     (c'est a dire qu'un appel \`a $f$ \'evalue $l$ en mettant les variables
@@ -75,7 +74,7 @@ On introduit alors un algorithme permettant de \textit{rectifier} une forme
 lin\'eaire $l$, c'est \`a dire de calculer une forme lin\'eaire r\'ecursive
 terminale \'equivalente \`a $l$.
 
-\begin{algorithm}
+\begin{algorithm}[H]
     \caption{Rectifier}
     \Entree{
         Une forme lin\'eaire correcte $l$ et un ensemble de fonctions

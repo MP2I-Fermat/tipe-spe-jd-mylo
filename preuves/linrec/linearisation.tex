@@ -47,6 +47,24 @@ notera plut\^ot:
      & ...
 \end{align*}
 
+\begin{remark}
+    Intuitivement, il faut consid\'erer les formes lin\'eaires comme \'etant
+    simplement une autre repr\'esentation des expressions \texttt{OCaml}.
+\end{remark}
+
+\begin{remark}
+    Les formes lin\'eaires ressemblent beaucoup \`a la forme
+    \href{https://en.wikipedia.org/wiki/Static_single-assignment_form}{SSA} des
+    langages de programmation imp\'eratifs. Il y a deux diff\'erences cl\'es:
+    \begin{enumerate}
+        \item Il est possible d'avoir des branchements dans les formes
+              lin\'eaires, au contraire des blocs d'un programme sous forme SSA.
+        \item On peut d\'efinir la notion de
+              \hyperref[definition_forme_lineaire_correcte]{correction} d'une
+              forme lin\'eaire qui nous sera utile plus tard.
+    \end{enumerate}
+\end{remark}
+
 \begin{example}
     Quelques formes lin\'eaires
     \begin{align*}
@@ -109,11 +127,7 @@ notera plut\^ot:
     Contexte d'\'evaluation
     \newline
     On appelle \textit{contexte d'\'evaluation} (ou \textit{contexte}) toute
-    % Ce ne sont pas des fonctions mathématiques.
-    % Par exemple, on pourrait imaginer un contexte ou une premiere lecture
-    % depuis stdin renvoie une valeur, et une deuxieme lecture une autre valeur,
-    % meme si la meme fonction a ete appellee avec les memes arguments.
-    \hl{fonction} de $V$ dans $E$ o\`u $V$ est un ensemble de noms de variables et
+    fonction de $V$ dans $E$ o\`u $V$ est un ensemble de noms de variables et
     $E$ est l'ensemble de valeurs \texttt{OCaml}.
 \end{definition}
 
@@ -121,6 +135,25 @@ On introduit alors deux algorithmes nous permettant de d\'ecrire
 l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
 
 \bigbreak
+
+\begin{algorithm}[H]
+    \caption{Eval}
+    \Entree{$l$ une forme lin\'eaire, $c$ un contexte}
+    \Sortie{La valeur \texttt{OCaml} r\'esultant de l'\'evaluation de $l$, et
+        potentiellement des effets de bord.}
+
+    \uSi{$l$ est r\'eduit \`a un seul couple $(p, e)$}{
+        Renvoyer Eval\_\'el\'ement($e$, $c$)
+    }\Sinon{
+        $(p, e) \leftarrow$ premier \'el\'ement de $l$ \\
+        $q \leftarrow$ reste de $l$ \\
+
+        $v \leftarrow$ Eval\_\'el\'ement($e$, $c$) \\
+        $c' \leftarrow c$ compl\'et\'e avec les variables r\'esultant
+        de l'\'ex\'ecution du motif $p$ sur $v$ \\
+        Renvoyer Eval($q$, $c'$)
+    }
+\end{algorithm}
 
 \begin{algorithm}[H]
     \caption{Eval\_\'el\'ement}
@@ -148,36 +181,28 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
         $c' \leftarrow c$ compl\'et\'e avec les variables r\'esultant
         de l'\'ex\'ecution du motif $p$ sur $v_1$ \\
         Renvoyer Eval($l_2$, $c'$)
+    }\uSinonSi{$e$ est une fonction \textnormal{\texttt{fun x\_1 \ldots x\_n ->}}\ $l$}{
+    Renvoyer la fonction qui, quand appell\'ee avec les arguments
+    % Cette definition ne marche pas pour les fonctions mutuellement recursives,
+    % car les fonctions definies apres n'existent pas dans le contexte c.
+    % Peut etre les aplatir lors de la linearisation?
+    % (i.e let x = a and y = b devient x, y := a, b)
+    $x_1, \ldots, x_n$, renvoie \hl{Eval($l$, $c\ [\textnormal{\texttt{x\_1}} \rightarrow x_1, \ldots, \textnormal{\texttt{x\_n}} \rightarrow x_n]$)}
     }\Sinon{
-        \bigskip
-        \ldots
-    }
-\end{algorithm}
-
-\begin{algorithm}[H]
-    \caption{Eval}
-    \Entree{$l$ une forme lin\'eaire, $c$ un contexte}
-    \Sortie{La valeur \texttt{OCaml} r\'esultant de l'\'evaluation de $l$, et
-        potentiellement des effets de bord.}
-
-    \uSi{$l$ est r\'eduit \`a un seul couple $(p, e)$}{
-        Renvoyer Eval\_\'el\'ement($e$, $c$)
-    }\Sinon{
-        $(p, e) \leftarrow$ premier \'el\'ement de $l$ \\
-        $q \leftarrow$ reste de $l$ \\
-
-        $v \leftarrow$ Eval\_\'el\'ement($e$, $c$) \\
-        $c' \leftarrow c$ compl\'et\'e avec les variables r\'esultant
-        de l'\'ex\'ecution du motif $p$ sur $v$ \\
-        Renvoyer Eval($q$, $c'$)
+        \ldots\ // Les autres cas sont tous d\'efinis de mani\`ere analogue.
     }
 \end{algorithm}
 
 \begin{remark}
     \label{justification_notation_forme_lineaire_simple}
     Le motif $p$ du dernier couple $(p, e)$ de toute forme lin\'eaire
-    n'intervient pas dans l'\'evaluation de cette forme lin\'eaire, ce qui
-    justifie r\'etroactivement la notation $e$ pour d\'esigner $[(p, e)]$.
+    n'intervient pas dans l'\'evaluation de cette forme lin\'eaire. De plus,
+    les variables introduites par $p$ ne peuvent \^etre r\'ef\'erenc\'ees par un
+    autre \'el\'ement lin\'eaire car c'est le dernier couple de sa forme
+    lin\'eaire.
+
+
+    Ceci, justifie r\'etroactivement la notation $e$ pour d\'esigner $[(p, e)]$.
 \end{remark}
 
 \begin{definition}
@@ -363,6 +388,7 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
 \end{remark}
 
 \begin{definition}
+    \label{definition_forme_lineaire_correcte}
     Forme lin\'eaire correcte
     \newline
     Une forme lin\'eaire $l$ est dite \textit{correcte} lorsque tout \'el\'ement
@@ -461,7 +487,7 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
     Expression lin\'earisable
     \newline
     Une expression \texttt{OCaml} $e$ est dite \textit{lin\'earisable} lorsque
-    il existe une forme lin\'eaire correspondant \`a $e$.
+    il existe une forme lin\'eaire correcte correspondant \`a $e$.
 \end{definition}
 
 \begin{proposition}
@@ -479,16 +505,23 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
 On introduit alors l'algorithme suivant pour lin\'eariser les expressions
 \texttt{OCaml}:
 
-\begin{algorithm}
+\begin{algorithm}[H]
     \caption{Lin\'eariser}
-    \Entree{Une expression \texttt{OCaml} $e$ lin\'earisable}
-    \Sortie{Une forme lin\'eaire $l$ correcte correspondant \`a $e$}
+    \Entree{
+        Une expression \texttt{OCaml} $e$ lin\'earisable, $k$ un entier
+        indiquant le prochain nom de variable non utilis\'e
+    }
+    \Sortie{
+        Une forme lin\'eaire $l$ correcte correspondant \`a $e$, $k'$ un entier
+        indiquant le prochain nom de variable non utilis\'e
+    }
 
     \hl{TODO}
 \end{algorithm}
 
 Montrons la correction de cet algorithme. Soit alors $e$ une expression
-\texttt{OCaml} et $l = \textnormal{Lin\'eariser}(e)$.
+\texttt{OCaml} et $l = \textnormal{Lin\'eariser}(e, k)$ o\`u $k$ est un entier
+indiquant le prochain nom de variable non utilis\'e dans $e$.
 
 \begin{proposition}
     $l$ est correcte
@@ -509,7 +542,8 @@ Montrons la correction de cet algorithme. Soit alors $e$ une expression
 \begin{remark}
     On se permettra de dire \textit{la} forme lina\'eaire associ\'ee \`a une
     expression \texttt{OCaml} $e$ pour d\'esigner la forme lin\'eaire renvoy\'ee
-    par l'appel Lin\'eariser($e$).
+    par l'appel Lin\'eariser($e$, $k$) o\`u $k$ est un entier indiquant le
+    prochain nom de variable non utilis\'e dans $e$.
 \end{remark}
 
 \subsection{D\'elin\'earisation}
