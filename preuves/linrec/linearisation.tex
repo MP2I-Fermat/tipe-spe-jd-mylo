@@ -270,9 +270,10 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
     Soit $e$ un \'el\'ement lin\'eaire et $(l_1, \ldots, l_n)$ ses fils (ce
     sont des formes lin\'eaires). Pour $i \in \lBrack 1; n \rBrack$, on dit que
     $l_i$ est \textit{localement terminale} lorsque pour tout contexte $c$, si
-    $l_i$ apparaît dans l'ordre d'\'execution, alors aucun des
-    $(l_j)_{j \in \lBrack 1; n \rBrack}$ n'apparaît apres $l_i$ dans l'ordre
-    d'\'ex\'ecution (y compris $l_i$ lui-m\^eme).
+    $l_i$ apparaît dans l'ordre d'\'execution, alors l'appel
+    Eval\_\'el\'ement($e$, $c$) termine imm\'ediatement apr\`es l'appel
+    Eval($l_i$, $c'$) (on n'a pas forc\'ement $c' = c$, par exemple si
+    $e = \texttt{let}\ l_1\ \texttt{if}\ l_2$).
 \end{definition}
 
 \begin{definition}
@@ -306,13 +307,16 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
 
     On a que :
     \begin{itemize}
-        \item $v$ n'est pas localement terminal car il apparaît toujours avant
-              l'un de $l_1$ ou $[(b_1, e_1)]$ dans l'ordre d'\'ex\'ecution de
-              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$
-        \item $l_1$ et $[(b_1, e_1)]$ sont localement terminaux car $v$ apparaît
-              toujours avant eux dans l'ordre d'\'ex\'ecution de
-              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$ et cet
-              ordre fait apparaitre au plus un de $l_1$ et $[(b_1, e_1)]$.
+        \item $v$ n'est pas localement terminal car l'appel Eval($v$, $c$) est
+              toujours suivi d'un appel Eval($l_1$, $c$) ou Eval($l_2$, $c$)
+              lors de l'appel Eval\_\'el\'ement(
+              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$,
+              $c$)
+        \item $l_1$ et $[(b_1, e_1)]$ sont localement terminaux car l'appel \\
+              Eval\_\'el\'ement(
+              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$,
+              $c$) se termine imm\'ediatement apr\`es l'appel Eval($l_1$, $c$)
+              ou Eval($l_2$, $c$)
         \item $e_1$ n'est pas terminal car
               $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$
               n'apparait pas en dernier dans la forme lin\'eaire le contenant.
@@ -325,6 +329,16 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
               $\texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ [(b_2, e_2)]$
               est bien le dernier \'el\'ement de la forme lin\'eaire consid\'er\'ee.
     \end{itemize}
+
+    Cependant, il se peut qu'une forme lin\'eaire soit bien le dernier pass\'e
+    en argument \`a Eval sans pour autant qu'elle soit localement terminale:
+    \begin{align*}
+        a_1 := l_1 + l_2
+    \end{align*}
+
+    Ici, ni $l_1$ ni $l_2$ sont terminaux car l'appel
+    Eval\_\'el\'ement($l_1 + l_2$, $c$) contient toujours une op\'eration
+    d'addition apr\`es l'appel Eval($l_1$, $c$) ou Eval($l_2$, $c$).
 \end{example}
 
 
