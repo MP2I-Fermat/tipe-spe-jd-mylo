@@ -27,7 +27,7 @@
               \hl{d'arit\'e $n$ sur les formes lin\'eaires}.
 
               \textit{
-                  C'est a dire que on cr\'ee un constructeur qui prend en
+                  C'est-\`a-dire qu'on cr\'ee un constructeur qui prend en
                   param\`etre un \'el\'ement de $P$ et $n$ formes lin\'eaires.
               }
     \end{enumerate}
@@ -79,7 +79,7 @@ notera plut\^ot:
     } \`a l'expression
     \texttt{OCaml} \texttt{(1 + 2) * (3 - 4)}. Comme l'expression est assez
     lourde, lorsqu'on rencontre une forme linéaire réduite \`a un \'el\'ement
-    $(p, e)$ et lorsqu'il n'y a pas d'ambiguit\'e, on \'ecrira $e$ a la place de
+    $(p, e)$ et lorsqu'il n'y a pas d'ambigu\"it\'e, on \'ecrira $e$ a la place de
     $[(p, e)]$. Ainsi, l'exemple precedent s'\'ecrit aussi :
     \begin{align*}
          & a_1 := 1 + 2     \\
@@ -116,8 +116,8 @@ notera plut\^ot:
 \begin{remark}
     Puisque les \'el\'ements lin\'eaires peuvent \^etre vus comme des arbres, on
     utilisera librement toute la terminologie des arbres pour d\'ecrire des
-    \'el\'ements lin\'eaires, \`a ce pr\`es qu'il faut modifier les
-    d\'efinitions en consid\'erant que les enfants d'un noeud sont des listes
+    \'el\'ements lin\'eaires, \`a ceci pr\`es qu'il faut modifier les
+    d\'efinitions en consid\'erant que les enfants d'un n{\oe}ud sont des listes
     d'arbres et non des arbres eux-m\^emes.
 \end{remark}
 
@@ -277,13 +277,13 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
     L'ordre d'\'ex\'ecution de cette forme lin\'eaire dans le contexte
     $[v \rightarrow vrai]$ est:
     $$
-        \lbrack (a_1, \texttt{if} \  v \  \texttt{then} \ l_1 \  \texttt{else} \  l_2),\ v,\ l_1 \rbrack
+        \big[ \lbrack (a_1, \texttt{if} \  v \  \texttt{then} \ l_1 \  \texttt{else} \  l_2) \rbrack,\ v,\ l_1 \big]
     $$
 
     Cependant, son ordre d'\'ex\'ecution dans le contexte
     $[v \rightarrow false]$ est:
     $$
-        \lbrack (a_1, \texttt{if} \  v \  \texttt{then} \ l_1 \  \texttt{else} \  l_2),\ v,\ l_2 \rbrack
+        \big[ \lbrack (a_1, \texttt{if} \  v \  \texttt{then} \ l_1 \  \texttt{else} \  l_2) \rbrack,\ v,\ l_2 \big]
     $$
 \end{example}
 
@@ -298,7 +298,7 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
     $l_i$ apparaît dans l'ordre d'\'execution, alors l'appel
     Eval\_\'el\'ement($e$, $c$) termine imm\'ediatement apr\`es l'appel
     Eval($l_i$, $c'$) (on n'a pas forc\'ement $c' = c$, par exemple si
-    $e = \texttt{let}\ l_1\ \texttt{if}\ l_2$).
+    $e = \texttt{let}\ l_1\ \texttt{in}\ l_2$).
 \end{definition}
 
 \begin{definition}
@@ -309,13 +309,14 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
     \begin{enumerate}
         \item Toute forme lin\'eaire strictement contenue (au sens des arbres)
               dans $l$ contenant $e$ est localement terminale.
-        \item Tout \'el\'ement lin\'eaire contenant $e$ (y compris $e$ lui-meme)
-              apparaît en dernier dans la forme lin\'eaire qui le contient.
+        \item Tout \'el\'ement lin\'eaire contenant $e$ (y compris $e$
+              lui-m\^eme) apparaît en dernier dans la forme lin\'eaire qui le
+              contient.
     \end{enumerate}
 \end{definition}
 
 \begin{remark}
-    Lorsqu'il n'y a pas d'ambiguit\'e, on dira simplement que $e$ est terminal.
+    Lorsqu'il n'y a pas d'ambigu\"it\'e, on dira simplement que $e$ est terminal.
 \end{remark}
 
 \begin{remark}
@@ -341,7 +342,7 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
               Eval\_\'el\'ement(
               $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$,
               $c$) se termine imm\'ediatement apr\`es l'appel Eval($l_1$, $c$)
-              ou Eval($l_2$, $c$)
+              ou Eval($[(b_1, e_1)]$, $c$)
         \item $e_1$ n'est pas terminal car
               $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$
               n'apparait pas en dernier dans la forme lin\'eaire le contenant.
@@ -399,14 +400,14 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
 \begin{example}
     Consid\'erons la forme lin\'eaire suivante:
     \begin{align*}
-         & a_1 := 1 + 2                           \\
-         & a_2 := a_1 + (3 - 4)                   \\
+         & a_1 := 1 + 2                            \\
+         & a_2 := a_1 + (3 - 4)                    \\
          & a_3 :=
         \begin{aligned}
              & \texttt{if}\ a_2 = 2  \\
              & \texttt{then} \left(
             \begin{aligned}
-                    a_4 := \texttt{print\_endline "Vrai!"}
+                    a_4 := \texttt{print\_endline "Vrai !"}
                 \end{aligned}
             \right)\                 \\
              & \texttt{else}\ \left(
@@ -414,8 +415,8 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
                      & a_5 := \texttt{print\_endline (string\_of\_int}\ a_2\ \texttt{)}
                 \end{aligned}
             \right)
-        \end{aligned}                 \\
-         & a_6 := \texttt{print\_endline "Fini!"}
+        \end{aligned}                  \\
+         & a_6 := \texttt{print\_endline "Fini !"}
     \end{align*}
 
     Cette forme lin\'eaire n'est pas correcte car:
@@ -431,16 +432,16 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
     On peut cependant cr\'eer une forme lin\'eaire correcte qui a le m\^eme
     comportement que celle-ci:
     \begin{align*}
-         & a_1 := 1 + 2                           \\
-         & a_2 := 3 - 4                           \\
-         & a_3 := a_1 + a_2                       \\
-         & a_4 := a_3 = 2                         \\
+         & a_1 := 1 + 2                            \\
+         & a_2 := 3 - 4                            \\
+         & a_3 := a_1 + a_2                        \\
+         & a_4 := a_3 = 2                          \\
          & a_5 :=
         \begin{aligned}
              & \texttt{if}\ a_4      \\
              & \texttt{then} \left(
             \begin{aligned}
-                    a_6 := \texttt{print\_endline "Vrai!"}
+                    a_6 := \texttt{print\_endline "Vrai !"}
                 \end{aligned}
             \right)\                 \\
              & \texttt{else}\ \left(
@@ -449,8 +450,8 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
                      & a_8 := \texttt{print\_endline}\ a_8
                 \end{aligned}
             \right)
-        \end{aligned}                 \\
-         & a_9 := \texttt{print\_endline "Fini!"}
+        \end{aligned}                  \\
+         & a_9 := \texttt{print\_endline "Fini !"}
     \end{align*}
 
     On peut v\'erifier que cette forme lin\'eaire est en effet correcte.
@@ -461,7 +462,7 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
 \textit{
     On suppose d\'efini un algorithme \textnormal{Eval\_OCaml} prenant en
     entr\'ee une expression \texttt{OCaml} $e$ et un contexte $c$ et qui
-    \'evalue l'expression $e$ dans $c$, de mani\`ere analogue \`a l'evaluation
+    \'evalue l'expression $e$ dans $c$, de mani\`ere analogue \`a l'\'evaluation
     des formes lin\'eaires.
 }
 
@@ -470,9 +471,9 @@ l'\textit{\'ex\'ecution} d'une forme ou d'un \'el\'ement lin\'eaire:
     Forme lin\'eaire correspondant \`a une expression \texttt{OCaml}
     \newline
     On dit qu'une forme lin\'eaire $l$ \textit{correspond} \`a une expression
-    \texttt{OCaml} $e$ lorsque Eval($l$, $c$) a le m\^eme r\'esultat (c'est a
-    dire renvoie la m\^eme valeur et a les m\^emes effets de bord) que
-    Eval\_OCaml($e$, $c$) pour tout contexte $c$.
+    \texttt{OCaml} $e$ lorsque Eval($l$, $c$) a le m\^eme r\'esultat
+    (c'est-\`a-dire renvoie la m\^eme valeur et a les m\^emes effets de bord)
+    que Eval\_OCaml($e$, $c$) pour tout contexte $c$.
 
     On dira de m\^eme que $e$ correspond \`a $l$ dans ce cas.
 \end{definition}
