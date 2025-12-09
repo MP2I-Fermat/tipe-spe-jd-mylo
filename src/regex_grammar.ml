@@ -15,14 +15,13 @@ type regex_token_type =
   | Escape
   | Character
   | Eof
-
+  | Unknown
 
 let add_character (c : uchar) (r : uchar regex) : uchar regex =
   Regex.Union (r, Regex.Symbol c)
 
-let add_character_c (c : char) (r: uchar regex) : uchar regex =
+let add_character_c (c : char) (r : uchar regex) : uchar regex =
   add_character (u c) r
-
 
 let rec add_character_range (start : uchar) (last : uchar) (r : uchar regex) =
   if start > last then failwith "Invalid range";
@@ -32,9 +31,8 @@ let rec add_character_range (start : uchar) (last : uchar) (r : uchar regex) =
       (Uchar.of_int (Uchar.to_int start + 1))
       last (add_character start r)
 
-let add_character_range_c (start: char) (last: char) (r: uchar regex) =
+let add_character_range_c (start : char) (last : char) (r : uchar regex) =
   add_character_range (u start) (u last) r
-
 
 let regex_token_rules =
   [
@@ -190,7 +188,7 @@ let rec regex_of_regex_syntax_tree
   | _ -> failwith "Invalid rule"
 
 let parse_regex (src : string) : uchar regex =
-  let tokens = tokenize regex_token_rules Eof src in
+  let tokens = tokenize regex_token_rules Eof Unknown src in
   let automaton = construit_automate_LR1 regex_grammar Regex_union Eof in
   let tree = parse automaton Eof tokens Regex_union in
   regex_of_regex_syntax_tree tree

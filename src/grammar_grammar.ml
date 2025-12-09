@@ -29,8 +29,8 @@ let grammar_token_rules =
         ( Concatenation (Symbol (u ':'), Symbol (u '=')),
           Regex.Star (Empty |> add_character_range_c ' ' '~') ),
       Terminal_pattern );
-    ( Concatenation (Concatenation (Symbol (u '-'), Symbol (u '>')),
-                     Symbol (u ' ')),
+    ( Concatenation
+        (Concatenation (Symbol (u '-'), Symbol (u '>')), Symbol (u ' ')),
       Derivation_symbol );
     ( Regex.Concatenation
         ( Regex.Empty
@@ -251,7 +251,7 @@ let grammar_of_syntax_tree
   (token_rules, grammar_of_rule_list grammar_rules)
 
 let parse_grammar (s : string) =
-  let tokens = tokenize grammar_token_rules Eof s in
+  let tokens = tokenize grammar_token_rules Eof Unrecognizable s in
   let tokens_no_whitespace =
     List.filter (fun token -> token.token_type <> Whitespace) tokens
   in

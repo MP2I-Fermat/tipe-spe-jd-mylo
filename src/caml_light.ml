@@ -36,10 +36,11 @@ let parse_caml_light_syntax_tree (source : string) =
         (parse_regex "( |\\n|\\t)+", "<whitespace>");
         (parse_regex "\\(\\*", "<comment_start>");
         (parse_regex "\\*\\)", "<comment_end>");
-        (parse_regex "[ -~]", "<unrecognizable>");
       ]
   in
-  let tokens = tokenize enhanced_token_rules "<eof>" source in
+  let tokens =
+    tokenize enhanced_token_rules "<eof>" "<unrecognizable>" source
+  in
 
   let rec filter_tokens_from (tokens : string token list) (comment_level : int)
       (res : string token list) =

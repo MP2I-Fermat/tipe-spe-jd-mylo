@@ -35,13 +35,13 @@ let string_of_lr1_grammar_symbol s =
 let string_of_situation
     ((((n, rule), idx), sigma) :
       (grammar_token_type, grammar_node_type) lr0_situation
-      * grammar_token_type Hashset.t) : string =
+      * grammar_token_type TerminalSet.t) : string =
   let ns = string_of_grammar_node_type n in
   let rule_strings = List.map string_of_lr1_grammar_symbol rule in
   let rule_beginning = String.concat " " (list_beginning rule_strings idx) in
   let rule_end = String.concat " " (list_skip rule_strings idx) in
   let sigma_s =
-    Hashset.to_list sigma
+    TerminalSet.to_seq sigma |> List.of_seq
     |> List.map string_of_grammar_token_type
     |> String.concat ", "
   in
@@ -62,19 +62,5 @@ let token_rules, rules = parse_grammar test_grammar;;
 
 List.iter
   (fun (regex, token) ->
-    print_endline (token ^ " := " ^ string_of_regex string_of_char regex))
+    print_endline (token ^ " := " ^ string_of_regex string_of_uchar regex))
   token_rules
-;;
-
-List.iter
-  (fun (rule, derivation) ->
-    print_string (rule ^ " -> ");
-    List.iter
-      (fun c ->
-        (match c with
-        | Terminal t -> print_string t
-        | NonTerminal nt -> print_string nt);
-        print_string " ")
-      derivation;
-    print_newline ())
-  rules

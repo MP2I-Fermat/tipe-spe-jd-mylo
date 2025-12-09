@@ -6,8 +6,8 @@ type 'a token = { token_type : 'a; value : string; start : int }
 
 exception Tokenize_failure of { current_pos : int }
 
-let tokenize (rules : (uchar regex * 'a) list) (tok_eof : 'a) (text : string) :
-    'a token list =
+let tokenize (rules : (uchar regex * 'a) list) (tok_eof : 'a) (tok_unknown : 'a)
+    (text : string) : 'a token list =
   if List.find_opt (fun (_, token_type) -> token_type = tok_eof) rules <> None
   then failwith "EOF token had production rule"
   else
@@ -60,7 +60,15 @@ let tokenize (rules : (uchar regex * 'a) list) (tok_eof : 'a) (text : string) :
         match
           read_longest_token_from global_offset states None [] remaining_text
         with
-        | None -> raise (Tokenize_failure { current_pos = global_offset })
+        (* | None -> raise (Tokenize_failure { current_pos = global_offset }) *)
+        | None ->
+            tokenize_from (global_offset + 1) (List.tl remaining_text)
+              ({
+                 start = global_offset;
+                 token_type = tok_unknown;
+                 value = string_of_uchar (List.hd remaining_text);
+               }
+              :: reversed_result)
         | Some (token, remaining_text) ->
             tokenize_from
               (global_offset + String.length token.value)
