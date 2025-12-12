@@ -514,10 +514,31 @@ On introduit alors l'algorithme suivant pour lin\'eariser les expressions
     }
     \Sortie{
         Une forme lin\'eaire $l$ correcte correspondant \`a $e$, $k'$ un entier
-        indiquant le prochain nom de variable non utilis\'e
+        indiquant le prochain nom de variable non utilis\'e, et telle que le
+        dernier couple $(p, e)$ de la forme renvoy\'ee est telle que $p$ est un
+        motif identifiant qui prendra la valeur de $e$ lors de l'\'ex\'ecution
+        de $l$.
     }
 
-    \hl{TODO}
+    \uSi{$e$ est une constante $c$}{
+        Renvoyer $[(\textnormal{\texttt{a\_}}k,\ $c$)],\ k + 1$
+    }\uSinonSi{$e$ est une variable $v$}{
+        Renvoyer $[(\textnormal{\texttt{a\_}}k,\ $v$)],\ k + 1$
+    }\uSinonSi{$e$ est une addition $e_1 + e_2$}{
+    $l_1, k_1 \leftarrow \textnormal{Lin\'eariser}(e_1, k)$ \\
+    $l_2, k_2 \leftarrow \textnormal{Lin\'eariser}(e_1, k_1)$ \\
+    $a_1 \leftarrow$ le nom du dernier motif dans $l_1$ \\
+    $a_2 \leftarrow$ le nom du dernier motif dans $l_2$ \\
+    Renvoyer $l_1.l_2.[(\textnormal{\texttt{a\_}}k_2,\ [(\_, a_1)] + [(\_, a_2)])],\ k_2 + 1$
+    }\uSinonSi{$e$ est une conditionelle \texttt{if} $e_1$ \texttt{then} $e_2$ \texttt{else} $e_3$}{
+    $l_1, k_1 \leftarrow \textnormal{Lin\'eariser}(e_1, k)$ \\
+    $l_2, k_2 \leftarrow \textnormal{Lin\'eariser}(e_1, k_1)$ \\
+    $l_3, k_3 \leftarrow \textnormal{Lin\'eariser}(e_1, k_2)$ \\
+    $a_1 \leftarrow$ le nom du dernier motif dans $l_1$ \\
+    Renvoyer $l_1.[(\texttt{a\_}k_3, \textnormal{\texttt{if}}\ [(\_, a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3)], k_3 + 1$
+    }\uSinon{
+        \ldots\ // Les autres cas sont d\'efinis de mani\`ere analogue.
+    }
 \end{algorithm}
 
 Montrons la correction de cet algorithme. Soit alors $e$ une expression
@@ -529,7 +550,60 @@ indiquant le prochain nom de variable non utilis\'e dans $e$.
 \end{proposition}
 
 \begin{proof}
-    \hl{TODO: Par induction sur $e$}
+    Par induction sur $e$.
+    \newline
+    On traitera trois cas, les autres cas \'etant tous tr\`es similaires.
+
+    \begin{itemize}
+        \item Si $e$ est une constante $c$: \\
+              Alors $l$ = $[(\textnormal{\texttt{a\_}}k,\ $c$)]$, qui est bien
+              une forme linéaire correcte.
+              \bigskip
+        \item Si $e$ est une addition $e_1$ + $e_2$ : \\
+              Supposons que les formes linéaires $l_1$ et $l_2$ renvoyées par
+              Linéariser($e_1$, $k$) et Linéariser($e_2$, $k$) respectivement
+              sont correctes. \\
+              Alors $l = l_1.l_2.[(\textnormal{\texttt{a\_}}k_2,\ [(\_, a_1)] + [(\_, a_2)])]$.
+              Montrons que $l$ est correcte. Soit alors $e'$ un élément linéaire
+              contenu dans $l$. On distingue trois cas possibles:
+              \begin{itemize}
+                  \item $e'$ est contenu dans $l_1$ ou $l_2$: \\
+                        Alors $e'$ est correct car $l_1$ et $l_2$ sont corrects
+                        par hypothèse d'induction.
+                  \item $e' = a_1$ ou $a = a_2$ : \\
+                        Alors $e'$ est correct car il n'a aucun fils qui est une
+                        forme linéaire.
+                  \item $e' = [(\_, a_1)] + [(\_, a_2)]$ : \\
+                        Alors $e'$ est correct car $[(\_, a_1)]$ et $[(\_, a_2)]$
+                        sont réduits \`a un seul couple avec $a_1$ et $a_2$ sont
+                        des constructeurs d'arité nulle (ce sont des variables).
+              \end{itemize}
+              Ainsi tout élément linéaire contenu dans $l$ est correct, donc $l$
+              est correcte.
+              \bigskip
+        \item Si $e$ est une conditionnelle \texttt{if} $e_1$ \texttt{then} $e_2$ \texttt{else} $e_3$ : \\
+              Supposons que les formes linéaires $l_1$, $l_2$ et $l_3$ renvoyées
+              par Linéariser($e_1$, $k$), Linéariser($e_2$, $k$) et
+              Linéariser($e_3$, $k$) soient correctes. \\
+              Alors $l = l_1.[(\texttt{a\_}k_3, \textnormal{\texttt{if}}\ [(\_, a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3)]$.
+              Montrons que $l$ est correcte. Soit alors $e'$ contenu dans $l$.
+              On distingue trois cas possibles:
+              \begin{itemize}
+                  \item $e'$ est contenu dans $l_1$, $l_2$ ou $l_3$ : \\
+                        Alors $e'$ est correcte par hypothèse d'induction.
+                  \item $e' = a_1$ : \\
+                        Alors $e'$ est correct car il n'a aucun fils qui est une
+                        forme linéaire.
+                  \item $e' = \textnormal{\texttt{if}}\ [(\_, a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3$ : \\
+                        $l_2$ et $l_3$ sont localement terminaux et
+                        $[(\_, a_1)]$ est réduit \`a un seul couple avec $a_1$
+                        constructeur d'arité nulle. Donc $e'$ est correct.
+              \end{itemize}
+              Ainsi tout élément linéaire contenu dans $l$ est correct, donc $l$
+              est correcte.
+    \end{itemize}
+
+    Les autres cas se traitent tous de manière similaire.
 \end{proof}
 
 \begin{proposition}
@@ -537,11 +611,47 @@ indiquant le prochain nom de variable non utilis\'e dans $e$.
 \end{proposition}
 
 \begin{proof}
-    \hl{TODO: Par induction sur $e$}
+    Par induction sur $e$.
+    \newline
+    On traitera trois cas, les autres cas \'etant tous tr\`es similaires.
+
+    \begin{itemize}
+        \item Si $e$ est une constante $c$: \\
+              Alors $l$ = $[(\textnormal{\texttt{a\_}}k,\ $c$)]$. L'appel
+              Eval($l$, $ctx$) renvoie alors la valeur de $c$ sans effets de
+              bord. L'appel Eval\_OCaml($l$, $ctx$) renvoie aussi la valeur de
+              $c$ sans effets de bord. Ainsi $l$ correspond a $e$.
+              \bigskip
+        \item Si $e$ est une addition $e_1$ + $e_2$ : \\
+              Supposons que les formes linéaires $l_1$ et $l_2$ renvoyées par
+              Linéariser($e_1$, $k$) et Linéariser($e_2$, $k$) correspondent \`a
+              $e_1$ et $e_2$ respectivement. \\
+              Alors $l = l_1.l_2.[(\textnormal{\texttt{a\_}}k_2,\ [(\_, a_1)] + [(\_, a_2)])]$.
+              Ainsi Eval($l$, $ctx$) évalue d'abord $l_1$, puis $l_2$, puis
+              renvoie la somme des valeurs obtenus (Eval($[(\_, a_i)]$) renvoie
+              immédiatement la valeur de $a_i$). Puisque $l_1$ et $l_2$
+              correspondent \`a $e_1$ et $e_2$, c'est équivalent \`a évaluer
+              $e_1$, puis $e_2$, puis renvoyer la somme des valeurs obtenus.
+              C'est le même comportement que Eval\_OCaml($e$, $ctx$), donc $l$
+              correspond bien \`a $e$.
+              \bigskip
+        \item Si $e$ est une conditionnelle \texttt{if} $e_1$ \texttt{then} $e_2$ \texttt{else} $e_3$ : \\
+              Supposons que les formes linéaires $l_1$, $l_2$ et $l_3$ renvoyées
+              par Linéariser($e_1$, $k$), Linéariser($e_2$, $k$) et
+              Linéariser($e_3$, $k$) correspondent \`a $e_1$, $e_2$ et $e_3$
+              respectivement. \\
+              Alors $l = l_1.[(\texttt{a\_}k_3, \textnormal{\texttt{if}}\ [(\_, a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3)]$.
+              Ainsi Eval($l$, $ctx$) évalue d'abord $l_1$, puis évalue $l_1$ si
+              la valeur obtenue est véridique, et $l_2$ sinon. Comme $l_1$,
+              $l_2$ et $l_3$ correspondent \`a $e_1$, $e_2$ et $e_3$
+              respectivement, c'est le même comportement que l'appel
+              Eval\_OCaml($e$, $ctx$). Ainsi $l$ correspond bien \`a $e$.
+    \end{itemize}
+    Les autres cas se traitent de manière similaire.
 \end{proof}
 
 \begin{remark}
-    On se permettra de dire \textit{la} forme lina\'eaire associ\'ee \`a une
+    On se permettra de dire \textit{la} forme lin\'eaire associ\'ee \`a une
     expression \texttt{OCaml} $e$ pour d\'esigner la forme lin\'eaire renvoy\'ee
     par l'appel Lin\'eariser($e$, $k$) o\`u $k$ est un entier indiquant le
     prochain nom de variable non utilis\'e dans $e$.
