@@ -3,6 +3,14 @@
 \subsection{R\'ecursivit\'e terminale}
 
 \begin{definition}
+    Forme linéaire terminale récursive.
+    \newline
+    On dit qu'une forme linéaire $l$ est récursivement terminale pour une
+    fonction $f$ si \'el\'ement lin\'eaire contenu dans $l$ dont l'\'evaluation
+    conduit \`a un appel de $f$ est terminal.
+\end{definition}
+
+\begin{definition}
     R\'ecursitivit\'e terminale
     \newline
     Soit $f$ une \hl{fonction} r\'ecursive d\'efinie par
@@ -10,8 +18,8 @@
     (c'est-\`a-dire qu'un appel \`a $f$ \'evalue $l$ en mettant les variables
     $x_1$ \`a $x_n$ aux valeurs donn\'ees en argument \`a la fonction).
 
-    On dit que $f$ est \textit{r\'ecursive terminale} si tout \'el\'ement
-    lin\'eaire dont l'\'evaluation conduit \`a un appel de $f$ est terminal.
+    On dit que $f$ est \textit{r\'ecursive terminale} si tout $l$ est
+    récursivement terminal pour $f$.
 \end{definition}
 
 \begin{example}
@@ -56,9 +64,9 @@
     On dit qu'un ensemble de fonctions $\{f_1, \ldots, f_n\}$ toutes d\'efinies
     comme ci-dessus sont mutuellement r\'ecursives terminales si, pour toute
     fonction $f_i$ d\'efinie par un appel \`a Eval($l_i$, $c$) et pour toute fonction
-    $f_j$, tout \'el\'ement lin\'eaire contenu (au sens des arbres) dans $l_i$
-    dont l'\'evaluation conduit \`a un appel de $f_j$ est terminal dans $l_i$.
+    $f_j$, $l_i$ est récursivement terminal pour $f_j$.
 \end{definition}
+
 
 \subsection{Rectification}
 
@@ -74,21 +82,79 @@ On introduit alors un algorithme permettant de \textit{rectifier} une forme
 lin\'eaire $l$, c'est \`a dire de calculer une forme lin\'eaire r\'ecursive
 terminale \'equivalente \`a $l$.
 
+\begin{definition}
+    Application complète d'une fonction \texttt{OCaml}
+    \newline
+    On dit qu'une application de fonction (un élément d'un arbre de syntaxe
+    abstrait \texttt{OCaml}) est \textit{complète} lorsque le nombre d'arguments
+    de l'application correspond exactement au nombre de paramètres de la
+    fonction appelée.
+\end{definition}
+
+\begin{definition}
+    Ensemble de fonctions rectifiable
+    \newline
+    Soit $E = \{f_1, \ldots, f_n\}$ un ensemble de fonctions. On dit que $E$ est
+    \textit{rectifiable} lorsque :
+    \begin{itemize}
+        \item Toute fonction $f_i \in E$ est définie par
+              $f_i: x_1, \ldots, x_n \rightarrowtail \textnormal{Eval}(l_i, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
+        \item Pour tout $f_i \in E$, pour tout $l_j$, toute application de $f_i$
+              contenue dans $l_j$ est complète.
+        \item Pour tout $f_i \in E$, pour toute fonction $g$ définie dans $f_i$
+              (par recours aux constructeurs \texttt{let g \ldots = \ldots} ou
+              \texttt{fun \ldots -> \ldots}), $g \in E$ (i.e tout appel d'une
+              fonction dans $E$ est elle-même dans une fonction de $E$).
+    \end{itemize}
+\end{definition}
+
 \begin{algorithm}[H]
     \caption{Rectifier}
     \Entree{
-        Une forme lin\'eaire correcte $l$ et un ensemble de fonctions
-        $\{f_1, \ldots, f_n\}$ tels que pour tout $f \in \{f_1, \ldots, f_i\}$,
-        toute r\'ef\'erence \`a $f$ contenue (au sens des arbres) dans $l$ est
-        une application \textbf{compl\`ete} de $f$
+        Une forme lin\'eaire correcte $l$, un ensemble de fonctions
+        rectifiable $E$, un nom de variable non utilisée dans $l$ $cont$ et une
+        fonction $nouveau\_nom$ de $E$ dans les noms de variables.
     }
     \Sortie{
-        Une forme lin\'eaire $l'$ \'equivalente \`a $l$ telle que pour tout
-        $f \in \{f_1, \ldots, f_i\}$, tout \'el\'ement lin\'eaire contenu (au
-        sens des arbres) dans $l'$ dont l'\'evaluation conduit \`a un appel de
-        $f$ est terminale dans $l'$
+        Une forme lin\'eaire correcte $l'$ telle que $l'$ est récursivement terminal pour toute fonction de $E$.
     }
-    \hl{TODO}
+
+    \uSi{$l$ ne contient aucun élément dont l'évaluation conduirait \`a un appel
+        d'une fonction de $E$}{
+        Renvoyer $l$
+    }
+    \uSinon{
+    $e \leftarrow$ Le premier élément de $l$ dont l'évaluation conduirait \`a un
+    appel d'une fonction de $E$ \\
+    $a \leftarrow$ Le motif associé \`a $e$ dans $l$ \\
+    $l_1 \leftarrow$ Les éléments de $l$ situés avant $e$ \\
+    $l_2 \leftarrow$ Les éléments de $l$ situés après $e$ \\
+
+
+
+    \uSi{$l_2$ est vide}{
+    \uSi{$e$ est un appel \`a une fonction $f$ de $E$}{
+        $e_{rec} \leftarrow$ Un appel \`a $nouveau\_nom(f)$ avec en arguments les
+        arguments de $e$ suivis de $cont$.
+    }\uSinon{
+        $e_{rec} \leftarrow$ $e$ avec chacun de ses fils $f$ remplacés par la
+        valeur de Rectifier($f$, $E$, $cont$)
+    }
+    Renvoyer $l_1.[(a, e_{rec})]$
+    }\uSinon{
+    $l_{2,rec} \leftarrow$ Rectifier($l_2$, $E$, $cont$) \\
+    $cont' \leftarrow$ Un nom de variable non utilisé dans $l$ différent de
+    $cont$. \\
+    \uSi{$e$ est un appel \`a une fonction $f$ de $E$}{
+        $e_{rec} \leftarrow$ Un appel \`a $nouveau\_nom(f)$ avec en arguments les
+        arguments de $e$ suivis de $cont'$.
+    }\uSinon{
+        $e_{rec} \leftarrow$ $e$ avec chacun de ses fils $f$ remplacés par la
+        valeur de Rectifier($f$, $E$, $cont'$)
+    }
+    Renvoyer $l_1.[(cont', \texttt{fun } a \texttt{ -> } l_{2,rec}), (a, e_{rec})]$
+    }
+    }
 \end{algorithm}
 
 Montrons alors la correction de cet algorithme. Soient $l$ et
@@ -113,3 +179,9 @@ $l' = \textnormal{Rectifier}(l, \{f_1, \ldots, f_n\})$.
 \begin{proof}
     \hl{TODO}
 \end{proof}
+
+\begin{proposition}
+    Rectifier permet de rectifier des fonctions
+    \newline
+    \hl{TODO}
+\end{proposition}
