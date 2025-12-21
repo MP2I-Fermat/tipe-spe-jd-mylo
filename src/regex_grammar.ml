@@ -46,11 +46,30 @@ let regex_token_rules =
     (Regex.Symbol (u '?'), Question);
     ( Regex.Concatenation
         ( Regex.Symbol (u '\\'),
-          Regex.Empty |> add_character_c '(' |> add_character_c ')'
-          |> add_character_c '|' |> add_character_c '*' |> add_character_c '\\'
-          |> add_character_c 'n' |> add_character_c 't' |> add_character_c 'r'
-          |> add_character_c '[' |> add_character_c ']' |> add_character_c '+'
-          |> add_character_c '?' ),
+          Regex.Union
+            ( Regex.Empty |> add_character_c '(' |> add_character_c ')'
+              |> add_character_c '|' |> add_character_c '*'
+              |> add_character_c '\\' |> add_character_c 'n'
+              |> add_character_c 't' |> add_character_c 'r'
+              |> add_character_c '[' |> add_character_c ']'
+              |> add_character_c '+' |> add_character_c '?',
+              Regex.Concatenation
+                ( Regex.Symbol (u 'u'),
+                  Regex.Concatenation
+                    ( Regex.Concatenation
+                        ( Regex.Empty
+                          |> add_character_range_c '0' '9'
+                          |> add_character_range_c 'a' 'f',
+                          Regex.Empty
+                          |> add_character_range_c '0' '9'
+                          |> add_character_range_c 'a' 'f' ),
+                      Regex.Concatenation
+                        ( Regex.Empty
+                          |> add_character_range_c '0' '9'
+                          |> add_character_range_c 'a' 'f',
+                          Regex.Empty
+                          |> add_character_range_c '0' '9'
+                          |> add_character_range_c 'a' 'f' ) ) ) ) ),
       Escape );
     ( Regex.Empty
       |> add_character_range_c ' ' '\''
@@ -104,12 +123,14 @@ let rec regex_of_regex_syntax_tree
     (node : (regex_token_type, regex_rule) syntax_tree) : uchar regex =
   let expand_escape (value : string) : uchar =
     let escaped_char = value.[1] in
-    (match escaped_char with
-    | 'n' -> '\n'
-    | 't' -> '\t'
-    | 'r' -> '\r'
-    | _ -> escaped_char)
-    |> u
+    match escaped_char with
+    | 'n' -> u '\n'
+    | 't' -> u '\t'
+    | 'r' -> u '\r'
+    | 'u' ->
+        let code = int_of_string ("0x" ^ String.sub value 2 4) in
+        Uchar.of_int code
+    | _ -> u escaped_char
   in
 
   let flatten_character_class
