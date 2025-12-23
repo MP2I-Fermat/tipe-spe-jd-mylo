@@ -23,6 +23,21 @@ le suivait précédemment sous forme d'une continuation.
     le receveur est $f$) dans $l$ est terminal.
 \end{definition}
 
+\begin{remark}
+    Cette définition est quelque part un peu trop forte, et quelque part un peu
+    trop faible.
+
+    Elle est trop forte puisqu'il se peut que $l$ contienne des appels à $f$ qui
+    ne sont en pratique jamais exécutés, par exemple dans un littéral de
+    fonction jamais appelé.
+
+    Elle est trop faible puisqu'il se peut que $l$ contienne des appels de
+    fonction qui \textit{mènent} à un appel de $f$ sans pour autant que cet
+    appel soit pour $f$ lui-même. On pallie cette faiblesse avec l'introduction
+    des \hyperref[ensemble_rectifiable]{ensembles de fonctions rectifiables}
+    plus tard.
+\end{remark}
+
 \begin{definition}
     R\'ecursitivit\'e terminale
     \newline
@@ -105,6 +120,7 @@ terminale \'equivalente \`a $l$.
 \end{definition}
 
 \begin{definition}
+    \label{ensemble_rectifiable}
     Ensemble de fonctions rectifiable
     \newline
     Soit $E = \{f_1, \ldots, f_n\}$ un ensemble de variables. On dit que $E$ est
