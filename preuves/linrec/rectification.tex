@@ -1,25 +1,38 @@
 \section{Rectification}
 
+\subsection{Introduction}
+
+Notre but dans cette section sera de développer un algorithme permettant de
+rectifier, c'est-à-dire de rendre récursivement terminal, des fonctions
+\texttt{OCaml}. On visera pour cela de mettre les fonction récursives sous forme
+de \href{https://en.wikipedia.org/wiki/Continuation-passing_style}{\textit{Continuation Passing Style} (CPS)}.
+
+L'idée est de les transformer en fonctions prenant un argument de plus: une
+\textit{continuation}, que la fonction appelle avec son résultat en dernier au
+lieu de renvoyer son résultat directement. On peut ainsi garantir que tout appel
+récursif est \textit{terminal} (cf. ci-dessous) en passant toute la logique qui
+le suivait précédemment sous forme d'une continuation.
+
 \subsection{R\'ecursivit\'e terminale}
 
 \begin{definition}
-    Forme linéaire terminale récursive.
+    Forme linéaire récursivement terminale.
     \newline
-    On dit qu'une forme linéaire $l$ est récursivement terminale pour une
-    fonction $f$ si \'el\'ement lin\'eaire contenu dans $l$ dont l'\'evaluation
-    conduit \`a un appel de $f$ est terminal.
+    On dit qu'une forme linéaire $l$ est \textit{récursivement terminale} pour
+    une variable $f$ si tout appel à $f$ (i.e toute application de fonction o\`u
+    le receveur est $f$) dans $l$ est terminal.
 \end{definition}
 
 \begin{definition}
     R\'ecursitivit\'e terminale
     \newline
-    Soit $f$ une \hl{fonction} r\'ecursive d\'efinie par
+    Soit $f$ une fonction r\'ecursive d\'efinie par
     $f: x_1, \ldots, x_n \rightarrowtail \textnormal{Eval}(l, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
     (c'est-\`a-dire qu'un appel \`a $f$ \'evalue $l$ en mettant les variables
     $x_1$ \`a $x_n$ aux valeurs donn\'ees en argument \`a la fonction).
 
-    On dit que $f$ est \textit{r\'ecursive terminale} si tout $l$ est
-    récursivement terminal pour $f$.
+    On dit que $f$ est \textit{r\'ecursive terminale} si $l$ est
+    récursivement terminale pour $f$.
 \end{definition}
 
 \begin{example}
@@ -29,14 +42,14 @@
              & a_1 := \texttt{List.is\_empty}\ l                                                     \\
              & a_2 := \texttt{if}\ a_1\ \texttt{then true else}\ \left(\begin{aligned}
                                                                                 & a_3 := \texttt{List.tl}\ l \\
-                                                                                & a_4 := \texttt{f}\ a_3     \\
+                                                                                & a_4 := f\ a_3              \\
                                                                                 & a_5 := \texttt{not}\ a_4
                                                                            \end{aligned}\right)
         \end{aligned}, [l \rightarrow l] \right)
     \end{align*}
 
     Cette fonction calcule si son argument $l$ est une liste de longueur paire.
-    Elle n'est pas r\'ecursive terminale car l'appel $\texttt{f}\ a_3$ n'est pas
+    Elle n'est pas r\'ecursive terminale car l'appel $f\ a_3$ n'est pas
     terminal.
 
     \begin{align*}
@@ -48,13 +61,13 @@
              & a_4 := a_1 = 1                                                     \\
              & a_5 := \texttt{List.hd}\ l                                         \\
              & a_6 := \texttt{List.tl}\ l                                         \\
-             & a_5 := \texttt{if}\ a_4\ \texttt{then}\ a_5\ \texttt{else g} \ a_6
+             & a_7 := \texttt{if}\ a_4\ \texttt{then}\ a_5\ \texttt{else}\ g\ a_6
         \end{aligned}, [l \rightarrow l]
         \right)
     \end{align*}
 
     Cette fonction renvoie le dernier \'el\'ement de la liste $l$ donn\'ee en
-    argument. Elle est r\'ecursive terminale car l'appel $\texttt{g} \ a_6$ est
+    argument. Elle est r\'ecursive terminale car l'appel $g\ a_6$ est
     terminal.
 \end{example}
 
@@ -62,9 +75,9 @@
     Fonctions mutuellement r\'ecursives terminales
     \newline
     On dit qu'un ensemble de fonctions $\{f_1, \ldots, f_n\}$ toutes d\'efinies
-    comme ci-dessus sont mutuellement r\'ecursives terminales si, pour toute
-    fonction $f_i$ d\'efinie par un appel \`a Eval($l_i$, $c$) et pour toute fonction
-    $f_j$, $l_i$ est récursivement terminal pour $f_j$.
+    comme ci-dessus sont \textit{mutuellement r\'ecursives terminales} si, pour
+    toute fonction $f_i$ d\'efinie par un appel \`a Eval($l_i$, $c$) et pour
+    toute fonction $f_j$, $l_i$ est récursivement terminal pour $f_j$.
 \end{definition}
 
 
@@ -94,38 +107,44 @@ terminale \'equivalente \`a $l$.
 \begin{definition}
     Ensemble de fonctions rectifiable
     \newline
-    Soit $E = \{f_1, \ldots, f_n\}$ un ensemble de fonctions. On dit que $E$ est
+    Soit $E = \{f_1, \ldots, f_n\}$ un ensemble de variables. On dit que $E$ est
     \textit{rectifiable} lorsque :
     \begin{itemize}
-        \item Toute fonction $f_i \in E$ est définie par
-              $f_i: x_1, \ldots, x_n \rightarrowtail \textnormal{Eval}(l_i, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
+        \item Toute variable $f_i \in E$ est définie par
+              $f_i: x_1, \ldots, x_n \rightarrowtail \textnormal{Eval}(l_i, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$ \\
+              \textit{Les éléments de $E$ sont alors à valeurs fonctionnelles.}
         \item Pour tout $f_i \in E$, pour tout $l_j$, toute application de $f_i$
               contenue dans $l_j$ est complète.
-        \item Pour tout $f_i \in E$, pour toute fonction $g$ définie dans $f_i$
-              (par recours aux constructeurs \texttt{let g \ldots = \ldots} ou
-              \texttt{fun \ldots -> \ldots}), $g \in E$ (i.e tout appel d'une
-              fonction dans $E$ est elle-même dans une fonction de $E$).
+        \item Pour tout $f_i \in E$, pour tout $l_j$, pour toute application
+              $g\ arg_1\ \ldots\ \arg_n$ contenue dans $l_j$, s'il existe un
+              contexte $c$ tel que Eval\_élément($g\ arg_1\ \ldots\ \arg_n$, $c$)
+              conduit à un appel Eval($l_i$, $c'$), alors $g \in E$. \\
+              \textit{Cela correspond à dire que tout appel à une fonction de
+                  $E$ est elle-même dans une fonction de $E$.}
     \end{itemize}
 \end{definition}
 
 \begin{algorithm}[H]
     \caption{Rectifier}
     \Entree{
-        Une forme lin\'eaire correcte $l$, un ensemble de fonctions
+        Une forme lin\'eaire correcte $l$, un ensemble de variables
         rectifiable $E$, un nom de variable non utilisée dans $l$ $cont$ et une
-        fonction $nouveau\_nom$ de $E$ dans les noms de variables.
+        fonction injective $nouveau\_nom$ de $E$ dans les noms de variables non
+        utilisées.
     }
     \Sortie{
-        Une forme lin\'eaire correcte $l'$ telle que $l'$ est récursivement terminal pour toute fonction de $E$.
+        Une forme lin\'eaire correcte $l'$ telle que $l'$ ne contient aucun
+        appel à une fonction de $E$ et est récursivement terminale pour toute
+        fonction de $nouveau\_nom(E)$.
     }
 
-    \uSi{$l$ ne contient aucun élément dont l'évaluation conduirait \`a un appel
-        d'une fonction de $E$}{
+    \uSi{$l$ ne contient aucune application de fonction dont le receveur est
+        dans $E$}{
         Renvoyer $l$
     }
     \uSinon{
-    $e \leftarrow$ Le premier élément de $l$ dont l'évaluation conduirait \`a un
-    appel d'une fonction de $E$ \\
+    $e \leftarrow$ Le premier élément de $l$ contenant une application d'une
+    fonction de $E$ \\
     $a \leftarrow$ Le motif associé \`a $e$ dans $l$ \\
     $l_1 \leftarrow$ Les éléments de $l$ situés avant $e$ \\
     $l_2 \leftarrow$ Les éléments de $l$ situés après $e$ \\
@@ -138,7 +157,7 @@ terminale \'equivalente \`a $l$.
         arguments de $e$ suivis de $cont$.
     }\uSinon{
         $e_{rec} \leftarrow$ $e$ avec chacun de ses fils $f$ remplacés par la
-        valeur de Rectifier($f$, $E$, $cont$)
+        valeur de Rectifier($f$, $E$, $cont$, $nouveau\_nom$)
     }
     Renvoyer $l_1.[(a, e_{rec})]$
     }\uSinon{
@@ -147,41 +166,184 @@ terminale \'equivalente \`a $l$.
     $cont$. \\
     \uSi{$e$ est un appel \`a une fonction $f$ de $E$}{
         $e_{rec} \leftarrow$ Un appel \`a $nouveau\_nom(f)$ avec en arguments les
-        arguments de $e$ suivis de $cont'$.
+        arguments de $e$ suivis de $cont'$
     }\uSinon{
         $e_{rec} \leftarrow$ $e$ avec chacun de ses fils $f$ remplacés par la
-        valeur de Rectifier($f$, $E$, $cont'$)
+        valeur de Rectifier($f$, $E$, $cont'$, $nouveau\_nom$)
     }
     Renvoyer $l_1.[(cont', \texttt{fun } a \texttt{ -> } l_{2,rec}), (a, e_{rec})]$
     }
     }
 \end{algorithm}
 
-Montrons alors la correction de cet algorithme. Soient $l$ et
-$\{f_1, \ldots, f_n\}$ une entr\'ee valide et
-$l' = \textnormal{Rectifier}(l, \{f_1, \ldots, f_n\})$.
+Montrons alors la correction de cet algorithme.
+
+\begin{lemma}
+    Si $l$ est réduit à un seul couple $(p, e)$ avec $e$ un constructeur d'arité
+    nulle, alors $Rectifier(l, E, cont, nouveau\_num) = l$.
+\end{lemma}
+
+\begin{proof}
+    $l$ ne peut pas contenir d'application de fonction dont le receveur est dans
+    $E$. Ainsi $Rectifier(l, E, cont, nouveau\_num) = l$.
+\end{proof}
 
 \begin{proposition}
-    $l'$ est \'equivalente \`a $l$
+    La forme linéaire renvoyée par Rectifier est correcte.
 \end{proposition}
 
 \begin{proof}
-    \hl{TODO}
+    Notons $P(h): \forall l \textnormal{ forme linéaire correcte de hauteur } h,
+        \forall E \textnormal{ rectifiable}, \\ \forall cont \textnormal{ nom de
+            variable}, \forall nouveau\_nom : E \rightarrow \textnormal{ noms de
+            variables},\\ Rectifier(l, e, cont, nouveau\_nom)$ est correct.
+
+    Montrons P($h$) pour tout $h \geq 0$ par récurrence sur $h$.
+
+    \begin{itemize}
+        \item Pour $h = 0$ : \\
+              Soit $l$ de hauteur nulle, ainsi que $E$, $cont$ et $nouveau\_nom$
+              des entrées de Rectifier. \\
+              Les éléments de de $l$ sont alors forcément des constructeurs
+              d'arité nulle. $l$ ne contient alors pas d'application de fonction
+              donc $Rectifier(l, E, cont, nouveau\_nom) = l$ est ainsi correct.
+
+        \item Soit $h \geq 0$. Supposons $P(i)$ pour tout $i \in \lBrack 0; h \rBrack$. \\
+              Notons $Q(n) : \forall l \textnormal{ forme linéaire correcte de
+                      hauteur inférieure à } h + 1 \textnormal{ et de longueur } n,
+                  \\ \forall E \textnormal{ rectifiable}, \forall cont
+                  \textnormal{ nom de variable}, \forall nouveau\_nom : E
+                  \rightarrow \textnormal{ noms de variables},\\ Rectifier(l, e,
+                  cont, nouveau\_nom)$ est correct.\\
+              Montrons Q($n$) pour tout $n \ge 0$ par récurrence.
+
+              \begin{itemize}
+                  \item Pour $n = 1$ : \\
+                        Soit $l$ de hauteur au plus $h + 1$ et de longueur $1$,
+                        ainsi que $E$, $cont$, $nouveau\_nom$ des entrées de
+                        Rectifier. \\
+                        On distingue alors trois cas:
+                        \begin{itemize}
+                            \item Si $l$ ne contient aucune application d'une
+                                  fonction de $E$ : \\
+                                  Alors $Rectifier(l, E, cont, nouveau\_nom) = l$ est correct.
+                            \item Si $l$ est réduit à une seule application
+                                  d'une fonction  $f$ de $E$ : \\
+                                  Alors $Rectifier(l, E, cont, nouveau\_nom)$
+                                  est un appel à $nouveau\_nom(f)$ avec les
+                                  mêmes arguments suivis de $cont$. Cette
+                                  application reste un élément linéaire dont
+                                  tous les fils sont des formes linéaires
+                                  réduites à un seul couple dont les éléments
+                                  linéaires sont des constructeurs d'arité
+                                  nulle ($nouveau\_nom(f)$ et $cont$ sont des
+                                  variables donc bien d'arité nulle).
+                                  $Rectifier(l, E, cont, nouveau\_nom)$ est donc
+                                  correct ($l_1$ est vide).
+                            \item Sinon, $l$ contient un seul couple $(p, e)$
+                                  qui contient un appel à une fonction de $E$.
+                                  En notant $C$ le constructeur de $e$ et $l_1,
+                                      \ldots, l_m$ ses fils, on a alors \\
+                                  $Rectifier(l, E, cont, nouveau\_nom) = \newline [(p, C(Rectifier(l_1, E, cont, nouveau\_nom), \ldots))]$. \\
+                                  Considérons alors $e$ dans
+                                  $Rectifier(l, E, cont, nouveau\_nom)$.
+                                  On distingue alors deux cas:
+                                  \begin{itemize}
+                                      \item Si $e$ est dans l'un des
+                                            $Rectifier(l_i, E, cont, nouveau\_nom)$ : \\
+                                            Alors, comme $Rectifier(l_i, E, cont, nouveau\_nom)$
+                                            est correct d'après \\ $P(haut(l_i))$,
+                                            $e$ est correct.
+                                      \item Si $e = C(Rectifier(l_1, E, cont, nouveau\_nom), \ldots)$ : \\
+                                            Soit alors $f$ un fils de $e$. Il
+                                            existe alors $i$ tel que \\
+                                            $f = Rectifier(l_i, E, cont, nouveau\_nom)$.
+                                            En particulier $f$ est localement
+                                            terminal ssi $l_i$ est localement
+                                            terminal. Alors, si $f$ n'est pas
+                                            localement terminal, $l_i$ ne l'est
+                                            pas non plus. Or comme $l$ est
+                                            correct, si $l_i$ n'est pas
+                                            localement terminal alors $l_i$ est
+                                            réduit à un seul couple dont
+                                            l'élément est un constructeur
+                                            d'arité nulle. Alors $f$ est aussi
+                                            réduit à un seul couple dont
+                                            l'élément est un constructeur
+                                            d'arité nulle d'après le Lemme 1. \\
+                                            $e$ est alors bien correct.
+                                  \end{itemize}
+                                  $Rectifier(l, E, cont, nouveau\_nom)$ est
+                                  ainsi bien correct.
+                        \end{itemize}
+                        Ainsi on vérifie bien $Q(0)$.
+                  \item Soit $n \geq 0$. Supposons $Q(i)$ pour tout $i \in \lBrack 0; n \rBrack$.
+                        Montrons $Q(n + 1)$. \\
+                        Soit alors $l$ de hauteur au plus $h + 1$ et de longueur
+                        $n + 1$, ainsi que $E$, $cont$, $nouveau\_nom$ des
+                        entrées de rectifier. \\
+                        On distingue alors deux cas :
+                        \begin{itemize}
+                            \item Si $l$ ne contient aucune application d'une fonction de
+                                  $E$ : \\
+                                  Alors $Rectifier(l, E, cont, nouveau\_nom) = l$
+                                  est correct.
+                            \item Sinon, $l$ contient une application d'une
+                                  fonction de $E$. \\
+                                  $l_{2,rec}$ est correct d'après $Q(|l_2|)$.
+                                  $e_{rec}$ est correct d'après les mêmes
+                                  arguments qui ci-dessus. $l_1$ est correct car
+                                  $l$ est correct. \\
+                                  Ainsi $Rectifier(l, E, cont, nouveau\_nom) = l_1.[(cont', \texttt{fun } a \texttt{ -> } l_{2,rec}), (a, e_{rec})]$
+                                  est correct ($l_{2,rec}$ est localement
+                                  terminale car elle n'apparaît jamais dans l'ordre
+                                  d'exécution de $\texttt{fun } a \texttt{ -> } l_{2,rec}$).
+                        \end{itemize}
+                        On vérifie alors $Q(i + 1)$.
+              \end{itemize}
+              On a alors, pour tout $n \in \mathbf{N}$, $Q(n)$. Or on obtient
+              alors $P(h + 1)$.
+    \end{itemize}
+    Ainsi pour tout $h \in \mathbf{N}$, $P(h)$ est vrai et donc pour toute
+    entrée de Rectifier, la forme linéaire renvoyée est correcte.
 \end{proof}
 
 
 \begin{proposition}
-    Pour tout $f \in \{f_1, \ldots, f_i\}$, tout \'el\'ement lin\'eaire contenu
-    (au sens des arbres) dans $l'$ dont l'\'evaluation conduit \`a un appel de
-    $f$ est terminale dans $l'$
+    La forme linéaire renvoyée par Rectifier est récursivement terminale pour
+    toute fonction de $nouveau\_nom(E)$.
 \end{proposition}
+
+\begin{proof}
+    Soit $l$, $E$, $cont$ et $nouveau\_nom$ une entrée de Rectifier. Soit \\
+    $f \in nouveau\_nom(E)$. Montrons que $l$ est récursivement terminale pour
+    $f$. \\
+    Si un élément linéaire contient un appel à $f$, c'est forcément puisque un
+    appel à une autre fonction a été remplacée dans $l$ (puisque les $f$ ne peut
+    pas apparaître dans $l$). En considérant les deux instructions
+    \textit{Renvoyer} de l'algorithme, cet élément linéaire est forcément le
+    dernier dans la forme linéaire le contenant. De plus, si $l'$ est une forme
+    linéaire strictement contenue dans $l$ qui contient $e$, alors $l'$ est
+    localement terminal car sinon $l$ ne serait pas correct. $l$ est donc
+    récursivement terminale pour $f$.
+\end{proof}
+
+\subsection{Application}
+
+Soit $E = \{f_1, \ldots, f_n\}$ un ensemble de noms de fonctions
+définies par $f_i: x_1, \ldots, x_n \rightarrowtail \textnormal{Eval}(l_i, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
+tel que $E$ soit rectifiable.
+
+Construisons un ensemble de fonctions $\{f_1', \ldots, f_n'\}$ par $f_i' : x_1 \rightarrow x_1, \ldots, x_n, \texttt{cont} \rightarrowtail \textnormal{Eval}(\textnormal{Rectifier}(l_i, E, \texttt{cont}, nouveau\_nom), [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n, \texttt{cont} \rightarrow \texttt{cont}])$
+avec \\ $nouveau\_nom$ défini par $f_i \rightarrowtail f_i'$.
+
+Montrons alors que, pour tout $f_i \in E$, pour toute fonction $g$ de type
+compatible, $g (f_i\ x_1\ \ldots\ x_n)$ est équivalent à $f_i'\ x_1\ \ldots\ x_n\ g$.
+
+On pourra alors redéfinir les $f_i$ par $f_i: x_1, \ldots, x_n \rightarrowtail f_i'\ x_1\ \ldots\ x_n\ \texttt{(fun x -> x)}$
+pour obtenir un programme équivalent mais o\`u les $f_i'$ sont mutuellement
+récursives terminales.
 
 \begin{proof}
     \hl{TODO}
 \end{proof}
-
-\begin{proposition}
-    Rectifier permet de rectifier des fonctions
-    \newline
-    \hl{TODO}
-\end{proposition}
