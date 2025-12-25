@@ -57,6 +57,11 @@ let uchar_list_of_string (s: string) : uchar list =
   in
   aux 0 []
 
+let explode_uchar = uchar_list_of_string
+
+let unicode_aware_length (s: string) : int =
+  s |> explode_uchar |> List.length
+
 
 (* Cette fonction NE renvoie PAS Uchar.to_int u. En réalité, elle renvoie la
  * représentation interne de u (i.e. les 1, 2, 3 ou 4 octets UTF-8) *)
