@@ -1,1092 +1,562 @@
 open Caml_light
-open Caml_light_utils
 
-let rec introduced_variables (p : pattern) =
-  match p with
-  | Ident i -> [ i ]
-  | Underscore -> []
-  | Parenthesised e -> introduced_variables e
-  | TypeCoercion { inner } -> introduced_variables inner
-  | Constant _ -> []
-  | Record r -> List.concat_map (fun (_, p) -> introduced_variables p) r
-  | List l -> List.concat_map introduced_variables l
-  | Construction { argument } -> introduced_variables argument
-  | Concatenation { head; tail } ->
-      List.concat [ introduced_variables head; introduced_variables tail ]
-  | Tuple t -> List.concat_map introduced_variables t
-  | Or o -> List.concat_map introduced_variables o
-  | As { inner } -> introduced_variables inner
+type linear_element =
+  | Variable of variable node
+  | Constant of constant node
+  | Parenthesised of { inner : linear_form; style : parenthesis_style }
+  | TypeCoercion of { inner : linear_form; typ : type_expression node }
+  | ListLiteral of linear_form list
+  | ArrayLiteral of linear_form list
+  | RecordLiteral of (label node * linear_form) list
+  | WhileLoop of { condition : linear_form; body : linear_form }
+  | ForLoop of {
+      direction : for_direction;
+      variable : lowercase_ident node;
+      start : linear_form;
+      finish : linear_form;
+      body : linear_form;
+    }
+  | Dereference of linear_form
+  | FieldAccess of { receiver : linear_form; target : label node }
+  | ArrayAccess of { receiver : linear_form; target : linear_form }
+  | FunctionApplication of {
+      receiver : linear_form;
+      arguments : linear_form list;
+    }
+  | PrefixOperation of { receiver : linear_form; operation : prefix_operation }
+  | InfixOperation of {
+      lhs : linear_form;
+      rhs : linear_form;
+      operation : infix_operation;
+    }
+  | Negation of linear_form
+  | Tuple of linear_form list
+  | FieldAssignment of {
+      receiver : linear_form;
+      target : label node;
+      value : linear_form;
+    }
+  | ArrayAssignment of {
+      receiver : linear_form;
+      target : linear_form;
+      value : linear_form;
+    }
+  | ReferenceAssignment of { receiver : linear_form; value : linear_form }
+  | If of {
+      condition : linear_form;
+      body : linear_form;
+      else_body : linear_form option;
+    }
+  | Sequence of linear_form list
+  | Match of { value : linear_form; cases : linear_pattern_cases }
+  | Try of { value : linear_form; cases : linear_pattern_cases }
+  | FunctionLiteral of {
+      style : function_literal_style;
+      cases : linear_pattern_cases;
+    }
+  | LetBinding of {
+      bindings : linear_binding node list;
+      is_rec : bool;
+      inner : linear_form;
+    }
+  | StringAccess of { receiver : linear_form; target : linear_form }
+  | StringAssignment of {
+      receiver : linear_form;
+      target : linear_form;
+      value : linear_form;
+    }
 
-let binding_names (b : binding) : variable list =
-  match b with
-  | Variable { lhs } -> introduced_variables lhs
-  | Function { name } -> [ name ]
+and linear_pattern_cases = (pattern node list * linear_form) list
 
-let binding_body (b : binding) : expression =
-  match b with Variable { value } -> value | Function { body } -> body
+and linear_function_ = {
+  name : variable node;
+  parameters : pattern node list;
+  body : linear_form;
+}
 
-let rec contains_only_full_applications (f : function_) (e : expression) : bool
-    =
+and linear_binding =
+  | Variable of { lhs : pattern node; value : linear_form }
+  | Function of linear_function_
+
+and linear_form = (pattern * linear_element) list
+
+let rec last_var (l : linear_form) : variable =
+  match l with
+  | [] -> failwith "l was empty"
+  | (p, _) :: [] -> (
+      match p with
+      | Ident v -> v
+      | _ -> failwith "l did not end with a variable pattern")
+  | x :: q -> last_var q
+
+let rec linearize (e : expression) (k : int) : linear_form * int =
+  let p (i : int) : pattern = Ident ("a_" ^ string_of_int i) in
+
   match e with
-  | Variable _ -> true
-  | Constant _ -> true
-  | Parenthesised { inner } -> contains_only_full_applications f inner
-  | TypeCoercion { inner } -> contains_only_full_applications f inner
-  | ListLiteral l -> List.for_all (contains_only_full_applications f) l
-  | ArrayLiteral l -> List.for_all (contains_only_full_applications f) l
-  | RecordLiteral l ->
-      List.for_all (fun (_, e) -> contains_only_full_applications f e) l
-  | WhileLoop { condition; body } ->
-      contains_only_full_applications f condition
-      && contains_only_full_applications f body
-  | ForLoop { start; finish; body } ->
-      contains_only_full_applications f start
-      && contains_only_full_applications f finish
-      && contains_only_full_applications f body
-  | Dereference e -> contains_only_full_applications f e
-  | FieldAccess { receiver } -> contains_only_full_applications f receiver
-  | ArrayAccess { receiver; target } ->
-      contains_only_full_applications f receiver
-      && contains_only_full_applications f target
-  | FunctionApplication { receiver; arguments } ->
-      (match receiver with
-      | Variable name when name = f.name ->
-          List.length arguments = List.length f.parameters
-      | _ -> true)
-      && contains_only_full_applications f receiver
-      && List.for_all (contains_only_full_applications f) arguments
-  | PrefixOperation { receiver } -> contains_only_full_applications f receiver
-  | InfixOperation { lhs; rhs } ->
-      contains_only_full_applications f lhs
-      && contains_only_full_applications f rhs
-  | Negation e -> contains_only_full_applications f e
-  | Tuple l -> List.for_all (contains_only_full_applications f) l
-  | FieldAssignment { receiver; value } ->
-      contains_only_full_applications f receiver
-      && contains_only_full_applications f value
-  | ArrayAssignment { receiver; target; value } ->
-      contains_only_full_applications f receiver
-      && contains_only_full_applications f target
-      && contains_only_full_applications f value
-  | ReferenceAssignment { receiver; value } ->
-      contains_only_full_applications f receiver
-      && contains_only_full_applications f value
-  | If { condition; body; else_body } -> (
-      contains_only_full_applications f condition
-      && contains_only_full_applications f body
-      &&
-      match else_body with
-      | None -> true
-      | Some else_body -> contains_only_full_applications f else_body)
-  | Sequence s -> List.for_all (contains_only_full_applications f) s
-  | Match { value; cases } ->
-      contains_only_full_applications f value
-      && List.for_all
-           (fun (p, e) ->
-             p
-             |> List.map introduced_variables
-             |> List.flatten |> List.mem f.name
-             || contains_only_full_applications f e)
-           cases
-  | Try { value; cases } ->
-      contains_only_full_applications f value
-      && List.for_all
-           (fun (p, e) ->
-             p
-             |> List.map introduced_variables
-             |> List.flatten |> List.mem f.name
-             || contains_only_full_applications f e)
-           cases
-  | FunctionLiteral { cases } ->
-      List.for_all
-        (fun (p, e) ->
-          p |> List.map introduced_variables |> List.flatten |> List.mem f.name
-          || contains_only_full_applications f e)
-        cases
-  | LetBinding { bindings; inner } ->
-      let check_binding (b : binding) : bool =
-        match b with
-        | Variable { lhs; value } ->
-            List.mem f.name (introduced_variables lhs)
-            || contains_only_full_applications f value
-        | Function f2 ->
-            f2.name = f.name
-            || f2.parameters
-               |> List.map introduced_variables
-               |> List.flatten |> List.mem f.name
-            || contains_only_full_applications f f2.body
+  | Variable v -> ([ (p k, Variable v) ], k + 1)
+  | Constant c -> ([ (p k, Constant c) ], k + 1)
+  | Parenthesised { inner; style } -> linearize inner k
+  | TypeCoercion { inner; typ } ->
+      let inner_lin, k = linearize inner k in
+      let inner_var = last_var inner_lin in
+      let e_elt =
+        TypeCoercion { inner = [ (p (k + 1), Variable inner_var) ]; typ }
       in
-      contains_only_full_applications f inner
-      && List.for_all check_binding bindings
-  | StringAccess { receiver; target } ->
-      contains_only_full_applications f receiver
-      && contains_only_full_applications f target
-  | StringAssignment { receiver; target; value } ->
-      contains_only_full_applications f receiver
-      && contains_only_full_applications f target
-      && contains_only_full_applications f value
-
-let contains_reference (v : variable) (e : expression) : bool =
-  let contains = ref false in
-  let _ =
-    map_expression ~direction:Outwards
-      (fun e ->
-        (match e with Variable v' when v = v' -> contains := true | _ -> ());
-        e)
-      e
-  in
-  !contains
-
-let rec contains_direct_access (f : string) (e : expression) : bool =
-  match e with
-  | Variable v -> v = f
-  | Constant _ -> false
-  | Parenthesised { inner } -> contains_direct_access f inner
-  | TypeCoercion { inner } -> contains_direct_access f inner
-  | ListLiteral l -> List.exists (contains_direct_access f) l
-  | ArrayLiteral l -> List.exists (contains_direct_access f) l
-  | RecordLiteral l -> List.exists (fun (_, e) -> contains_direct_access f e) l
-  | WhileLoop { condition; body } ->
-      contains_direct_access f condition || contains_direct_access f body
-  | ForLoop { start; finish; body } ->
-      contains_direct_access f start
-      || contains_direct_access f finish
-      || contains_direct_access f body
-  | Dereference e -> contains_direct_access f e
-  | FieldAccess { receiver } -> contains_direct_access f receiver
-  | ArrayAccess { receiver; target } ->
-      contains_direct_access f receiver || contains_direct_access f target
-  | FunctionApplication { receiver; arguments } ->
-      contains_direct_access f receiver
-      || List.exists (contains_direct_access f) arguments
-  | PrefixOperation { receiver } -> contains_direct_access f receiver
-  | InfixOperation { lhs; rhs } ->
-      contains_direct_access f lhs || contains_direct_access f rhs
-  | Negation e -> contains_direct_access f e
-  | Tuple l -> List.exists (contains_direct_access f) l
-  | FieldAssignment { receiver; value } ->
-      contains_direct_access f receiver || contains_direct_access f value
-  | ArrayAssignment { receiver; target; value } ->
-      contains_direct_access f receiver
-      || contains_direct_access f target
-      || contains_direct_access f value
-  | ReferenceAssignment { receiver; value } ->
-      contains_direct_access f receiver || contains_direct_access f value
-  | If { condition; body; else_body } -> (
-      contains_direct_access f condition
-      || contains_direct_access f body
-      ||
-      match else_body with
-      | None -> true
-      | Some else_body -> contains_direct_access f else_body)
-  | Sequence s -> List.exists (contains_direct_access f) s
-  | Match { value; cases } ->
-      contains_direct_access f value
-      || List.exists
-           (fun (p, e) ->
-             p |> List.map introduced_variables |> List.flatten |> List.mem f
-             || contains_direct_access f e)
-           cases
-  | Try { value; cases } ->
-      contains_direct_access f value
-      || List.exists
-           (fun (p, e) ->
-             p |> List.map introduced_variables |> List.flatten |> List.mem f
-             || contains_direct_access f e)
-           cases
-  | FunctionLiteral _ -> false
-  | LetBinding { bindings; inner } ->
-      let check_binding (b : binding) : bool =
-        match b with
-        | Variable { lhs; value } ->
-            List.mem f (introduced_variables lhs)
-            || contains_direct_access f value
-        | Function _ -> false
-      in
-      contains_direct_access f inner || List.exists check_binding bindings
-  | StringAccess { receiver; target } ->
-      contains_direct_access f receiver || contains_direct_access f target
-  | StringAssignment { receiver; target; value } ->
-      contains_direct_access f receiver
-      || contains_direct_access f target
-      || contains_direct_access f value
-
-let is_rectify_candidate (f : function_) ~(binding_is_rec : bool) : bool =
-  binding_is_rec
-  && contains_reference f.name f.body
-  && contains_only_full_applications f f.body
-
-let is_simple_expression (e : expression) : bool =
-  let res = ref true in
-  let _ =
-    map_expression
-      (fun e' ->
-        (res := e == e' || match e' with Variable _ -> true | _ -> false);
-        e')
-      e ~direction:Inwards
-  in
-  !res
-
-let linearize (e : expression) : binding list list * variable =
-  let var_name (count : int) : variable = "_lin_" ^ string_of_int count in
-
-  let rec linearize_items_from (e : expression) (count : int) :
-      int * binding list list * variable =
-    match e with
-    | Variable v -> (count, [], v)
-    | InfixOperation { lhs; operation; rhs } ->
-        let count, lhs_items, lhs_name = linearize_items_from lhs count in
-        let count, rhs_items, rhs_name = linearize_items_from rhs count in
-        let op_name = var_name count in
-        ( count + 1,
-          lhs_items @ rhs_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident op_name;
-                    value =
-                      InfixOperation
-                        {
-                          lhs = Variable lhs_name;
-                          operation;
-                          rhs = Variable rhs_name;
-                        };
-                  };
-              ];
-            ],
-          op_name )
-    | Constant c ->
-        let constant_name = var_name count in
-        ( count + 1,
-          [ [ Variable { lhs = Ident constant_name; value = Constant c } ] ],
-          constant_name )
-    | Parenthesised { inner } -> linearize_items_from inner count
-    | TypeCoercion { inner; typ } ->
-        let count, inner_items, inner_name = linearize_items_from inner count in
-        let coercion_name = var_name count in
-        ( count + 1,
-          inner_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident coercion_name;
-                    value = TypeCoercion { inner = Variable inner_name; typ };
-                  };
-              ];
-            ],
-          coercion_name )
-    | ListLiteral l ->
-        let count, content_items, content_names =
-          List.fold_left
-            (fun (count, prev_literals, prev_names) element ->
-              let count, element_literals, element_name =
-                linearize_items_from element count
-              in
-              ( count,
-                prev_literals @ element_literals,
-                element_name :: prev_names ))
-            (count, [], []) l
-        in
-        let list_name = var_name count in
-        ( count + 1,
-          content_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident list_name;
-                    value =
-                      ListLiteral
-                        (content_names
-                        |> List.map (fun n -> (Variable n : expression))
-                        |> List.rev);
-                  };
-              ];
-            ],
-          list_name )
-    | ArrayLiteral l ->
-        let count, content_items, content_names =
-          List.fold_left
-            (fun (count, prev_literals, prev_names) element ->
-              let count, element_literals, element_name =
-                linearize_items_from element count
-              in
-              ( count,
-                prev_literals @ element_literals,
-                element_name :: prev_names ))
-            (count, [], []) l
-        in
-        let array_name = var_name count in
-        ( count + 1,
-          content_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident array_name;
-                    value =
-                      ArrayLiteral
-                        (content_names
-                        |> List.map (fun n -> (Variable n : expression))
-                        |> List.rev);
-                  };
-              ];
-            ],
-          array_name )
-    | RecordLiteral r ->
-        let count, content_items, contents =
-          List.fold_left
-            (fun (count, prev_literals, prev_names) (label, element) ->
-              let count, element_literals, element_name =
-                linearize_items_from element count
-              in
-              ( count,
-                prev_literals @ element_literals,
-                (label, (Variable element_name : expression)) :: prev_names ))
-            (count, [], []) r
-        in
-        let record_name = var_name count in
-        ( count + 1,
-          content_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident record_name;
-                    value = RecordLiteral (List.rev contents);
-                  };
-              ];
-            ],
-          record_name )
-    | WhileLoop _ -> failwith "Unimplemented: linearize WhileLoop"
-    | ForLoop _ -> failwith "Unimplemented: linearize ForLoop"
-    | Dereference e ->
-        let count, e_items, e_name = linearize_items_from e count in
-        let dereference_name = var_name count in
-        ( count + 1,
-          e_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident dereference_name;
-                    value = Dereference (Variable e_name);
-                  };
-              ];
-            ],
-          dereference_name )
-    | FieldAccess { receiver; target } ->
-        let count, receiver_items, receiver_name =
-          linearize_items_from receiver count
-        in
-        let access_name = var_name count in
-        ( count + 1,
-          receiver_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident access_name;
-                    value =
-                      FieldAccess { receiver = Variable receiver_name; target };
-                  };
-              ];
-            ],
-          access_name )
-    | ArrayAccess { receiver; target } ->
-        let count, receiver_items, receiver_name =
-          linearize_items_from receiver count
-        in
-        let target, target_items, target_name =
-          linearize_items_from target count
-        in
-        let access_name = var_name count in
-        ( count + 1,
-          receiver_items @ target_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident access_name;
-                    value =
-                      ArrayAccess
-                        {
-                          receiver = Variable receiver_name;
-                          target = Variable target_name;
-                        };
-                  };
-              ];
-            ],
-          access_name )
-    | FunctionApplication { receiver; arguments } ->
-        let count, receiver_items, receiver_name =
-          linearize_items_from receiver count
-        in
-        let count, arguments_items, arguments_name =
-          List.fold_left
-            (fun (count, arguments_items, arguments_names) argument ->
-              let count, argument_items, argument_name =
-                linearize_items_from argument count
-              in
-              ( count,
-                arguments_items @ argument_items,
-                arguments_names @ [ argument_name ] ))
-            (count, [], []) arguments
-        in
-        let application_name = var_name count in
-        ( count + 1,
-          receiver_items @ arguments_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident application_name;
-                    value =
-                      FunctionApplication
-                        {
-                          receiver = Variable receiver_name;
-                          arguments =
-                            List.map
-                              (fun v -> Caml_light.Variable v)
-                              arguments_name;
-                        };
-                  };
-              ];
-            ],
-          application_name )
-    | PrefixOperation { receiver; operation } ->
-        let count, receiver_items, receiver_name =
-          linearize_items_from receiver count
-        in
-        let operation_name = var_name count in
-        ( count + 1,
-          receiver_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident operation_name;
-                    value =
-                      PrefixOperation
-                        { operation; receiver = Variable receiver_name };
-                  };
-              ];
-            ],
-          operation_name )
-    | Negation receiver ->
-        let count, receiver_items, receiver_name =
-          linearize_items_from receiver count
-        in
-        let operation_name = var_name count in
-        ( count + 1,
-          receiver_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident operation_name;
-                    value = Negation (Variable receiver_name);
-                  };
-              ];
-            ],
-          operation_name )
-    | Tuple t ->
-        let count, content_literals, content_names =
-          List.fold_left
-            (fun (count, prev_literals, prev_names) element ->
-              let count, element_literals, element_name =
-                linearize_items_from element count
-              in
-              ( count,
-                prev_literals @ element_literals,
-                element_name :: prev_names ))
-            (count, [], []) t
-        in
-        let list_name = var_name count in
-        ( count + 1,
-          content_literals
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident list_name;
-                    value =
-                      Tuple
-                        (content_names
-                        |> List.map (fun n -> (Variable n : expression))
-                        |> List.rev);
-                  };
-              ];
-            ],
-          list_name )
-    | FieldAssignment { receiver; target; value } ->
-        let count, receiver_items, receiver_name =
-          linearize_items_from receiver count
-        in
-        let count, value_items, value_name = linearize_items_from value count in
-        let access_name = var_name count in
-        ( count + 1,
-          receiver_items @ value_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident access_name;
-                    value =
-                      FieldAssignment
-                        {
-                          receiver = Variable receiver_name;
-                          target;
-                          value = Variable value_name;
-                        };
-                  };
-              ];
-            ],
-          access_name )
-    | ArrayAssignment { receiver; target; value } ->
-        let count, receiver_items, receiver_name =
-          linearize_items_from receiver count
-        in
-        let target, target_items, target_name =
-          linearize_items_from target count
-        in
-        let count, value_items, value_name = linearize_items_from value count in
-        let access_name = var_name count in
-        ( count + 1,
-          receiver_items @ target_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident access_name;
-                    value =
-                      ArrayAssignment
-                        {
-                          receiver = Variable receiver_name;
-                          target = Variable target_name;
-                          value = Variable value_name;
-                        };
-                  };
-              ];
-            ],
-          access_name )
-    | ReferenceAssignment { receiver; value } ->
-        let count, receiver_items, receiver_name =
-          linearize_items_from receiver count
-        in
-        let count, value_items, value_name = linearize_items_from value count in
-        let access_name = var_name count in
-        ( count + 1,
-          receiver_items @ value_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident access_name;
-                    value =
-                      ReferenceAssignment
-                        {
-                          receiver = Variable receiver_name;
-                          value = Variable value_name;
-                        };
-                  };
-              ];
-            ],
-          access_name )
-    (* Branching expression *)
-    | If { condition; body; else_body } ->
-        let count, condition_items, condition_name =
-          linearize_items_from condition count
-        in
-        let if_name = var_name count in
-        ( count + 1,
-          condition_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident if_name;
-                    value =
-                      If
-                        { condition = Variable condition_name; body; else_body };
-                  };
-              ];
-            ],
-          if_name )
-    | Sequence l ->
+      (inner_lin @ [ (p k, e_elt) ], k + 2)
+  | ListLiteral l ->
+      let elt_lins, elt_names, k =
         List.fold_left
-          (fun (count, items, root) e ->
-            let count, e_items, e_root = linearize_items_from e count in
-            (count, items @ e_items, e_root))
-          (count, [], "_") l
-    (* Branching expression *)
-    | Match { value; cases } ->
-        let count, value_items, value_name = linearize_items_from value count in
-        let match_name = var_name count in
-        ( count + 1,
-          value_items
-          @ [
-              [
-                Variable
+          (fun (lins, names, k) elt ->
+            let elt_lin, k = linearize elt k in
+            let elt_name = last_var elt_lin in
+            (elt_lin :: lins, elt_name :: names, k))
+          ([], [], k) l
+      in
+      let e_elt =
+        ListLiteral
+          (elt_names |> List.rev
+          |> List.mapi (fun i name -> [ (p (k + i + 1), Variable name) ]))
+      in
+      let elt_count = List.length elt_names in
+      ( (elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ],
+        k + elt_count + 1 )
+  | ArrayLiteral l ->
+      let elt_lins, elt_names, k =
+        List.fold_left
+          (fun (lins, names, k) elt ->
+            let elt_lin, k = linearize elt k in
+            let elt_name = last_var elt_lin in
+            (elt_lin :: lins, elt_name :: names, k))
+          ([], [], k) l
+      in
+      let e_elt =
+        ArrayLiteral
+          (elt_names |> List.rev
+          |> List.mapi (fun i name -> [ (p (k + i + 1), Variable name) ]))
+      in
+      let elt_count = List.length elt_names in
+      ( (elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ],
+        k + elt_count + 1 )
+  | RecordLiteral l ->
+      let elt_lins, elt_names, k =
+        List.fold_left
+          (fun (lins, names, k) (field, elt) ->
+            let elt_lin, k = linearize elt k in
+            let elt_name = last_var elt_lin in
+            (elt_lin :: lins, (field, elt_name) :: names, k))
+          ([], [], k) l
+      in
+      let e_elt =
+        RecordLiteral
+          (elt_names |> List.rev
+          |> List.mapi (fun i (field, name) ->
+                 (field, [ (p (k + i + 1), Variable name) ])))
+      in
+      let elt_count = List.length elt_names in
+      ( (elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ],
+        k + elt_count + 1 )
+  | WhileLoop _ -> failwith "Cannot linearize while loops"
+  | ForLoop _ -> failwith "Cannot linearize for loops"
+  | Dereference inner ->
+      let inner_lin, k = linearize inner k in
+      let inner_var = last_var inner_lin in
+      let e_elt = Dereference [ (p (k + 1), Variable inner_var) ] in
+      (inner_lin @ [ (p k, e_elt) ], k + 2)
+  | FieldAccess { target; receiver } ->
+      let receiver_lin, k = linearize receiver k in
+      let receiver_var = last_var receiver_lin in
+      let e_elt =
+        FieldAccess
+          { target; receiver = [ (p (k + 1), Variable receiver_var) ] }
+      in
+      (receiver_lin @ [ (p k, e_elt) ], k + 2)
+  | ArrayAccess { target; receiver } ->
+      let receiver_lin, k = linearize receiver k in
+      let receiver_var = last_var receiver_lin in
+      let target_lin, k = linearize target k in
+      let target_var = last_var target_lin in
+      let e_elt =
+        ArrayAccess
+          {
+            receiver = [ (p (k + 1), Variable receiver_var) ];
+            target = [ (p (k + 2), Variable target_var) ];
+          }
+      in
+      (receiver_lin @ target_lin @ [ (p k, e_elt) ], k + 3)
+  | FunctionApplication { receiver; arguments } -> (
+      match receiver with
+      | Constant c ->
+          (* This is a type constructor. Technically we deviate from the definition of a correct
+          linear form here (the argument may be a parenthesised tuple with depth > 1). *)
+          let arguments_lins, argument_names, k =
+            match arguments with
+            | [ Parenthesised { inner = Tuple actual_arguments } ] ->
+                List.fold_left
+                  (fun (lins, names, k) elt ->
+                    let elt_lin, k = linearize elt k in
+                    let elt_name = last_var elt_lin in
+                    (elt_lin :: lins, elt_name :: names, k))
+                  ([], [], k) actual_arguments
+            | [ argument ] ->
+                let argument_lin, k = linearize argument k in
+                let argument_name = last_var argument_lin in
+                ([ argument_lin ], [ argument_name ], k)
+            | _ -> failwith "Type constructor had more than one argument"
+          in
+          let e_elt =
+            match argument_names with
+            | [ argument ] ->
+                FunctionApplication
                   {
-                    lhs = Ident match_name;
-                    value = Match { value = Variable value_name; cases };
-                  };
-              ];
-            ],
-          match_name )
-    (* Branching expression *)
-    | Try { value; cases } ->
-        let count, value_items, value_name = linearize_items_from value count in
-        let match_name = var_name count in
-        ( count + 1,
-          value_items
-          @ [
-              [
-                Variable
+                    receiver = [ (p (k + 1), Constant c) ];
+                    arguments = [ [ (p (k + 2), Variable argument) ] ];
+                  }
+            | _ ->
+                FunctionApplication
                   {
-                    lhs = Ident match_name;
-                    value = Try { value = Variable value_name; cases };
-                  };
-              ];
-            ],
-          match_name )
-    (* Branching expression *)
-    | FunctionLiteral { style; cases } ->
-        let function_name = var_name count in
-        ( count + 1,
-          [
-            [
-              Variable
-                {
-                  lhs = Ident function_name;
-                  value = FunctionLiteral { style; cases };
-                };
-            ];
-          ],
-          function_name )
-    | LetBinding { bindings; is_rec; inner } ->
-        let count, bindings_items, bindings =
-          List.fold_left
-            (fun (count, bindings_items, bindings) binding ->
-              match binding with
-              | (Variable { lhs; value } : binding) ->
-                  if is_simple_expression value then
-                    (count, bindings_items, bindings @ [ binding ])
-                  else
-                    let count, items, value_name =
-                      linearize_items_from value count
-                    in
-                    ( count,
-                      bindings_items @ items,
-                      bindings
-                      @ [ Variable { lhs; value = Variable value_name } ] )
-              (* Branching expression *)
-              | Function _ -> (count, bindings_items, bindings @ [ binding ]))
-            (count, [], []) bindings
-        in
-        let count, inner_items, inner_name = linearize_items_from inner count in
-        (count, bindings_items @ [ bindings ] @ inner_items, inner_name)
-    | StringAccess { target; receiver } ->
-        let count, receiver_items, receiver_name =
-          linearize_items_from receiver count
-        in
-        let target, target_items, target_name =
-          linearize_items_from target count
-        in
-        let access_name = var_name count in
-        ( count + 1,
-          receiver_items @ target_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident access_name;
-                    value =
-                      StringAccess
-                        {
-                          receiver = Variable receiver_name;
-                          target = Variable target_name;
-                        };
-                  };
-              ];
-            ],
-          access_name )
-    | StringAssignment { receiver; target; value } ->
-        let count, receiver_items, receiver_name =
-          linearize_items_from receiver count
-        in
-        let target, target_items, target_name =
-          linearize_items_from target count
-        in
-        let count, value_items, value_name = linearize_items_from value count in
-        let access_name = var_name count in
-        ( count + 1,
-          receiver_items @ target_items
-          @ [
-              [
-                Variable
-                  {
-                    lhs = Ident access_name;
-                    value =
-                      StringAssignment
-                        {
-                          receiver = Variable receiver_name;
-                          target = Variable target_name;
-                          value = Variable value_name;
-                        };
-                  };
-              ];
-            ],
-          access_name )
-  in
-  let count, items, root = linearize_items_from e 0 in
-  (items, root)
-
-let rec delinearize ((items, root) : binding list list * string) : expression =
-  let find_binding_definition (l : binding list list) (v : variable) :
-      expression option =
-    let flat = List.flatten l in
-    let rec find_definition (l : binding list) : expression option =
-      match l with
-      | [] -> None
-      | Variable { lhs; value } :: q when lhs = Ident v -> Some value
-      | _ :: q -> find_definition q
-    in
-    find_definition flat
-  in
-
-  let collapsed_items =
-    items
-    |> List.fold_left
-         (fun so_far bindings ->
-           let substituted = ref [] in
-
-           let substitute_linear_variables (e : expression) : expression =
-             map_expression ~direction:Outwards
-               (fun e ->
-                 match e with
-                 | Variable v
-                   when String.starts_with ~prefix:"_lin_" v
-                        || String.starts_with ~prefix:"_aux_continue" v
-                        || String.starts_with ~prefix:"_new_aux_continue" v -> (
-                     match find_binding_definition so_far v with
-                     | Some def ->
-                         substituted := v :: !substituted;
-                         Parenthesised { inner = def; style = Parenthesis }
-                     | None -> Variable v)
-                 | _ -> e)
-               e
-           in
-
-           let linearized_bindings =
-             bindings
-             |> List.map (fun binding ->
-                    match binding with
-                    | (Variable { lhs; value } : binding) ->
-                        (Variable
-                           { lhs; value = substitute_linear_variables value }
-                          : binding)
-                    | Function { name; parameters; body } ->
-                        Function
-                          {
-                            name;
-                            parameters;
-                            body = substitute_linear_variables body;
-                          })
-           in
-
-           let filtered_decls =
-             so_far
-             |> List.map (fun bindings ->
-                    bindings
-                    |> List.filter (fun binding ->
-                           match binding with
-                           | (Variable { lhs = Ident v } : binding) ->
-                               not (List.mem v !substituted)
-                           | _ -> true))
-             |> List.filter (fun bindings -> bindings <> [])
-           in
-           linearized_bindings :: filtered_decls)
-         []
-    |> List.rev
-  in
-
-  let rec delinearize_items (items : binding list list) (root : expression) :
-      expression =
-    match items with
-    | bindings :: q -> (
-        let q_expression = delinearize_items q root in
-
-        match (bindings, q_expression) with
-        | [ Variable { lhs = Ident v1; value } ], Variable v2 when v1 = v2 ->
-            value
-        | _ ->
-            let is_rec =
-              List.exists
-                (fun binding ->
-                  let names = binding_names binding in
-                  List.exists
-                    (fun binding' ->
-                      List.exists
-                        (fun name ->
-                          contains_reference name (binding_body binding'))
-                        names)
-                    bindings)
-                bindings
-            in
-
-            LetBinding { is_rec; bindings; inner = q_expression })
-    | [] -> root
-  in
-
-  delinearize_items collapsed_items (Variable root)
-
-let rectify ({ name = function_name; parameters; body } : function_) : function_
-    =
-  let aux_name = function_name ^ "_aux" in
-  let aux_continue_name =
-    "_aux_continue" ^ string_of_int (List.length parameters)
-  in
-
-  let id_function : expression =
-    Parenthesised
-      {
-        style = Parenthesis;
-        inner =
-          FunctionLiteral
-            {
-              style = Fun;
-              cases = [ ([ Ident "_aux_ret" ], Variable "_aux_ret") ];
-            };
-      }
-  in
-
-  let rec rectify_linear ((items, root) : binding list list * variable) :
-      binding list list * variable =
-    match items with
-    | [] ->
-        ( [
-            [
-              Variable
-                {
-                  lhs = Ident "_lin_ret";
-                  value =
-                    FunctionApplication
-                      {
-                        receiver = Variable aux_continue_name;
-                        arguments = [ Variable root ];
-                      };
-                };
-            ];
-          ],
-          "_lin_ret" )
-    | bindings :: q -> (
-        (* Bindings is either:
-           - A single binding containing a recursive call either directly or indirectly (i.e a function application or a match statement).
-           - A set of indirectly self-referential bindings that can only contain recursive calls in their lazily evaluated code (i.e function bodies).
-        *)
-        match bindings with
-        | [ (Variable { lhs; value } as binding) ]
-          when contains_direct_access function_name value ->
-            if introduced_variables lhs = [ root ] then
-              ([ [ push_rectification_down binding ] ], root)
-            else
-              let new_continuation_body =
-                rectify_expression (delinearize (q, root))
-              in
-
-              ( [
-                  [
-                    Variable
-                      {
-                        lhs = Ident ("_new" ^ aux_continue_name);
-                        value =
-                          FunctionLiteral
-                            {
-                              style = Fun;
-                              cases = [ ([ lhs ], new_continuation_body) ];
-                            };
-                      };
-                  ];
-                  [
-                    Variable
-                      {
-                        lhs = Ident aux_continue_name;
-                        value = Variable ("_new" ^ aux_continue_name);
-                      };
-                  ];
-                  [
-                    push_rectification_down
-                      (Variable { lhs = Ident "_lin_ret"; value });
-                  ];
-                ],
-                "_lin_ret" )
-        | _ ->
-            let inner_items, inner_root = rectify_linear (q, root) in
-            ( List.map push_rectification_down bindings :: inner_items,
-              inner_root ))
-  and rectify_expression (e : expression) : expression =
-    delinearize (rectify_linear (linearize e))
-  (* Pushes rectification down into branching expressions that cannot be linearized. *)
-  and push_rectification_down (b : binding) : binding =
-    match b with
-    | Variable { lhs; value } ->
-        let new_value =
-          match value with
-          (* Substitute calls to original function with calls to auxiliary function here. *)
-          | FunctionApplication
-              { receiver = Caml_light.Variable receiver_name; arguments }
-            when receiver_name = function_name ->
-              FunctionApplication
-                {
-                  receiver = Variable aux_name;
-                  arguments = arguments @ [ Variable aux_continue_name ];
-                }
-          | Match { value; cases } ->
-              Match
-                {
-                  value;
-                  cases =
-                    List.map
-                      (fun (patterns, value) ->
-                        (patterns, rectify_expression value))
-                      cases;
-                }
-          | If { condition; body; else_body } ->
-              If
-                {
-                  condition;
-                  body = rectify_expression body;
-                  else_body =
-                    (match else_body with
-                    | None -> None
-                    | Some e -> Some (rectify_expression e));
-                }
-          | Try { value; cases } ->
-              Try
-                {
-                  value;
-                  cases =
-                    List.map
-                      (fun (patterns, value) ->
-                        (patterns, rectify_expression value))
-                      cases;
-                }
-          | FunctionLiteral { style; cases } ->
-              failwith
-                "Cannot push rectification into a function (mutually recursive \
-                 functions are not implemented yet)"
-          | _ -> value
-        in
-        Variable { lhs; value = new_value }
-    | Function _ ->
-        failwith
-          "Cannot push rectification into a function (mutually recursive \
-           functions are not implemented yet)"
-  in
-
-  let new_parameters =
-    List.mapi
-      (fun i pattern ->
-        match pattern with Ident v -> v | _ -> "_arg_" ^ string_of_int i)
-      parameters
-  in
-
-  {
-    name = function_name;
-    parameters = List.map (fun name -> Ident name) new_parameters;
-    body =
-      LetBinding
-        {
-          bindings =
-            [
-              Function
-                {
-                  name = aux_name;
-                  parameters =
-                    parameters
-                    @ [
-                        Parenthesised
-                          (TypeCoercion
-                             {
-                               inner = Ident aux_continue_name;
-                               typ =
-                                 Function
-                                   {
-                                     argument = Argument "aux_continue_type";
-                                     result = Argument "aux_continue_type";
-                                   };
-                             });
+                    receiver = [ (p (k + 1), Constant c) ];
+                    arguments =
+                      [
+                        [
+                          ( p (k + 2),
+                            Parenthesised
+                              {
+                                style = Parenthesis;
+                                inner =
+                                  [
+                                    ( p (k + 3),
+                                      Tuple
+                                        (argument_names |> List.rev
+                                        |> List.mapi (fun i arg ->
+                                               [ (p (k + i + 4), Variable arg) ])
+                                        ) );
+                                  ];
+                              } );
+                        ];
                       ];
-                  body = rectify_expression body;
-                };
-            ];
-          is_rec = true;
-          inner =
+                  }
+          in
+          let argument_count = List.length argument_names in
+          ( (arguments_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ],
+            k + argument_count + 4 )
+      | _ ->
+          let receiver_lin, k = linearize receiver k in
+          let receiver_var = last_var receiver_lin in
+          let arg_lins, arg_names, k =
+            List.fold_left
+              (fun (lins, names, k) elt ->
+                let elt_lin, k = linearize elt k in
+                let elt_name = last_var elt_lin in
+                (elt_lin :: lins, elt_name :: names, k))
+              ([], [], k) arguments
+          in
+          let e_elt =
             FunctionApplication
               {
-                receiver = Variable aux_name;
+                receiver = [ (p (k + 1), Variable receiver_var) ];
                 arguments =
-                  (new_parameters
-                  |> List.map (fun v -> (Variable v : expression)))
-                  @ [ id_function ];
-              };
-        };
-  }
-
-let rectify_program (p : program) : program =
-  let rec rectify_expression (e : expression) : expression =
-    map_expression
-      (fun e ->
-        match e with
-        | LetBinding { bindings; is_rec; inner } ->
-            LetBinding
-              {
-                bindings =
-                  List.map (rectify_binding ~binding_is_rec:is_rec) bindings;
-                is_rec;
-                inner;
+                  arg_names |> List.rev
+                  |> List.mapi (fun i name ->
+                         [ (p (k + i + 2), Variable name) ]);
               }
-        | _ -> e)
-      e ~direction:Outwards
-  and rectify_binding (b : binding) ~(binding_is_rec : bool) : binding =
-    match b with
-    | Variable { lhs; value } ->
-        Variable { lhs; value = rectify_expression value }
-    | Function { name; parameters; body } ->
-        let f' = { name; parameters; body = rectify_expression body } in
-        if is_rectify_candidate f' ~binding_is_rec then Function (rectify f')
-        else Function f'
-  in
-
-  let rectify_phrase (p : phrase) : phrase =
-    match p with
-    | Expression e -> Expression (rectify_expression e)
-    | ValueDefinition { bindings; is_rec } ->
-        let new_bindings =
-          List.map (rectify_binding ~binding_is_rec:is_rec) bindings
-        in
-        ValueDefinition
+          in
+          let argument_count = List.length arguments in
+          ( receiver_lin
+            @ (arg_lins |> List.rev |> List.concat)
+            @ [ (p k, e_elt) ],
+            k + argument_count + 2 ))
+  | PrefixOperation { operation; receiver } ->
+      let receiver_lin, k = linearize receiver k in
+      let receiver_var = last_var receiver_lin in
+      let e_elt =
+        PrefixOperation
+          { operation; receiver = [ (p (k + 1), Variable receiver_var) ] }
+      in
+      (receiver_lin @ [ (p k, e_elt) ], k + 2)
+  | InfixOperation { lhs; rhs; operation } ->
+      let lhs_lin, k = linearize lhs k in
+      let lhs_var = last_var lhs_lin in
+      let rhs_lin, k = linearize rhs k in
+      let rhs_var = last_var rhs_lin in
+      let e_elt =
+        InfixOperation
           {
-            bindings = new_bindings;
-            is_rec =
-              is_rec
-              && List.exists
-                   (fun binding ->
-                     let names = binding_names binding in
-                     List.exists
-                       (fun binding' ->
-                         List.exists
-                           (fun name ->
-                             contains_reference name (binding_body binding'))
-                           names)
-                       new_bindings)
-                   new_bindings;
+            operation;
+            lhs = [ (p (k + 1), Variable lhs_var) ];
+            rhs = [ (p (k + 2), Variable rhs_var) ];
           }
-    | _ -> p
-  in
+      in
+      (lhs_lin @ rhs_lin @ [ (p k, e_elt) ], k + 3)
+  | Negation inner ->
+      let inner_lin, k = linearize inner k in
+      let inner_var = last_var inner_lin in
+      let e_elt = Negation [ (p (k + 1), Variable inner_var) ] in
+      (inner_lin @ [ (p k, e_elt) ], k + 2)
+  | Tuple t ->
+      let elt_lins, elt_names, k =
+        List.fold_left
+          (fun (lins, names, k) elt ->
+            let elt_lin, k = linearize elt k in
+            let elt_name = last_var elt_lin in
+            (elt_lin :: lins, elt_name :: names, k))
+          ([], [], k) t
+      in
+      let e_elt =
+        Tuple
+          (elt_names |> List.rev
+          |> List.mapi (fun i name -> [ (p (k + i + 1), Variable name) ]))
+      in
+      let elt_count = List.length elt_names in
+      ( (elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ],
+        k + elt_count + 1 )
+  | FieldAssignment { receiver; target; value } ->
+      let receiver_lin, k = linearize receiver k in
+      let receiver_var = last_var receiver_lin in
+      let value_lin, k = linearize value k in
+      let value_var = last_var value_lin in
+      let e_elt =
+        FieldAssignment
+          {
+            receiver = [ (p (k + 1), Variable receiver_var) ];
+            target;
+            value = [ (p (k + 2), Variable value_var) ];
+          }
+      in
+      (receiver_lin @ value_lin @ [ (p k, e_elt) ], k + 3)
+  | ArrayAssignment { receiver; target; value } ->
+      let receiver_lin, k = linearize receiver k in
+      let receiver_var = last_var receiver_lin in
+      let target_lin, k = linearize target k in
+      let target_var = last_var target_lin in
+      let value_lin, k = linearize value k in
+      let value_var = last_var value_lin in
+      let e_elt =
+        ArrayAssignment
+          {
+            receiver = [ (p (k + 1), Variable receiver_var) ];
+            target = [ (p (k + 2), Variable target_var) ];
+            value = [ (p (k + 3), Variable value_var) ];
+          }
+      in
+      (receiver_lin @ target_lin @ value_lin @ [ (p k, e_elt) ], k + 4)
+  | ReferenceAssignment { receiver; value } ->
+      let receiver_lin, k = linearize receiver k in
+      let receiver_var = last_var receiver_lin in
+      let value_lin, k = linearize value k in
+      let value_var = last_var value_lin in
+      let e_elt =
+        ReferenceAssignment
+          {
+            receiver = [ (p (k + 1), Variable receiver_var) ];
+            value = [ (p (k + 2), Variable value_var) ];
+          }
+      in
+      (receiver_lin @ value_lin @ [ (p k, e_elt) ], k + 3)
+  | If { condition; body; else_body } ->
+      let condition_lin, k = linearize condition k in
+      let condition_var = last_var condition_lin in
+      let body_lin, k = linearize body k in
+      let else_body_lin, k =
+        match else_body with
+        | None -> (None, k)
+        | Some else_body ->
+            let else_body_lin, k = linearize else_body k in
+            (Some else_body_lin, k)
+      in
+      let e_elt =
+        If
+          {
+            condition = [ (p (k + 2), Variable condition_var) ];
+            body = body_lin;
+            else_body = else_body_lin;
+          }
+      in
+      (condition_lin @ [ (p k, e_elt) ], k + 2)
+  | Sequence s ->
+      let elt_lins, k =
+        List.fold_left
+          (fun (lins, k) elt ->
+            let elt_lin, k = linearize elt k in
+            (elt_lin :: lins, k))
+          ([], k) s
+      in
+      (elt_lins |> List.rev |> List.concat, k)
+  | Match { value; cases } ->
+      let value_lin, k = linearize value k in
+      let value_var = last_var value_lin in
+      let orig_k = k in
+      let cases_lins, k =
+        List.fold_left
+          (fun (lins, k) (pattern, body) ->
+            let body_lin, k = linearize body k in
+            ((pattern, body_lin) :: lins, k))
+          ([], orig_k + 2)
+          cases
+      in
+      let e_elt =
+        Match
+          {
+            value = [ (p (orig_k + 1), Variable value_var) ];
+            cases = List.rev cases_lins;
+          }
+      in
+      (value_lin @ [ (p orig_k, e_elt) ], k)
+  | Try _ -> failwith "Cannot linearize try expressions"
+  | FunctionLiteral { style; cases } ->
+      let orig_k = k in
+      let cases_lins, k =
+        List.fold_left
+          (fun (lins, k) (pattern, body) ->
+            let body_lin, k = linearize body k in
+            ((pattern, body_lin) :: lins, k))
+          ([], orig_k + 1)
+          cases
+      in
+      let e_elt = FunctionLiteral { style; cases = List.rev cases_lins } in
+      ([ (p orig_k, e_elt) ], k)
+  | LetBinding { bindings; is_rec; inner } ->
+      let bindings_as_assignments =
+        bindings
+        |> List.map (fun (binding : Caml_light.binding) ->
+               match binding with
+               | Function { name; parameters; body } ->
+                   ( Ident name,
+                     Caml_light.FunctionLiteral
+                       { style = Fun; cases = [ (parameters, body) ] } )
+               | Variable { lhs; value } -> (lhs, value))
+      in
+      let bindings_lins, k =
+        List.fold_left
+          (fun (lins, k) (lhs, elt) ->
+            let elt_lin, k = linearize elt k in
+            let elt_var = last_var elt_lin in
+            ((elt_lin @ [ (lhs, Variable elt_var) ]) :: lins, k))
+          ([], k) bindings_as_assignments
+      in
+      let inner_lin, k = linearize inner k in
+      (inner_lin :: bindings_lins |> List.rev |> List.concat, k)
+  | StringAccess { target; receiver } ->
+      let receiver_lin, k = linearize receiver k in
+      let receiver_var = last_var receiver_lin in
+      let target_lin, k = linearize target k in
+      let target_var = last_var target_lin in
+      let e_elt =
+        ArrayAccess
+          {
+            receiver = [ (p (k + 1), Variable receiver_var) ];
+            target = [ (p (k + 2), Variable target_var) ];
+          }
+      in
+      (receiver_lin @ target_lin @ [ (p k, e_elt) ], k + 3)
+  | StringAssignment { receiver; target; value } ->
+      let receiver_lin, k = linearize receiver k in
+      let receiver_var = last_var receiver_lin in
+      let target_lin, k = linearize target k in
+      let target_var = last_var target_lin in
+      let value_lin, k = linearize value k in
+      let value_var = last_var value_lin in
+      let e_elt =
+        ArrayAssignment
+          {
+            receiver = [ (p (k + 1), Variable receiver_var) ];
+            target = [ (p (k + 2), Variable target_var) ];
+            value = [ (p (k + 3), Variable value_var) ];
+          }
+      in
+      (receiver_lin @ target_lin @ value_lin @ [ (p k, e_elt) ], k + 4)
 
-  List.map rectify_phrase p
+let rec delinearize_element (e : linear_element) : expression =
+  match e with
+  | Variable v -> Variable v
+  | Constant c -> Constant c
+  | Parenthesised { style; inner } ->
+      Parenthesised { style; inner = delinearize inner }
+  | TypeCoercion { typ; inner } ->
+      TypeCoercion { typ; inner = delinearize inner }
+  | ListLiteral l -> ListLiteral (List.map delinearize l)
+  | ArrayLiteral l -> ArrayLiteral (List.map delinearize l)
+  | RecordLiteral l ->
+      RecordLiteral
+        (List.map (fun (field, value) -> (field, delinearize value)) l)
+  | WhileLoop _ -> failwith "Found linearized while loop"
+  | ForLoop _ -> failwith "Found linearized for loop"
+  | Dereference inner -> Dereference (delinearize inner)
+  | FieldAccess { receiver; target } ->
+      FieldAccess { receiver = delinearize receiver; target }
+  | ArrayAccess { receiver; target } ->
+      ArrayAccess
+        { receiver = delinearize receiver; target = delinearize target }
+  | FunctionApplication { receiver; arguments } ->
+      FunctionApplication
+        {
+          receiver = delinearize receiver;
+          arguments = List.map delinearize arguments;
+        }
+  | PrefixOperation { operation; receiver } ->
+      PrefixOperation { operation; receiver = delinearize receiver }
+  | InfixOperation { lhs; operation; rhs } ->
+      InfixOperation { lhs = delinearize lhs; operation; rhs = delinearize rhs }
+  | Negation inner -> Negation (delinearize inner)
+  | Tuple l -> Tuple (List.map delinearize l)
+  | FieldAssignment { receiver; target; value } ->
+      FieldAssignment
+        { receiver = delinearize receiver; target; value = delinearize value }
+  | ArrayAssignment { receiver; target; value } ->
+      ArrayAssignment
+        {
+          receiver = delinearize receiver;
+          target = delinearize target;
+          value = delinearize value;
+        }
+  | ReferenceAssignment { receiver; value } ->
+      ReferenceAssignment
+        { receiver = delinearize receiver; value = delinearize value }
+  | If { condition; body; else_body } ->
+      If
+        {
+          condition = delinearize condition;
+          body = delinearize body;
+          else_body =
+            (match else_body with
+            | None -> None
+            | Some b -> Some (delinearize b));
+        }
+  | Sequence s -> Sequence (List.map delinearize s)
+  | Match { value; cases } ->
+      Match
+        {
+          value = delinearize value;
+          cases =
+            List.map (fun (pattern, body) -> (pattern, delinearize body)) cases;
+        }
+  | Try _ -> failwith "Found linearized try"
+  | FunctionLiteral { style; cases } ->
+      FunctionLiteral
+        {
+          style;
+          cases =
+            List.map (fun (pattern, body) -> (pattern, delinearize body)) cases;
+        }
+  | LetBinding _ -> failwith "Found linearized let"
+  | StringAccess { receiver; target } ->
+      StringAccess
+        { receiver = delinearize receiver; target = delinearize target }
+  | StringAssignment { receiver; target; value } ->
+      StringAssignment
+        {
+          receiver = delinearize receiver;
+          target = delinearize target;
+          value = delinearize value;
+        }
+
+and delinearize (l : linear_form) : expression =
+  match l with
+  | [] -> failwith "Empty linear form"
+  | (p, e) :: [] -> delinearize_element e
+  | (p, e) :: q ->
+      LetBinding
+        {
+          is_rec = false;
+          bindings = [ Variable { lhs = p; value = delinearize_element e } ];
+          inner = delinearize q;
+        }
