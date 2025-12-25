@@ -156,7 +156,9 @@ terminale \'equivalente \`a $l$.
 
     \uSi{$l$ ne contient aucune application de fonction dont le receveur est
         dans $E$}{
-        Renvoyer $l$
+        $a \leftarrow$ Le dernier motif de $l$ % TODO: N'est pas nécessairement une variable.
+        $p \leftarrow$ Un nom de variable non utilisé dans $l$
+        Renvoyer $l.[(p, cont\ a)]$
     }
     \uSinon{
     $e \leftarrow$ Le premier élément de $l$ contenant une application d'une
@@ -209,6 +211,8 @@ Montrons alors la correction de cet algorithme.
 \end{proposition}
 
 \begin{proof}
+    \hl{TODO: Needs revisiting}
+
     Notons $P(h): \forall l \textnormal{ forme linéaire correcte de hauteur } h,
         \forall E \textnormal{ rectifiable}, \\ \forall cont \textnormal{ nom de
             variable}, \forall nouveau\_nom : E \rightarrow \textnormal{ noms de
