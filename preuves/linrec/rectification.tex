@@ -174,8 +174,9 @@ terminale \'equivalente \`a $l$.
         $e_{rec} \leftarrow$ Un appel \`a $nouveau\_nom(f)$ avec en arguments les
         arguments de $e$ suivis de $cont$.
     }\uSinon{
-        $e_{rec} \leftarrow$ $e$ avec chacun de ses fils $f$ remplacés par la
-        valeur de Rectifier($f$, $E$, $cont$, $nouveau\_nom$)
+        $e_{rec} \leftarrow$ $e$ avec chacun de ses fils localement terminaux
+        $f$ remplacés par la valeur de
+        Rectifier($f$, $E$, $cont$, $nouveau\_nom$)
     }
     Renvoyer $l_1.[(a, e_{rec})]$
     }\uSinon{
@@ -186,8 +187,9 @@ terminale \'equivalente \`a $l$.
         $e_{rec} \leftarrow$ Un appel \`a $nouveau\_nom(f)$ avec en arguments les
         arguments de $e$ suivis de $cont'$
     }\uSinon{
-        $e_{rec} \leftarrow$ $e$ avec chacun de ses fils $f$ remplacés par la
-        valeur de Rectifier($f$, $E$, $cont'$, $nouveau\_nom$)
+        $e_{rec} \leftarrow$ $e$ avec chacun de ses fils localement terminaux
+        $f$ remplacés par la valeur de
+        Rectifier($f$, $E$, $cont'$, $nouveau\_nom$)
     }
     Renvoyer $l_1.[(cont', \texttt{fun } a \texttt{ -> } l_{2,rec}), (a, e_{rec})]$
     }
