@@ -560,3 +560,154 @@ and delinearize (l : linear_form) : expression =
           bindings = [ Variable { lhs = p; value = delinearize_element e } ];
           inner = delinearize q;
         }
+
+let rec element_contains_application (f : variable) (e : linear_element) : bool
+    =
+  match e with
+  | Variable _ -> false
+  | Constant _ -> false
+  | Parenthesised { inner } | TypeCoercion { inner } ->
+      contains_application f inner
+  | ListLiteral l | ArrayLiteral l -> List.exists (contains_application f) l
+  | RecordLiteral l -> l |> List.map snd |> List.exists (contains_application f)
+  | WhileLoop _ -> failwith "Found linearized while loop"
+  | ForLoop _ -> failwith "Found linearized for loop"
+  | Dereference inner -> contains_application f inner
+  | FieldAccess { receiver } -> contains_application f receiver
+  | ArrayAccess { receiver; target } ->
+      contains_application f receiver || contains_application f target
+  | FunctionApplication { receiver; arguments } ->
+      (match receiver with [ (_, Variable f') ] -> f' = f | _ -> false)
+      || contains_application f receiver
+      || List.exists (contains_application f) arguments
+  | PrefixOperation { receiver } -> contains_application f receiver
+  | InfixOperation { lhs; rhs } ->
+      contains_application f lhs || contains_application f rhs
+  | Negation inner -> contains_application f inner
+  | Tuple l -> List.exists (contains_application f) l
+  | FieldAssignment { receiver; value } ->
+      contains_application f receiver || contains_application f value
+  | ArrayAssignment { receiver; target; value } ->
+      contains_application f receiver
+      || contains_application f target
+      || contains_application f value
+  | ReferenceAssignment { receiver; value } ->
+      contains_application f receiver || contains_application f value
+  | If { condition; body; else_body } -> (
+      contains_application f condition
+      || contains_application f body
+      ||
+      match else_body with None -> false | Some b -> contains_application f b)
+  | Sequence s -> List.exists (contains_application f) s
+  | Match { value; cases } ->
+      contains_application f value
+      || cases |> List.map snd |> List.exists (contains_application f)
+  | Try _ -> failwith "Found linearized try"
+  (* TODO: Formalise "contains" better to explain this *)
+  | FunctionLiteral _ -> false
+  | LetBinding _ -> failwith "Found linearized try"
+  | StringAccess { receiver; target } ->
+      contains_application f receiver || contains_application f target
+  | StringAssignment { receiver; target; value } ->
+      contains_application f receiver
+      || contains_application f target
+      || contains_application f value
+
+and contains_application (f : variable) (l : linear_form) : bool =
+  match l with
+  | [] -> false
+  | (p, e) :: q -> element_contains_application f e || contains_application f q
+
+let map_locally_terminal_children (f : linear_form -> linear_form)
+    (e : linear_element) : linear_element =
+  match (e : linear_element) with
+  | If { condition; body; else_body } ->
+      If
+        {
+          condition;
+          body = f body;
+          else_body =
+            (match else_body with None -> None | Some b -> Some (f b));
+        }
+  | Match { value; cases } ->
+      Match
+        {
+          value;
+          cases = List.map (fun (pattern, body) -> (pattern, f body)) cases;
+        }
+  | FunctionLiteral { style; cases } ->
+      FunctionLiteral
+        {
+          style;
+          cases = List.map (fun (pattern, body) -> (pattern, f body)) cases;
+        }
+  (* No locally terminal children *)
+  | _ -> e
+
+let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable)
+    (new_name : variable -> variable) : linear_form =
+  let rec find_first_recursive_element (tail : linear_form) (head : linear_form)
+      : linear_form * ((pattern * linear_element) * linear_form) option =
+    match tail with
+    | [] -> (List.rev head, None)
+    | (p, e) :: q ->
+        if List.exists (fun f -> element_contains_application f e) e_rect then
+          (List.rev head, Some ((p, e), q))
+        else find_first_recursive_element q ((p, e) :: head)
+  in
+  let l_1, maybe_recursive = find_first_recursive_element l [] in
+  match maybe_recursive with
+  | None ->
+      let head_var = last_var l_1 in
+      l_1
+      @ [
+          ( Ident "cont_res",
+            FunctionApplication
+              {
+                receiver = [ (Ident "cont_call", Variable cont) ];
+                arguments = [ [ (Ident "cont_arg", Variable head_var) ] ];
+              } );
+        ]
+  | Some ((a, e), l_2) -> (
+      match l_2 with
+      | [] ->
+          let e_rec =
+            match e with
+            | FunctionApplication { receiver = [ (p, Variable f) ]; arguments }
+              when List.mem f e_rect ->
+                FunctionApplication
+                  {
+                    receiver = [ (p, Variable (new_name f)) ];
+                    arguments =
+                      arguments @ [ [ (Ident "cont_arg", Variable cont) ] ];
+                  }
+            | _ ->
+                map_locally_terminal_children
+                  (fun f -> rectify f e_rect cont new_name)
+                  e
+          in
+          l_1 @ [ (a, e_rec) ]
+      | _ ->
+          let l_2_rec = rectify l_2 e_rect cont new_name in
+          let cont' = cont ^ "'" in
+          let e_rec =
+            match e with
+            | FunctionApplication { receiver = [ (p, Variable f) ]; arguments }
+              when List.mem f e_rect ->
+                FunctionApplication
+                  {
+                    receiver = [ (p, Variable (new_name f)) ];
+                    arguments =
+                      arguments @ [ [ (Ident "cont_arg", Variable cont') ] ];
+                  }
+            | _ ->
+                map_locally_terminal_children
+                  (fun f -> rectify f e_rect cont' new_name)
+                  e
+          in
+          l_1
+          @ [
+              ( Ident cont',
+                FunctionLiteral { style = Fun; cases = [ ([ a ], l_2_rec) ] } );
+              (a, e_rec);
+            ])
