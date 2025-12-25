@@ -2,7 +2,7 @@ open Regex
 open Automaton
 open Utils
 
-type 'a token = { token_type : 'a; value : string; start : int }
+type 'a token = { token_type : 'a; value : string; start : int; length : int }
 
 exception Tokenize_failure of { current_pos : int }
 
@@ -22,7 +22,7 @@ let tokenize (rules : (uchar regex * 'a) list) (tok_eof : 'a) (tok_unknown : 'a)
     let rec tokenize_from (global_offset : int) (remaining_text : uchar list)
         (reversed_result : 'a token list) : 'a token list =
       if remaining_text = [] then
-        { token_type = tok_eof; value = ""; start = global_offset }
+        { token_type = tok_eof; value = ""; start = global_offset; length = 0 }
         :: reversed_result
       else
         let rec read_longest_token_from (start : int)
@@ -42,6 +42,7 @@ let tokenize (rules : (uchar regex * 'a) list) (tok_eof : 'a) (tok_unknown : 'a)
                         token_type = List.assq e.automaton automatons;
                         value = implode_uchar (List.rev current_lexeme);
                         start;
+                        length = List.length current_lexeme;
                       },
                       remaining_text )
             in
@@ -67,11 +68,12 @@ let tokenize (rules : (uchar regex * 'a) list) (tok_eof : 'a) (tok_unknown : 'a)
                  start = global_offset;
                  token_type = tok_unknown;
                  value = string_of_uchar (List.hd remaining_text);
+                 length = 1;
                }
               :: reversed_result)
         | Some (token, remaining_text) ->
             tokenize_from
-              (global_offset + String.length token.value)
+              (global_offset + token.length)
               remaining_text (token :: reversed_result)
     in
     List.rev (tokenize_from 0 (uchar_list_of_string text) [])
