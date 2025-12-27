@@ -16,57 +16,63 @@ le suivait précédemment sous forme d'une continuation.
 \subsection{R\'ecursivit\'e terminale}
 
 \begin{definition}
-    Forme linéaire récursivement terminale.
+    Ensemble de variables rectifiant une forme linéaire.
     \newline
-    On dit qu'une forme linéaire $l$ est \textit{récursivement terminale} pour
-    une variable $f$ si tout appel à $f$ (i.e toute application de fonction o\`u
-    le receveur est $f$) dans $l$ est terminal.
+    Soit $l$ une forme linéaire correcte. On dit que $l$ est rectifiable par un
+    ensemble de noms de variables $E$ lorsque pour tout appel de fonction
+    $g\ arg_1 \ldots\ arg_n$ contenu dans $l$, s'il existe un contexte $c$ tel
+    que Eval($l$, $c$) conduise à un appel Eval\_élément($g$, $c'$) et que
+    l'appel Eval\_élément($g$, $c'$) conduise à un appel Eval($l$, $c''$), alors
+    l'unique variable dans $g$ est dans $E$ ($g$ est forcément réduit à un
+    couple $(p, e)$ avec $e$ constructeur d'arité nulle car $l$ est correcte, et
+    $e$ ne peut pas être une constante car il doit être à valeurs
+    fonctionnelles).
+
+    \textit{Intuitivement, cela correspond à dire que $E$ contient les noms des
+        fonctions qui pourraient conduire à un appel récursif de $l$.}
 \end{definition}
 
-\begin{remark}
-    Cette définition est quelque part un peu trop forte, et quelque part un peu
-    trop faible.
-
-    Elle est trop forte puisqu'il se peut que $l$ contienne des appels à $f$ qui
-    ne sont en pratique jamais exécutés, par exemple dans un littéral de
-    fonction jamais appelé.
-
-    Elle est trop faible puisqu'il se peut que $l$ contienne des appels de
-    fonction qui \textit{mènent} à un appel de $f$ sans pour autant que cet
-    appel soit pour $f$ lui-même. On pallie cette faiblesse avec l'introduction
-    des \hyperref[ensemble_rectifiable]{ensembles de fonctions rectifiables}
-    plus tard.
-\end{remark}
+\begin{definition}
+    On dit qu'un ensemble de fonctions $\{f_1, \ldots, f_n\}$ définies par
+    $f_i : x_1, \ldots, x_n \rightarrow Eval(l_i, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
+    sont \textit{mutuellement récursives terminales} lorsqu'il existe un
+    ensemble de noms de variables $E$ qui rectifie tous les $l_i$ tel que pour
+    toute variable $g$ dans $E$, pour toute forme linéaire $l_i$ avec
+    $i \in \lBrack 1; n \rBrack$, tout appel à $g$ dans $l_i$ est terminal.
+\end{definition}
 
 \begin{definition}
-    R\'ecursitivit\'e terminale
-    \newline
-    Soit $f$ une fonction r\'ecursive d\'efinie par
-    $f: x_1, \ldots, x_n \rightarrowtail \textnormal{Eval}(l, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
-    (c'est-\`a-dire qu'un appel \`a $f$ \'evalue $l$ en mettant les variables
-    $x_1$ \`a $x_n$ aux valeurs donn\'ees en argument \`a la fonction).
-
-    On dit que $f$ est \textit{r\'ecursive terminale} si $l$ est
-    récursivement terminale pour $f$.
+    On dit qu'une fonction $f$ définie par
+    $f : x_1, \ldots, x_n \rightarrow Eval(l, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
+    est récursive terminale lorsque $\{f\}$ est mutuellement récursif terminal.
 \end{definition}
 
 \begin{example}
+    Considérons
     \begin{align*}
-        f : l \rightarrowtail \textnormal{Eval} \left(
+        f : l \rightarrow Eval \left(
         \begin{aligned}
              & a_1 := \texttt{List.is\_empty}\ l                                                     \\
              & a_2 := \texttt{if}\ a_1\ \texttt{then true else}\ \left(\begin{aligned}
                                                                                 & a_3 := \texttt{List.tl}\ l \\
                                                                                 & a_4 := f\ a_3              \\
                                                                                 & a_5 := \texttt{not}\ a_4
-                                                                           \end{aligned}\right)
-        \end{aligned}, [l \rightarrow l] \right)
+                                                                           \end{aligned}
+            \right)
+        \end{aligned}, [l \rightarrow l]
+        \right)
     \end{align*}
 
-    Cette fonction calcule si son argument $l$ est une liste de longueur paire.
-    Elle n'est pas r\'ecursive terminale car l'appel $f\ a_3$ n'est pas
-    terminal.
+    Cette fonction calcule si la liste donnée en argument est de longueur paire.
 
+    Elle n'est pas récursive terminale car si le corps de $f$ est rectifiable
+    par un ensemble $E$, alors on a forcément $f \in E$ (l'appel $f\ a_3$
+    conduit à l'évaluation du corps de $f$). Or l'appel $f\ a_3$ n'est pas
+    terminal donc $f$ n'est pas récursive terminale.
+
+    \bigbreak
+
+    Considérons maintenant
     \begin{align*}
         g : l \rightarrowtail \textnormal{Eval} \left(
         \begin{aligned}
@@ -81,20 +87,11 @@ le suivait précédemment sous forme d'une continuation.
         \right)
     \end{align*}
 
-    Cette fonction renvoie le dernier \'el\'ement de la liste $l$ donn\'ee en
-    argument. Elle est r\'ecursive terminale car l'appel $g\ a_6$ est
-    terminal.
+    Cette fonction calcule le dernier élément de la liste donnée en paramètre.
+    Elle est récursive terminale car son corps est rectifiable par $\{g\}$ (les
+    appels \texttt{List.length}, \texttt{failwith}, \texttt{List.hd} et
+    \texttt{List.tl} n'appellent jamais $g$) et l'appel $g\ a_6$ est terminal.
 \end{example}
-
-\begin{definition}
-    Fonctions mutuellement r\'ecursives terminales
-    \newline
-    On dit qu'un ensemble de fonctions $\{f_1, \ldots, f_n\}$ toutes d\'efinies
-    comme ci-dessus sont \textit{mutuellement r\'ecursives terminales} si, pour
-    toute fonction $f_i$ d\'efinie par un appel \`a Eval($l_i$, $c$) et pour
-    toute fonction $f_j$, $l_i$ est récursivement terminal pour $f_j$.
-\end{definition}
-
 
 \subsection{Rectification}
 
@@ -109,36 +106,6 @@ le suivait précédemment sous forme d'une continuation.
 On introduit alors un algorithme permettant de \textit{rectifier} une forme
 lin\'eaire $l$, c'est \`a dire de calculer une forme lin\'eaire r\'ecursive
 terminale \'equivalente \`a $l$.
-
-\begin{definition}
-    Application complète d'une fonction \texttt{OCaml}
-    \newline
-    On dit qu'une application de fonction (un élément d'un arbre de syntaxe
-    abstrait \texttt{OCaml}) est \textit{complète} lorsque le nombre d'arguments
-    de l'application correspond exactement au nombre de paramètres de la
-    fonction appelée.
-\end{definition}
-
-\begin{definition}
-    \label{ensemble_rectifiable}
-    Ensemble de fonctions rectifiable
-    \newline
-    Soit $E = \{f_1, \ldots, f_n\}$ un ensemble de variables. On dit que $E$ est
-    \textit{rectifiable} lorsque :
-    \begin{itemize}
-        \item Toute variable $f_i \in E$ est définie par
-              $f_i: x_1, \ldots, x_n \rightarrowtail \textnormal{Eval}(l_i, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$ \\
-              \textit{Les éléments de $E$ sont alors à valeurs fonctionnelles.}
-        \item Pour tout $f_i \in E$, pour tout $l_j$, toute application de $f_i$
-              contenue dans $l_j$ est complète.
-        \item Pour tout $f_i \in E$, pour tout $l_j$, pour toute application
-              $g\ arg_1\ \ldots\ \arg_n$ contenue dans $l_j$, s'il existe un
-              contexte $c$ tel que Eval\_élément($g\ arg_1\ \ldots\ \arg_n$, $c$)
-              conduit à un appel Eval($l_i$, $c'$), alors $g \in E$. \\
-              \textit{Cela correspond à dire que tout appel à une fonction de
-                  $E$ est elle-même dans une fonction de $E$.}
-    \end{itemize}
-\end{definition}
 
 \begin{algorithm}[H]
     \caption{Rectifier}
@@ -332,6 +299,7 @@ Montrons alors la correction de cet algorithme.
 
 
 \begin{proposition}
+    \hl{TODO: Needs revisiting} \\
     La forme linéaire renvoyée par Rectifier est récursivement terminale pour
     toute fonction de $nouveau\_nom(E)$.
 \end{proposition}
@@ -369,3 +337,17 @@ récursives terminales.
 \begin{proof}
     \hl{TODO}
 \end{proof}
+
+Pour rectifier un ensemble de fonctions $\{f_1, \ldots, f_n\}$ arbitraire, il
+nous faut alors un moyen de calculer un ensemble rectifiable qui contient tous
+les $f_i$. On introduit alors l'algorithme suivant :
+
+\begin{algorithm}[H]
+    \caption{Cl\^oture\_rectifiable}
+    \Entree{Un ensemble $\{f_1, \ldots, f_n\}$ de noms de variables}
+    \Sortie{
+        Un ensemble $\{g_1, \ldots, g_m\}$ de noms de variables rectifiable qui
+        contient tous les $f_i$, ou \texttt{None}
+    }
+\end{algorithm}
+
