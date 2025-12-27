@@ -162,14 +162,24 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
       let inner_var = last_var inner_lin in
       let e_elt = Dereference [ (p (k + 1), Variable inner_var) ] in
       (inner_lin @ [ (p k, e_elt) ], k + 2)
-  | FieldAccess { target; receiver } ->
-      let receiver_lin, k = linearize receiver k in
-      let receiver_var = last_var receiver_lin in
-      let e_elt =
-        FieldAccess
-          { target; receiver = [ (p (k + 1), Variable receiver_var) ] }
-      in
-      (receiver_lin @ [ (p k, e_elt) ], k + 2)
+  | FieldAccess { target; receiver } -> (
+      match receiver with
+      | Constant c ->
+          (* This is a module access *)
+          ( [
+              ( p k,
+                FieldAccess { receiver = [ (p (k + 1), Constant c) ]; target }
+              );
+            ],
+            k + 2 )
+      | _ ->
+          let receiver_lin, k = linearize receiver k in
+          let receiver_var = last_var receiver_lin in
+          let e_elt =
+            FieldAccess
+              { target; receiver = [ (p (k + 1), Variable receiver_var) ] }
+          in
+          (receiver_lin @ [ (p k, e_elt) ], k + 2))
   | ArrayAccess { target; receiver } ->
       let receiver_lin, k = linearize receiver k in
       let receiver_var = last_var receiver_lin in
