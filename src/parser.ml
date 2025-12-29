@@ -563,7 +563,7 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
                 etat_courant := Stack.top pile_etats;
                 parse_a_partir ((NonTerminalRepr (nt, pos_start)) :: text)))
   in
-  if nouveau_texte = [Token eof_symbol] then
+  if nouveau_texte = [Token {token_type=eof_symbol; value=""; start=0; length=0}] then
     raise EmptyFile
   else
     parse_a_partir nouveau_texte
