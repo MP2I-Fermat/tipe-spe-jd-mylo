@@ -3,6 +3,7 @@ open Automaton
 open Utils
 
 exception SyntaxError of string * int
+exception EmptyFile
 
 type ('token_type, 'non_terminal) grammar_entry =
   | NonTerminal of 'non_terminal
@@ -562,7 +563,10 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
                 etat_courant := Stack.top pile_etats;
                 parse_a_partir ((NonTerminalRepr (nt, pos_start)) :: text)))
   in
-  parse_a_partir nouveau_texte
+  if nouveau_texte = [Token eof_symbol] then
+    raise EmptyFile
+  else
+    parse_a_partir nouveau_texte
 
 (*************************** Fonctions d’affichage ***************************)
 let string_of_symbol (s : (char, char) grammar_entry) : string =
