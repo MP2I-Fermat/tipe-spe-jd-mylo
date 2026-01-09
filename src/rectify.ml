@@ -50,10 +50,7 @@ type linear_element =
   | Sequence of linear_form list
   | Match of { value : linear_form; cases : linear_pattern_cases }
   | Try of { value : linear_form; cases : linear_pattern_cases }
-  | FunctionLiteral of {
-      style : function_literal_style;
-      cases : linear_pattern_cases;
-    }
+  | FunctionLiteral of linear_function_literal
   | LetBinding of {
       bindings : linear_binding node list;
       is_rec : bool;
@@ -67,6 +64,11 @@ type linear_element =
     }
 
 and linear_pattern_cases = (pattern node list * linear_form) list
+
+and linear_function_literal = {
+  style : function_literal_style;
+  cases : linear_pattern_cases;
+}
 
 and linear_function_ = {
   name : variable node;
@@ -692,8 +694,8 @@ let map_locally_terminal_children (f : linear_form -> linear_form)
   (* No locally terminal children *)
   | _ -> e
 
-let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable)
-    (new_name : variable -> variable) : linear_form =
+let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable) :
+    linear_form =
   let rec find_first_recursive_element (tail : linear_form) (head : linear_form)
       : linear_form * ((variable * linear_element) * linear_form) option =
     match tail with
@@ -725,17 +727,15 @@ let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable)
               when List.mem f e_rect ->
                 FunctionApplication
                   {
-                    receiver = [ (p, Variable (new_name f)) ];
+                    receiver = [ (p, Variable f) ];
                     arguments = arguments @ [ [ ("cont_arg", Variable cont) ] ];
                   }
             | _ ->
-                map_locally_terminal_children
-                  (fun f -> rectify f e_rect cont new_name)
-                  e
+                map_locally_terminal_children (fun f -> rectify f e_rect cont) e
           in
           l_1 @ [ (a, e_rec) ]
       | _ ->
-          let l_2_rec = rectify l_2 e_rect cont new_name in
+          let l_2_rec = rectify l_2 e_rect cont in
           let cont' = cont ^ "'" in
           let e_rec =
             match e with
@@ -743,12 +743,12 @@ let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable)
               when List.mem f e_rect ->
                 FunctionApplication
                   {
-                    receiver = [ (p, Variable (new_name f)) ];
+                    receiver = [ (p, Variable f) ];
                     arguments = arguments @ [ [ ("cont_arg", Variable cont') ] ];
                   }
             | _ ->
                 map_locally_terminal_children
-                  (fun f -> rectify f e_rect cont' new_name)
+                  (fun f -> rectify f e_rect cont')
                   e
           in
           l_1
@@ -758,3 +758,462 @@ let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable)
                   { style = Fun; cases = [ ([ Ident a ], l_2_rec) ] } );
               (a, e_rec);
             ])
+
+let rec push_new_element_names (e : linear_element) (e_rect : variable list)
+    (cont : variable) (new_name : variable -> variable) =
+  match e with
+  | Variable _ -> e
+  | Constant _ -> e
+  | Parenthesised { inner; style } ->
+      Parenthesised { style; inner = push_new_names inner e_rect cont new_name }
+  | TypeCoercion { inner; typ } ->
+      TypeCoercion { inner = push_new_names inner e_rect cont new_name; typ }
+  | ListLiteral l ->
+      ListLiteral (List.map (fun l -> push_new_names l e_rect cont new_name) l)
+  | ArrayLiteral l ->
+      ArrayLiteral (List.map (fun l -> push_new_names l e_rect cont new_name) l)
+  | RecordLiteral r ->
+      RecordLiteral
+        (List.map (fun (n, e) -> (n, push_new_names e e_rect cont new_name)) r)
+  | WhileLoop { condition; body } ->
+      WhileLoop
+        {
+          condition = push_new_names condition e_rect cont new_name;
+          body = push_new_names body e_rect cont new_name;
+        }
+  | ForLoop { direction = direction'; variable; start; finish; body } ->
+      ForLoop
+        {
+          direction = direction';
+          variable;
+          start = push_new_names start e_rect cont new_name;
+          finish = push_new_names finish e_rect cont new_name;
+          body = push_new_names body e_rect cont new_name;
+        }
+  | Dereference e -> Dereference (push_new_names e e_rect cont new_name)
+  | FieldAccess { receiver; target } ->
+      FieldAccess
+        { receiver = push_new_names receiver e_rect cont new_name; target }
+  | ArrayAccess { receiver; target } ->
+      ArrayAccess
+        {
+          receiver = push_new_names receiver e_rect cont new_name;
+          target = push_new_names target e_rect cont new_name;
+        }
+  | FunctionApplication { receiver; arguments } ->
+      FunctionApplication
+        {
+          receiver = push_new_names receiver e_rect cont new_name;
+          arguments =
+            List.map
+              (fun arg -> push_new_names arg e_rect cont new_name)
+              arguments;
+        }
+  | PrefixOperation { receiver; operation } ->
+      PrefixOperation
+        { operation; receiver = push_new_names receiver e_rect cont new_name }
+  | InfixOperation { lhs; rhs; operation } ->
+      InfixOperation
+        {
+          lhs = push_new_names lhs e_rect cont new_name;
+          rhs = push_new_names rhs e_rect cont new_name;
+          operation;
+        }
+  | Negation e -> Negation (push_new_names e e_rect cont new_name)
+  | Tuple t ->
+      Tuple (List.map (fun l -> push_new_names l e_rect cont new_name) t)
+  | FieldAssignment { receiver; target; value } ->
+      FieldAssignment
+        {
+          receiver = push_new_names receiver e_rect cont new_name;
+          target;
+          value = push_new_names value e_rect cont new_name;
+        }
+  | ArrayAssignment { receiver; target; value } ->
+      ArrayAssignment
+        {
+          receiver = push_new_names receiver e_rect cont new_name;
+          target = push_new_names target e_rect cont new_name;
+          value = push_new_names value e_rect cont new_name;
+        }
+  | ReferenceAssignment { receiver; value } ->
+      ReferenceAssignment
+        {
+          receiver = push_new_names receiver e_rect cont new_name;
+          value = push_new_names value e_rect cont new_name;
+        }
+  | If { condition; body; else_body } ->
+      If
+        {
+          condition = push_new_names condition e_rect cont new_name;
+          body = push_new_names body e_rect cont new_name;
+          else_body =
+            Option.map
+              (fun b -> push_new_names b e_rect cont new_name)
+              else_body;
+        }
+  | Sequence s ->
+      Sequence (List.map (fun e -> push_new_names e e_rect cont new_name) s)
+  | Match { value; cases } ->
+      Match
+        {
+          value = push_new_names value e_rect cont new_name;
+          cases =
+            List.map
+              (fun (patterns, e) ->
+                (patterns, push_new_names e e_rect cont new_name))
+              cases;
+        }
+  | Try { value; cases } ->
+      Try
+        {
+          value = push_new_names value e_rect cont new_name;
+          cases =
+            List.map
+              (fun (patterns, e) ->
+                (patterns, push_new_names e e_rect cont new_name))
+              cases;
+        }
+  | FunctionLiteral { style; cases } ->
+      FunctionLiteral
+        {
+          style;
+          cases =
+            List.map
+              (fun (patterns, e) ->
+                (patterns, push_new_names e e_rect cont new_name))
+              cases;
+        }
+  | LetBinding { bindings; is_rec; inner } ->
+      LetBinding
+        {
+          bindings =
+            List.map
+              (fun (binding : linear_binding) ->
+                match binding with
+                | Variable { lhs; value } ->
+                    (Variable
+                       {
+                         lhs;
+                         value = push_new_names value e_rect cont new_name;
+                       }
+                      : linear_binding)
+                | Function { name; parameters; body } ->
+                    Function
+                      {
+                        name;
+                        parameters;
+                        body = push_new_names body e_rect cont new_name;
+                      })
+              bindings;
+          is_rec;
+          inner = push_new_names inner e_rect cont new_name;
+        }
+  | StringAccess { receiver; target } ->
+      StringAccess
+        {
+          receiver = push_new_names receiver e_rect cont new_name;
+          target = push_new_names target e_rect cont new_name;
+        }
+  | StringAssignment { receiver; target; value } ->
+      StringAssignment
+        {
+          receiver = push_new_names receiver e_rect cont new_name;
+          target = push_new_names target e_rect cont new_name;
+          value = push_new_names value e_rect cont new_name;
+        }
+
+and push_new_names (l : linear_form) (e_rect : variable list) (cont : variable)
+    (new_name : variable -> variable) =
+  l
+  |> List.map (fun (name, elt) ->
+         let new_elt = push_new_element_names elt e_rect cont new_name in
+         if List.mem name e_rect then
+           let new_new_elt =
+             match elt with
+             | Variable v -> Variable (new_name v)
+             | FunctionLiteral { style; cases } ->
+                 FunctionLiteral
+                   {
+                     style;
+                     cases =
+                       List.map
+                         (fun (arguments, body) ->
+                           (arguments @ [ Ident cont ], body))
+                         cases;
+                   }
+             | _ -> failwith ("Unable to update definition of " ^ name)
+           in
+           (new_name name, new_new_elt)
+         else (name, new_elt))
+
+(*
+  Si f est à rectifier, on autorise les occurrences de f de la forme:
+  1. a = f (nouveau nom) -> Inspect the pairs
+  2. a = f arg1 ... argn (application totale) -> Inspect the containing element if terminal, needs to know containing function
+  3. a = f arg1 ... argi (application partielle) -> Inspect the containing element if terminal, needs to know parent associated value
+  4. g arg1 ... f ... arg n (application totale ou f est paramètre) -> Inspect the containing element if terminal, needs to know parent function
+
+  Dans les cas 1. et 3., a devient aussi rectifiable.
+  Dans le cas 2, la fonction contenant l'appel devient rectifiable.
+  Dans le cas 4, si on connait la définition de g, le paramètre associé
+  à f devient rectifiable.
+  Dans tous les autres cas, on abandonne.
+*)
+let cloture_rectifiable (fns : (variable * linear_element) list) :
+    variable list option =
+  let rec find_definitions_in_element (fn : variable) (e : linear_element) :
+      linear_element list =
+    match e with
+    | Variable _ | Constant _ -> []
+    | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
+        find_definitions fn inner
+    | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
+        l |> List.map (fun elt -> find_definitions fn elt) |> List.concat
+    | RecordLiteral r ->
+        r |> List.map (fun (_, elt) -> find_definitions fn elt) |> List.concat
+    | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
+    | FieldAccess { receiver } -> find_definitions fn receiver
+    | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
+        find_definitions fn receiver @ find_definitions fn target
+    | FunctionApplication { receiver; arguments } ->
+        find_definitions fn receiver
+        @ (arguments
+          |> List.map (fun arg -> find_definitions fn arg)
+          |> List.concat)
+    | PrefixOperation { receiver } -> find_definitions fn receiver
+    | InfixOperation { lhs; rhs } ->
+        find_definitions fn lhs @ find_definitions fn rhs
+    | Negation receiver -> find_definitions fn receiver
+    | FieldAssignment { receiver; value } ->
+        find_definitions fn receiver @ find_definitions fn value
+    | ArrayAssignment { receiver; target; value }
+    | StringAssignment { receiver; target; value } ->
+        find_definitions fn receiver
+        @ find_definitions fn target @ find_definitions fn value
+    | ReferenceAssignment { receiver; value } ->
+        find_definitions fn receiver @ find_definitions fn value
+    | If { condition; body; else_body } -> (
+        find_definitions fn condition
+        @ find_definitions fn body
+        @ match else_body with None -> [] | Some b -> find_definitions fn b)
+    | Match { value; cases } ->
+        find_definitions fn value
+        @ (cases
+          |> List.map (fun (_, body) -> find_definitions fn body)
+          |> List.concat)
+    | Try _ -> failwith "Found linearized try"
+    | FunctionLiteral { cases } ->
+        List.map (fun (_, body) -> find_definitions fn body) cases
+        |> List.concat
+    | LetBinding { bindings; inner } ->
+        find_definitions fn inner
+        @ (bindings
+          |> List.map (fun (binding : linear_binding) ->
+                 match binding with
+                 | Variable { value } -> find_definitions fn value
+                 | Function { name; body } -> find_definitions fn body)
+          |> List.concat)
+  and find_definitions (fn : variable) (l : linear_form) : linear_element list =
+    let child_definitions =
+      l
+      |> List.map (fun (_, e) -> find_definitions_in_element fn e)
+      |> List.flatten
+    in
+    let self_definitions =
+      l
+      |> List.filter_map (fun (variable, elt) ->
+             if variable = fn then Some elt else None)
+    in
+
+    child_definitions @ self_definitions
+  in
+
+  let find_definition (fn : variable) : linear_element option =
+    let root_definitions =
+      fns
+      |> List.filter_map (fun (name, def) ->
+             if name = fn then Some def else None)
+    in
+    let inner_definitions =
+      fns |> List.map snd
+      |> List.map (find_definitions_in_element fn)
+      |> List.concat
+    in
+    let definitions = root_definitions @ inner_definitions in
+    match definitions with [ def ] -> Some def | _ -> None
+  in
+
+  let rec get_argument_count (fn : variable) : int option =
+    match find_definition fn with
+    | Some def -> (
+        match def with
+        | FunctionLiteral { cases } -> (
+            match cases with
+            | (arguments, _) :: _ -> Some (List.length arguments)
+            | _ -> None)
+        | Variable v -> get_argument_count v
+        | _ -> None)
+    | None -> None
+  in
+
+  let rec get_name (p : pattern) : variable option =
+    match p with
+    | Ident n -> Some n
+    | Underscore -> None
+    | Parenthesised inner -> get_name inner
+    | TypeCoercion { inner } -> get_name inner
+    | Constant _ -> None
+    | Record _ -> None
+    | List _ -> None
+    | Construction _ -> None
+    | Concatenation _ -> None
+    | Tuple _ -> None
+    | Or _ -> None
+    | As { name } -> Some name
+  in
+
+  let rec get_nth_argument_names (fn : variable) (n : int) :
+      variable list option =
+    match find_definition fn with
+    | Some def -> (
+        match def with
+        | FunctionLiteral { cases } ->
+            let nth_names =
+              List.map
+                (fun (patterns, _) ->
+                  let pattern = List.nth_opt patterns n in
+                  match pattern with Some p -> get_name p | None -> None)
+                cases
+            in
+            if List.for_all (fun name -> name <> None) nth_names then
+              Some (nth_names |> List.map Option.get |> List.sort_uniq compare)
+            else None
+        | Variable v -> get_nth_argument_names v n
+        | FunctionApplication { receiver; arguments } ->
+            let receiver_name = last_var receiver in
+            get_nth_argument_names receiver_name (n + List.length arguments)
+        | _ -> None)
+    | None -> None
+  in
+
+  let cloture = ref (fns |> List.map fst) in
+  let a_traiter = ref !cloture in
+
+  let add_fn (fn : variable) : unit =
+    if not (List.mem fn !cloture) then (
+      cloture := fn :: !cloture;
+      a_traiter := fn :: !a_traiter)
+  in
+
+  let exception Exit in
+  try
+    while !a_traiter <> [] do
+      let current = List.hd !a_traiter in
+      a_traiter := List.tl !a_traiter;
+
+      let current_argument_count =
+        match get_argument_count current with Some n -> n | None -> raise Exit
+      in
+
+      let rec propagate_from_element (e_name : variable) (e : linear_element)
+          (enclosing_function : variable) : unit =
+        match e with
+        | Variable _ | Constant _ -> ()
+        | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner
+          ->
+            propagate_from inner enclosing_function false
+        | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
+            l
+            |> List.iter (fun elt ->
+                   propagate_from elt enclosing_function false)
+        | RecordLiteral r ->
+            r
+            |> List.iter (fun (_, elt) ->
+                   propagate_from elt enclosing_function false)
+        | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
+        | FieldAccess { receiver } ->
+            propagate_from receiver enclosing_function false
+        | ArrayAccess { receiver; target } | StringAccess { receiver; target }
+          ->
+            propagate_from receiver enclosing_function false;
+            propagate_from target enclosing_function false
+        | FunctionApplication { receiver; arguments } ->
+            propagate_from receiver enclosing_function true;
+            arguments
+            |> List.iter (fun arg -> propagate_from arg enclosing_function true)
+        | PrefixOperation { receiver } ->
+            propagate_from receiver enclosing_function false
+        | InfixOperation { lhs; rhs } ->
+            propagate_from lhs enclosing_function false;
+            propagate_from rhs enclosing_function false
+        | Negation receiver -> propagate_from receiver enclosing_function false
+        | FieldAssignment { receiver; value } ->
+            propagate_from receiver enclosing_function false;
+            propagate_from value enclosing_function false
+        | ArrayAssignment { receiver; target; value }
+        | StringAssignment { receiver; target; value } ->
+            propagate_from receiver enclosing_function false;
+            propagate_from target enclosing_function false;
+            propagate_from value enclosing_function false
+        | ReferenceAssignment { receiver; value } ->
+            propagate_from receiver enclosing_function false;
+            propagate_from value enclosing_function false
+        | If { condition; body; else_body } -> (
+            propagate_from condition enclosing_function false;
+            propagate_from body enclosing_function false;
+            match else_body with
+            | None -> ()
+            | Some b -> propagate_from b enclosing_function false)
+        | Match { value; cases } ->
+            propagate_from value enclosing_function false;
+            cases
+            |> List.iter (fun (_, body) ->
+                   propagate_from body enclosing_function false)
+        | Try _ -> failwith "Found linearized try"
+        | FunctionLiteral { cases } ->
+            List.iter (fun (_, body) -> propagate_from body e_name false) cases
+        | LetBinding { bindings; inner } ->
+            propagate_from inner enclosing_function false;
+            bindings
+            |> List.iter (fun (binding : linear_binding) ->
+                   match binding with
+                   | Variable { value } ->
+                       propagate_from value enclosing_function false
+                   | Function { name; body } -> propagate_from body name false)
+      and propagate_from (l : linear_form) (enclosing_function : variable)
+          (can_leak : bool) : unit =
+        if last_var l = current && not can_leak then raise Exit;
+        l
+        |> List.iter (fun (name, element) ->
+               match element with
+               | Variable n -> if n = current then add_fn name
+               | FunctionApplication { receiver; arguments } ->
+                   let receiver = last_var receiver in
+                   if receiver = current then
+                     if List.length arguments = current_argument_count then
+                       add_fn enclosing_function
+                     else raise Exit
+                   else
+                     arguments
+                     |> List.iteri (fun i argument ->
+                            if last_var argument = current then
+                              let ith_names =
+                                get_nth_argument_names receiver i
+                              in
+                              match ith_names with
+                              | Some names -> List.iter add_fn names
+                              | None -> raise Exit)
+               | _ -> ());
+
+        l
+        |> List.iter (fun (name, element) ->
+               propagate_from_element name element enclosing_function)
+      in
+
+      fns
+      |> List.iter (fun (name, def) ->
+             propagate_from_element name def "UNKNOWN_GLOBAL_ENCLOSURE")
+    done;
+    Some !cloture
+  with Exit -> None
