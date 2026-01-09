@@ -11,3 +11,9 @@ let rec sum_tree (t : int_tree) =
 ;;
 
 print_endline (string_of_int (sum_tree (Node (Leaf 1, 2, Leaf 3))))
+
+let rec fibonacci (n : int) =
+  if n = 0 || n = 1 then 1 else fibonacci (n - 1) + fibonacci (n - 2)
+;;
+
+print_endline (string_of_int (fibonacci 10))
