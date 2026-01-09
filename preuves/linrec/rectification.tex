@@ -32,6 +32,14 @@ le suivait précédemment sous forme d'une continuation.
         fonctions qui pourraient conduire à un appel récursif de $l$.}
 \end{definition}
 
+\begin{remark}
+    Une forme linéaire $l$ est toujours rectifiable par l'ensemble des noms de
+    variables apparaissant dans des applications de fonctions dans $l$.
+
+    Cependant, nous verrons plus tard que l'on a intérêt à minimiser la taille
+    de l'ensemble rectifiant $l$.
+\end{remark}
+
 \begin{definition}
     On dit qu'un ensemble de fonctions $\{f_1, \ldots, f_n\}$ définies par
     $f_i : x_1, \ldots, x_n \rightarrow Eval(l_i, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
@@ -344,10 +352,27 @@ les $f_i$. On introduit alors l'algorithme suivant :
 
 \begin{algorithm}[H]
     \caption{Cl\^oture\_rectifiable}
-    \Entree{Un ensemble $\{f_1, \ldots, f_n\}$ de noms de variables}
+    \Entree{Un ensemble $\{l_1, \ldots, l_n\}$ de formes linéaires correctes}
     \Sortie{
-        Un ensemble $\{g_1, \ldots, g_m\}$ de noms de variables rectifiable qui
-        contient tous les $f_i$, ou \texttt{None}
+        Un ensemble $E$ de noms de variables tels que chaque $l_i$ soit
+        rectifiable par $E$
     }
+
+    \hl{TODO}
 \end{algorithm}
 
+\begin{remark}
+    On considère dans cet algorithme que les noms de variables sont uniques. Si
+    deux variables partagent le même nom, on les distinguera, par exemple par
+    leur localisation dans le code source. Ceci nous permet bien de parler de
+    "la" (et non "les") définitions d'une variable.
+\end{remark}
+
+\begin{proposition}
+    L'ensemble $E$ renvoyé par Cl\^oture\_rectifiable($\{l_1, \ldots, l_n\}$)
+    est tel que chaque $l_i$ est rectifiable par $E$.
+\end{proposition}
+
+\begin{proof}
+    \hl{TODO (good luck)}
+\end{proof}
