@@ -439,12 +439,32 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
         List.fold_left
           (fun (lins, k) (lhs, elt) ->
             let elt_lin, k = linearize elt k in
-            let elt_var = last_var elt_lin in
-            ((elt_lin @ [ (lhs, Variable elt_var) ]) :: lins, k))
+            (elt_lin :: lins, k))
           ([], k) bindings_as_assignments
       in
       let inner_lin, k = linearize inner k in
-      (inner_lin :: bindings_lins |> List.rev |> List.concat, k)
+      let e_elt =
+        LetBinding
+          {
+            bindings =
+              bindings_lins |> List.rev
+              |> List.mapi (fun i elt_lin ->
+                     let corresponding_pattern =
+                       fst (List.nth bindings_as_assignments i)
+                     in
+                     (Variable
+                        {
+                          lhs = corresponding_pattern;
+                          value = [ (p (k + i), Variable (last_var elt_lin)) ];
+                        }
+                       : linear_binding));
+            is_rec = false;
+            inner = inner_lin;
+          }
+      in
+      ( [ (p (k + List.length bindings_lins), e_elt) ] :: bindings_lins
+        |> List.rev |> List.concat,
+        k + List.length bindings_lins + 1 )
   | StringAccess { target; receiver } ->
       let receiver_lin, k = linearize receiver k in
       let receiver_var = last_var receiver_lin in
@@ -547,7 +567,20 @@ let rec delinearize_element (e : linear_element) : expression =
           cases =
             List.map (fun (pattern, body) -> (pattern, delinearize body)) cases;
         }
-  | LetBinding _ -> failwith "Found linearized let"
+  | LetBinding { bindings; is_rec; inner } ->
+      LetBinding
+        {
+          bindings =
+            List.map
+              (fun (binding : linear_binding) ->
+                match binding with
+                | Variable { lhs; value } ->
+                    (Variable { lhs; value = delinearize value } : binding)
+                | Function _ -> failwith "Found function")
+              bindings;
+          is_rec;
+          inner = delinearize inner;
+        }
   | StringAccess { receiver; target } ->
       StringAccess
         { receiver = delinearize receiver; target = delinearize target }
@@ -615,7 +648,14 @@ let rec element_contains_application (f : variable) (e : linear_element) : bool
   | Try _ -> failwith "Found linearized try"
   (* TODO: Formalise "contains" better to explain this *)
   | FunctionLiteral _ -> false
-  | LetBinding _ -> failwith "Found linearized try"
+  | LetBinding { bindings; inner } ->
+      contains_application f inner
+      || bindings
+         |> List.exists (fun (binding : linear_binding) ->
+                match binding with
+                | Variable { value } -> contains_application f value
+                (* TODO: Formalise "contains" better to explain this *)
+                | Function _ -> false)
   | StringAccess { receiver; target } ->
       contains_application f receiver || contains_application f target
   | StringAssignment { receiver; target; value } ->
