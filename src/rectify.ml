@@ -78,19 +78,16 @@ and linear_binding =
   | Variable of { lhs : pattern node; value : linear_form }
   | Function of linear_function_
 
-and linear_form = (pattern * linear_element) list
+and linear_form = (variable * linear_element) list
 
 let rec last_var (l : linear_form) : variable =
   match l with
   | [] -> failwith "l was empty"
-  | (p, _) :: [] -> (
-      match p with
-      | Ident v -> v
-      | _ -> failwith "l did not end with a variable pattern")
+  | (p, _) :: [] -> p
   | x :: q -> last_var q
 
 let rec linearize (e : expression) (k : int) : linear_form * int =
-  let p (i : int) : pattern = Ident ("a_" ^ string_of_int i) in
+  let p (i : int) : variable = "a_" ^ string_of_int i in
 
   match e with
   | Variable v -> ([ (p k, Variable v) ], k + 1)
@@ -600,7 +597,8 @@ and delinearize (l : linear_form) : expression =
       LetBinding
         {
           is_rec = false;
-          bindings = [ Variable { lhs = p; value = delinearize_element e } ];
+          bindings =
+            [ Variable { lhs = Ident p; value = delinearize_element e } ];
           inner = delinearize q;
         }
 
@@ -697,7 +695,7 @@ let map_locally_terminal_children (f : linear_form -> linear_form)
 let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable)
     (new_name : variable -> variable) : linear_form =
   let rec find_first_recursive_element (tail : linear_form) (head : linear_form)
-      : linear_form * ((pattern * linear_element) * linear_form) option =
+      : linear_form * ((variable * linear_element) * linear_form) option =
     match tail with
     | [] -> (List.rev head, None)
     | (p, e) :: q ->
@@ -711,11 +709,11 @@ let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable)
       let head_var = last_var l_1 in
       l_1
       @ [
-          ( Ident "cont_res",
+          ( "cont_res",
             FunctionApplication
               {
-                receiver = [ (Ident "cont_call", Variable cont) ];
-                arguments = [ [ (Ident "cont_arg", Variable head_var) ] ];
+                receiver = [ ("cont_call", Variable cont) ];
+                arguments = [ [ ("cont_arg", Variable head_var) ] ];
               } );
         ]
   | Some ((a, e), l_2) -> (
@@ -728,8 +726,7 @@ let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable)
                 FunctionApplication
                   {
                     receiver = [ (p, Variable (new_name f)) ];
-                    arguments =
-                      arguments @ [ [ (Ident "cont_arg", Variable cont) ] ];
+                    arguments = arguments @ [ [ ("cont_arg", Variable cont) ] ];
                   }
             | _ ->
                 map_locally_terminal_children
@@ -747,8 +744,7 @@ let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable)
                 FunctionApplication
                   {
                     receiver = [ (p, Variable (new_name f)) ];
-                    arguments =
-                      arguments @ [ [ (Ident "cont_arg", Variable cont') ] ];
+                    arguments = arguments @ [ [ ("cont_arg", Variable cont') ] ];
                   }
             | _ ->
                 map_locally_terminal_children
@@ -757,7 +753,8 @@ let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable)
           in
           l_1
           @ [
-              ( Ident cont',
-                FunctionLiteral { style = Fun; cases = [ ([ a ], l_2_rec) ] } );
+              ( cont',
+                FunctionLiteral
+                  { style = Fun; cases = [ ([ Ident a ], l_2_rec) ] } );
               (a, e_rec);
             ])
