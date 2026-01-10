@@ -184,7 +184,7 @@ let rec regex_of_regex_syntax_tree
       let inner = regex_of_regex_syntax_tree node in
       Regex.Concatenation (inner, Regex.Star inner)
   | Node (Regex_primitive, [ node; Leaf { token_type = Question } ]) ->
-      Regex.Union (Regex.Epsilon, Regex.Star (regex_of_regex_syntax_tree node))
+      Regex.Union (Regex.Epsilon, regex_of_regex_syntax_tree node)
   | Node (Regex_primitive, [ Leaf { token_type = Character; value } ]) ->
       Regex.Symbol (u value.[0])
   | Node (Regex_primitive, [ Leaf { token_type = Escape; value } ]) ->
