@@ -17,3 +17,7 @@ let rec fibonacci (n : int) =
 ;;
 
 print_endline (string_of_int (fibonacci 10))
+
+let rec custom_fold_left (fn : 'acc -> 'el -> 'ac) (init : 'acc) (l : 'el list)
+    =
+  match l with [] -> init | x :: q -> custom_fold_left fn (fn init x) q
