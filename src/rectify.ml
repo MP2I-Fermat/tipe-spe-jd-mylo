@@ -691,18 +691,19 @@ let map_locally_terminal_children (f : linear_form -> linear_form)
           style;
           cases = List.map (fun (pattern, body) -> (pattern, f body)) cases;
         }
+  | LetBinding { is_rec; bindings; inner } ->
+      LetBinding { is_rec; bindings; inner = f inner }
   (* No locally terminal children *)
   | _ -> e
 
-let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable) :
-    linear_form =
+let rec rectify (l : linear_form) (cloture_rect : variable list) : linear_form =
   let rec find_first_recursive_element (tail : linear_form) (head : linear_form)
       : linear_form * ((variable * linear_element) * linear_form) option =
     match tail with
     | [] -> (List.rev head, None)
     | (p, e) :: q ->
-        if List.exists (fun f -> element_contains_application f e) e_rect then
-          (List.rev head, Some ((p, e), q))
+        if List.exists (fun f -> element_contains_application f e) cloture_rect
+        then (List.rev head, Some ((p, e), q))
         else find_first_recursive_element q ((p, e) :: head)
   in
   let l_1, maybe_recursive = find_first_recursive_element l [] in
@@ -714,7 +715,7 @@ let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable) :
           ( "cont_res",
             FunctionApplication
               {
-                receiver = [ ("cont_call", Variable cont) ];
+                receiver = [ ("cont_call", Variable "cont") ];
                 arguments = [ [ ("cont_arg", Variable head_var) ] ];
               } );
         ]
@@ -724,154 +725,185 @@ let rec rectify (l : linear_form) (e_rect : variable list) (cont : variable) :
           let e_rec =
             match e with
             | FunctionApplication { receiver = [ (p, Variable f) ]; arguments }
-              when List.mem f e_rect ->
+              when List.mem f cloture_rect ->
                 FunctionApplication
                   {
                     receiver = [ (p, Variable f) ];
-                    arguments = arguments @ [ [ ("cont_arg", Variable cont) ] ];
-                  }
-            | _ ->
-                map_locally_terminal_children (fun f -> rectify f e_rect cont) e
-          in
-          l_1 @ [ (a, e_rec) ]
-      | _ ->
-          let l_2_rec = rectify l_2 e_rect cont in
-          let cont' = cont ^ "'" in
-          let e_rec =
-            match e with
-            | FunctionApplication { receiver = [ (p, Variable f) ]; arguments }
-              when List.mem f e_rect ->
-                FunctionApplication
-                  {
-                    receiver = [ (p, Variable f) ];
-                    arguments = arguments @ [ [ ("cont_arg", Variable cont') ] ];
+                    arguments =
+                      arguments @ [ [ ("cont_arg", Variable "cont") ] ];
                   }
             | _ ->
                 map_locally_terminal_children
-                  (fun f -> rectify f e_rect cont')
+                  (fun f -> rectify f cloture_rect)
+                  e
+          in
+          l_1 @ [ (a, e_rec) ]
+      | _ ->
+          let l_2_rec = rectify l_2 cloture_rect in
+          let e_rec =
+            match e with
+            | FunctionApplication { receiver = [ (p, Variable f) ]; arguments }
+              when List.mem f cloture_rect ->
+                FunctionApplication
+                  {
+                    receiver = [ (p, Variable f) ];
+                    arguments =
+                      arguments @ [ [ ("cont_arg", Variable "cont") ] ];
+                  }
+            | _ ->
+                map_locally_terminal_children
+                  (fun f -> rectify f cloture_rect)
                   e
           in
           l_1
           @ [
-              ( cont',
+              ( "new_cont",
                 FunctionLiteral
                   { style = Fun; cases = [ ([ Ident a ], l_2_rec) ] } );
+              ("cont", Variable "new_cont");
               (a, e_rec);
             ])
 
-let rec push_new_element_names (e : linear_element) (e_rect : variable list)
-    (cont : variable) (new_name : variable -> variable) =
+let rec push_rectified_element (e : linear_element)
+    (cloture_rect : variable list) (new_name : variable -> variable) =
   match e with
   | Variable _ -> e
   | Constant _ -> e
   | Parenthesised { inner; style } ->
-      Parenthesised { style; inner = push_new_names inner e_rect cont new_name }
+      Parenthesised
+        {
+          style;
+          inner = push_rectified_definitions inner cloture_rect new_name;
+        }
   | TypeCoercion { inner; typ } ->
-      TypeCoercion { inner = push_new_names inner e_rect cont new_name; typ }
+      TypeCoercion
+        { inner = push_rectified_definitions inner cloture_rect new_name; typ }
   | ListLiteral l ->
-      ListLiteral (List.map (fun l -> push_new_names l e_rect cont new_name) l)
+      ListLiteral
+        (List.map
+           (fun l -> push_rectified_definitions l cloture_rect new_name)
+           l)
   | ArrayLiteral l ->
-      ArrayLiteral (List.map (fun l -> push_new_names l e_rect cont new_name) l)
+      ArrayLiteral
+        (List.map
+           (fun l -> push_rectified_definitions l cloture_rect new_name)
+           l)
   | RecordLiteral r ->
       RecordLiteral
-        (List.map (fun (n, e) -> (n, push_new_names e e_rect cont new_name)) r)
+        (List.map
+           (fun (n, e) ->
+             (n, push_rectified_definitions e cloture_rect new_name))
+           r)
   | WhileLoop { condition; body } ->
       WhileLoop
         {
-          condition = push_new_names condition e_rect cont new_name;
-          body = push_new_names body e_rect cont new_name;
+          condition = push_rectified_definitions condition cloture_rect new_name;
+          body = push_rectified_definitions body cloture_rect new_name;
         }
   | ForLoop { direction = direction'; variable; start; finish; body } ->
       ForLoop
         {
           direction = direction';
           variable;
-          start = push_new_names start e_rect cont new_name;
-          finish = push_new_names finish e_rect cont new_name;
-          body = push_new_names body e_rect cont new_name;
+          start = push_rectified_definitions start cloture_rect new_name;
+          finish = push_rectified_definitions finish cloture_rect new_name;
+          body = push_rectified_definitions body cloture_rect new_name;
         }
-  | Dereference e -> Dereference (push_new_names e e_rect cont new_name)
+  | Dereference e ->
+      Dereference (push_rectified_definitions e cloture_rect new_name)
   | FieldAccess { receiver; target } ->
       FieldAccess
-        { receiver = push_new_names receiver e_rect cont new_name; target }
+        {
+          receiver = push_rectified_definitions receiver cloture_rect new_name;
+          target;
+        }
   | ArrayAccess { receiver; target } ->
       ArrayAccess
         {
-          receiver = push_new_names receiver e_rect cont new_name;
-          target = push_new_names target e_rect cont new_name;
+          receiver = push_rectified_definitions receiver cloture_rect new_name;
+          target = push_rectified_definitions target cloture_rect new_name;
         }
   | FunctionApplication { receiver; arguments } ->
       FunctionApplication
         {
-          receiver = push_new_names receiver e_rect cont new_name;
+          receiver = push_rectified_definitions receiver cloture_rect new_name;
           arguments =
             List.map
-              (fun arg -> push_new_names arg e_rect cont new_name)
+              (fun arg -> push_rectified_definitions arg cloture_rect new_name)
               arguments;
         }
   | PrefixOperation { receiver; operation } ->
       PrefixOperation
-        { operation; receiver = push_new_names receiver e_rect cont new_name }
+        {
+          operation;
+          receiver = push_rectified_definitions receiver cloture_rect new_name;
+        }
   | InfixOperation { lhs; rhs; operation } ->
       InfixOperation
         {
-          lhs = push_new_names lhs e_rect cont new_name;
-          rhs = push_new_names rhs e_rect cont new_name;
+          lhs = push_rectified_definitions lhs cloture_rect new_name;
+          rhs = push_rectified_definitions rhs cloture_rect new_name;
           operation;
         }
-  | Negation e -> Negation (push_new_names e e_rect cont new_name)
+  | Negation e -> Negation (push_rectified_definitions e cloture_rect new_name)
   | Tuple t ->
-      Tuple (List.map (fun l -> push_new_names l e_rect cont new_name) t)
+      Tuple
+        (List.map
+           (fun l -> push_rectified_definitions l cloture_rect new_name)
+           t)
   | FieldAssignment { receiver; target; value } ->
       FieldAssignment
         {
-          receiver = push_new_names receiver e_rect cont new_name;
+          receiver = push_rectified_definitions receiver cloture_rect new_name;
           target;
-          value = push_new_names value e_rect cont new_name;
+          value = push_rectified_definitions value cloture_rect new_name;
         }
   | ArrayAssignment { receiver; target; value } ->
       ArrayAssignment
         {
-          receiver = push_new_names receiver e_rect cont new_name;
-          target = push_new_names target e_rect cont new_name;
-          value = push_new_names value e_rect cont new_name;
+          receiver = push_rectified_definitions receiver cloture_rect new_name;
+          target = push_rectified_definitions target cloture_rect new_name;
+          value = push_rectified_definitions value cloture_rect new_name;
         }
   | ReferenceAssignment { receiver; value } ->
       ReferenceAssignment
         {
-          receiver = push_new_names receiver e_rect cont new_name;
-          value = push_new_names value e_rect cont new_name;
+          receiver = push_rectified_definitions receiver cloture_rect new_name;
+          value = push_rectified_definitions value cloture_rect new_name;
         }
   | If { condition; body; else_body } ->
       If
         {
-          condition = push_new_names condition e_rect cont new_name;
-          body = push_new_names body e_rect cont new_name;
+          condition = push_rectified_definitions condition cloture_rect new_name;
+          body = push_rectified_definitions body cloture_rect new_name;
           else_body =
             Option.map
-              (fun b -> push_new_names b e_rect cont new_name)
+              (fun b -> push_rectified_definitions b cloture_rect new_name)
               else_body;
         }
   | Sequence s ->
-      Sequence (List.map (fun e -> push_new_names e e_rect cont new_name) s)
+      Sequence
+        (List.map
+           (fun e -> push_rectified_definitions e cloture_rect new_name)
+           s)
   | Match { value; cases } ->
       Match
         {
-          value = push_new_names value e_rect cont new_name;
+          value = push_rectified_definitions value cloture_rect new_name;
           cases =
             List.map
               (fun (patterns, e) ->
-                (patterns, push_new_names e e_rect cont new_name))
+                (patterns, push_rectified_definitions e cloture_rect new_name))
               cases;
         }
   | Try { value; cases } ->
       Try
         {
-          value = push_new_names value e_rect cont new_name;
+          value = push_rectified_definitions value cloture_rect new_name;
           cases =
             List.map
               (fun (patterns, e) ->
-                (patterns, push_new_names e e_rect cont new_name))
+                (patterns, push_rectified_definitions e cloture_rect new_name))
               cases;
         }
   | FunctionLiteral { style; cases } ->
@@ -881,7 +913,7 @@ let rec push_new_element_names (e : linear_element) (e_rect : variable list)
           cases =
             List.map
               (fun (patterns, e) ->
-                (patterns, push_new_names e e_rect cont new_name))
+                (patterns, push_rectified_definitions e cloture_rect new_name))
               cases;
         }
   | LetBinding { bindings; is_rec; inner } ->
@@ -895,7 +927,9 @@ let rec push_new_element_names (e : linear_element) (e_rect : variable list)
                     (Variable
                        {
                          lhs;
-                         value = push_new_names value e_rect cont new_name;
+                         value =
+                           push_rectified_definitions value cloture_rect
+                             new_name;
                        }
                       : linear_binding)
                 | Function { name; parameters; body } ->
@@ -903,32 +937,33 @@ let rec push_new_element_names (e : linear_element) (e_rect : variable list)
                       {
                         name;
                         parameters;
-                        body = push_new_names body e_rect cont new_name;
+                        body =
+                          push_rectified_definitions body cloture_rect new_name;
                       })
               bindings;
           is_rec;
-          inner = push_new_names inner e_rect cont new_name;
+          inner = push_rectified_definitions inner cloture_rect new_name;
         }
   | StringAccess { receiver; target } ->
       StringAccess
         {
-          receiver = push_new_names receiver e_rect cont new_name;
-          target = push_new_names target e_rect cont new_name;
+          receiver = push_rectified_definitions receiver cloture_rect new_name;
+          target = push_rectified_definitions target cloture_rect new_name;
         }
   | StringAssignment { receiver; target; value } ->
       StringAssignment
         {
-          receiver = push_new_names receiver e_rect cont new_name;
-          target = push_new_names target e_rect cont new_name;
-          value = push_new_names value e_rect cont new_name;
+          receiver = push_rectified_definitions receiver cloture_rect new_name;
+          target = push_rectified_definitions target cloture_rect new_name;
+          value = push_rectified_definitions value cloture_rect new_name;
         }
 
-and push_new_names (l : linear_form) (e_rect : variable list) (cont : variable)
+and push_rectified_definitions (l : linear_form) (cloture_rect : variable list)
     (new_name : variable -> variable) =
   l
   |> List.map (fun (name, elt) ->
-         let new_elt = push_new_element_names elt e_rect cont new_name in
-         if List.mem name e_rect then
+         let new_elt = push_rectified_element elt cloture_rect new_name in
+         if List.mem name cloture_rect then
            let new_new_elt =
              match elt with
              | Variable v -> Variable (new_name v)
@@ -939,7 +974,7 @@ and push_new_names (l : linear_form) (e_rect : variable list) (cont : variable)
                      cases =
                        List.map
                          (fun (arguments, body) ->
-                           (arguments @ [ Ident cont ], body))
+                           (arguments @ [ Ident "cont" ], body))
                          cases;
                    }
              | _ -> failwith ("Unable to update definition of " ^ name)

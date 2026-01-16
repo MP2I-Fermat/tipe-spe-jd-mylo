@@ -55,6 +55,7 @@ let rectified =
              (* TODO: Dig down? *)
              | None -> phrase
              | Some clot ->
+                 (* rmq: clot can only contain functions defined in defined_functions & their bodies *)
                  ValueDefinition
                    {
                      is_rec;
@@ -82,10 +83,9 @@ let rectified =
                                            parameters @ [ Ident "cont" ];
                                          body =
                                            delinearize
-                                             (push_new_names
-                                                (rectify linearized_body clot
-                                                   "cont")
-                                                clot "cont" new_name);
+                                             (push_rectified_definitions
+                                                (rectify linearized_body clot)
+                                                clot new_name);
                                        }
                                       : Caml_light.binding)
                                   in
