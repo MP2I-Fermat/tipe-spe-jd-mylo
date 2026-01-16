@@ -49,7 +49,7 @@ let rectified =
                                 } ))
              in
 
-             let new_name (n : string) = n ^ "_new" in
+             let new_name (n : string) = n ^ "_rectified" in
 
              match cloture_rectifiable defined_functions with
              (* TODO: Dig down? *)

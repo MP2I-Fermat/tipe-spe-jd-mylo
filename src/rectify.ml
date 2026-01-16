@@ -595,6 +595,17 @@ and delinearize (l : linear_form) : expression =
   match l with
   | [] -> failwith "Empty linear form"
   | (p, e) :: [] -> delinearize_element e
+  (* Special case for formatting functions nicely *)
+  | (p, FunctionLiteral { style; cases = [ (args, body) ] }) :: q ->
+      LetBinding
+        {
+          is_rec = false;
+          bindings =
+            [
+              Function { name = p; parameters = args; body = delinearize body };
+            ];
+          inner = delinearize q;
+        }
   | (p, e) :: q ->
       LetBinding
         {
