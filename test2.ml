@@ -4,7 +4,7 @@ let fizzbuzz (max: int) =
   let rec fizzbuzz_a_partir (n: int) =
     if n > max then
       ()
-    else
+    else begin
       if n mod 15 = 0 then
         print_endline "fizzbuzz"
       else if n mod 5 = 0 then
@@ -15,6 +15,7 @@ let fizzbuzz (max: int) =
         (print_int n; print_newline ())
       ;
       fizzbuzz_a_partir (n+1)
+    end
   in
-  fizzbuzz_a_partir 0
+  fizzbuzz_a_partir 1
 

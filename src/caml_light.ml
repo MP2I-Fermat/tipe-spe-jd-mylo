@@ -1588,9 +1588,9 @@ let stringify_ast_into (ast : program) (sink : string -> unit) : unit =
     | Variable v -> sink v
     | Constant c -> handle_constant c
     | Parenthesised e ->
-        sink (if e.style = Parenthesis then "(" else "begin");
+        sink (if e.style = Parenthesis then "(" else " begin ");
         handle_expression e.inner;
-        sink (if e.style = Parenthesis then ")" else "end")
+        sink (if e.style = Parenthesis then ")" else " end ")
     | TypeCoercion e ->
         sink "(";
         handle_expression e.inner;

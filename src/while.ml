@@ -6,6 +6,160 @@ let fonction_vers_while
     (name: variable)
     (parameters: pattern list)
     (body: expression) : expression =
+  (* Remplace les références aux arguments par les refs correspondants *)
+  let rec replace_args_with_refs (p: string list) (inner_expr: expression) :
+      expression =
+    match inner_expr with
+    | Variable(s) ->
+        if List.mem s p then
+          Dereference(Variable(s^"_ref"))
+        else
+          Variable(s)
+    | Constant(c) -> Constant(c)
+    | Parenthesised { inner ; style } ->
+        Parenthesised { inner = replace_args_with_refs p inner ; style = style}
+    | TypeCoercion {inner ; typ } ->
+        TypeCoercion { inner = replace_args_with_refs p inner ; typ = typ }
+    | ListLiteral(l) ->
+        ListLiteral (List.map (replace_args_with_refs p) l)
+    | ArrayLiteral(l) ->
+        ArrayLiteral (List.map (replace_args_with_refs p) l)
+    | RecordLiteral(l) ->
+        RecordLiteral
+          (List.map (fun (lbl, expr) -> (lbl, replace_args_with_refs p expr)) l)
+    | WhileLoop { condition ; body } ->
+        WhileLoop {
+          condition = replace_args_with_refs p condition ;
+          body = replace_args_with_refs p body
+        }
+    | ForLoop { direction; variable; start; finish; body } ->
+        ForLoop {
+          direction = direction;
+          variable = variable;
+          start = replace_args_with_refs p start;
+          finish = replace_args_with_refs p finish;
+          body = replace_args_with_refs p body
+        }
+    | Dereference(e) ->
+        Dereference(replace_args_with_refs p e)
+    | FieldAccess { receiver ; target } ->
+        FieldAccess {
+          receiver = replace_args_with_refs p receiver ;
+          target
+        }
+    | ArrayAccess { receiver ; target } ->
+        ArrayAccess {
+          receiver = replace_args_with_refs p receiver ;
+          target = replace_args_with_refs p target
+        }
+    | FunctionApplication { receiver ; arguments } ->
+        FunctionApplication {
+          receiver = replace_args_with_refs p receiver ;
+          arguments = List.map (replace_args_with_refs p) arguments
+        }
+    | PrefixOperation { receiver ; operation } ->
+        PrefixOperation {
+          receiver = replace_args_with_refs p receiver ;
+          operation
+        }
+    | InfixOperation { lhs ; rhs ; operation } ->
+        InfixOperation {
+          lhs = replace_args_with_refs p lhs ;
+          rhs = replace_args_with_refs p rhs ;
+          operation
+        }
+    | Negation(e) ->
+        Negation(replace_args_with_refs p e)
+    | Tuple(l) ->
+        Tuple (List.map (replace_args_with_refs p) l)
+    | FieldAssignment { receiver ; target ; value } ->
+        FieldAssignment {
+          receiver = replace_args_with_refs p receiver ;
+          target;
+          value = replace_args_with_refs p value
+        }
+    | ArrayAssignment { receiver ; target ; value } ->
+        ArrayAssignment {
+          receiver = replace_args_with_refs p receiver ;
+          target = replace_args_with_refs p target ;
+          value = replace_args_with_refs p value
+        }
+    | ReferenceAssignment { receiver ; value } ->
+        ReferenceAssignment {
+          receiver = replace_args_with_refs p receiver ;
+          value = replace_args_with_refs p value
+    }
+    | If { condition ; body ; else_body } ->
+        If {
+          condition = replace_args_with_refs p condition ;
+          body = replace_args_with_refs p body ;
+          else_body =
+            match else_body with
+            | None -> None
+            | Some(e) -> Some(replace_args_with_refs p e)
+        }
+    | Sequence(l) ->
+        Sequence (List.map (replace_args_with_refs p) l)
+    | Match { value ; cases } ->
+        Match {
+          value = replace_args_with_refs p value ;
+          cases = List.map
+            (fun (pattern, expr) -> (pattern, replace_args_with_refs p expr))
+            cases
+        }
+    | Try { value ; cases } ->
+        Try {
+          value = replace_args_with_refs p value ;
+          cases = List.map
+            (fun (pattern, expr) -> (pattern, replace_args_with_refs p expr))
+            cases
+        }
+    | FunctionLiteral { style ; cases } ->
+        (* TODO à repenser certainemenjt *)
+        FunctionLiteral {
+          style;
+          cases = List.map
+            (fun (pattern, expr) -> (pattern, replace_args_with_refs p expr))
+            cases
+        }
+    | LetBinding {
+        bindings : binding node list;
+        is_rec : bool;
+        inner : expression node;
+      } ->
+        LetBinding {
+          bindings = List.map
+            (fun (b: binding) ->
+              match b with
+              | Variable { lhs ; value } ->
+                  (Variable {
+                    lhs ;
+                    value = replace_args_with_refs p value
+                  }: binding)
+              | Function { name ; parameters ; body } ->
+                  (* TODO à repenser aussi *)
+                  Function {
+                    name ;
+                    parameters ;
+                    body = replace_args_with_refs p body
+                  }
+            ) bindings ;
+          is_rec ;
+          inner = replace_args_with_refs p inner
+        }
+    | StringAccess { receiver ; target } ->
+        StringAccess {
+          receiver = replace_args_with_refs p receiver;
+          target = replace_args_with_refs p target
+        }
+    | StringAssignment { receiver ; target ; value } ->
+        StringAssignment {
+          receiver = replace_args_with_refs p receiver;
+          target = replace_args_with_refs p target;
+          value = replace_args_with_refs p value;
+        }
+  in
+  (* Renvoie une liste de définitions de refs correspondant aux arguments *)
   let rec parameter_list_to_ref_list (p: string list) (inner_expr: expression) :
       expression =
     match p with
@@ -28,7 +182,7 @@ let fonction_vers_while
         (LetBinding ({
           bindings = [
             Variable {
-              lhs = Ident ("_"^x^"_ref_");
+              lhs = Ident (x^"_ref");
               value = FunctionApplication {
                 receiver = Variable "ref";
                 arguments = [Variable x]
@@ -45,7 +199,7 @@ let fonction_vers_while
       | Ident name -> Some name
       | _ -> None
     ) parameters in
-  parameter_list_to_ref_list params body
+  parameter_list_to_ref_list params (replace_args_with_refs params body)
 
 let parse_file name =
   let input_channel = open_in name in
@@ -93,7 +247,7 @@ let test2 =
              {name;
               parameters;
               body = fonction_vers_while name parameters body}];
-          is_rec = false;
+          is_rec = true;
           inner =
            FunctionApplication
             {receiver = Variable "fizzbuzz_a_partir";
