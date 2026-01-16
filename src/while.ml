@@ -6,8 +6,64 @@ let fonction_vers_while
     (name: variable)
     (parameters: pattern list)
     (body: expression) : expression =
+
+  (* Renvoie une liste de définitions de refs correspondant aux arguments *)
+  let rec parameter_list_to_ref_list (p: string list) (inner_expr: expression) :
+      expression =
+    match p with
+    | [] ->
+        (LetBinding ({
+          bindings = [
+            Variable {
+              lhs = Ident "_call_";
+              value = FunctionApplication {
+                receiver = Variable "ref";
+                arguments = [Variable "true"]
+              }
+            }
+          ];
+          is_rec = false;
+          inner = inner_expr
+        }))
+    | x::q ->
+        parameter_list_to_ref_list q
+        (LetBinding {
+          bindings = [
+            Variable {
+              lhs = Ident (x^"_ref");
+              value = FunctionApplication {
+                receiver = Variable "ref";
+                arguments = [Variable x]
+              }
+            }
+          ];
+          is_rec = false;
+          inner = inner_expr
+        })
+  in
+
+  (* Renvoie une liste de définitions de variables temporaires correspondant aux
+   * arguments *)
+  let rec parameter_list_to_temp_list (p: string list)
+      (new_vals: expression list) (inner_expr: expression) : expression =
+    match p, new_vals with
+    | [], [] -> inner_expr
+    | [], _ | _, [] -> failwith "pas la même taille"
+    | x::q, v::qv ->
+        parameter_list_to_temp_list q qv
+        (LetBinding {
+          bindings = [
+            Variable {
+              lhs = Ident (x^"_temp");
+              value = replace_args_with_refs p v
+            }
+          ];
+          is_rec = false;
+          inner = inner_expr
+        })
+
   (* Remplace les références aux arguments par les refs correspondants *)
-  let rec replace_args_with_refs (p: string list) (inner_expr: expression) :
+  and replace_args_with_refs (p: string list) (inner_expr: expression) :
       expression =
     match inner_expr with
     | Variable(s) ->
@@ -53,10 +109,28 @@ let fonction_vers_while
           target = replace_args_with_refs p target
         }
     | FunctionApplication { receiver ; arguments } ->
-        FunctionApplication {
-          receiver = replace_args_with_refs p receiver ;
-          arguments = List.map (replace_args_with_refs p) arguments
-        }
+        if receiver = Variable(name) then
+          let seq = Sequence (
+            ReferenceAssignment {
+              receiver = Variable("_call_");
+              value = Variable("true")
+            }::
+            List.map
+            (fun nom ->
+              ReferenceAssignment {
+                receiver = Variable(nom^"_ref");
+                value = Variable(nom^"_temp")
+              }
+            )
+            p
+          )
+        in
+        parameter_list_to_temp_list p arguments seq
+        else
+          FunctionApplication {
+            receiver = replace_args_with_refs p receiver ;
+            arguments = List.map (replace_args_with_refs p) arguments
+          }
     | PrefixOperation { receiver ; operation } ->
         PrefixOperation {
           receiver = replace_args_with_refs p receiver ;
@@ -159,53 +233,36 @@ let fonction_vers_while
           value = replace_args_with_refs p value;
         }
   in
-  (* Renvoie une liste de définitions de refs correspondant aux arguments *)
-  let rec parameter_list_to_ref_list (p: string list) (inner_expr: expression) :
-      expression =
-    match p with
-    | [] ->
-        (LetBinding ({
-          bindings = [
-            Variable {
-              lhs = Ident "_call_";
-              value = FunctionApplication {
-                receiver = Variable "ref";
-                arguments = [Variable "false"]
-              }
-            }
-          ];
-          is_rec = false;
-          inner = inner_expr
-        }))
-    | x::q ->
-        parameter_list_to_ref_list q
-        (LetBinding ({
-          bindings = [
-            Variable {
-              lhs = Ident (x^"_ref");
-              value = FunctionApplication {
-                receiver = Variable "ref";
-                arguments = [Variable x]
-              }
-            }
-          ];
-          is_rec = false;
-          inner = inner_expr
-        }))
+
+  let wrap_in_while (body: expression) : expression =
+    WhileLoop {
+      condition = Dereference(Variable "_call_");
+      body = Sequence [
+        ReferenceAssignment {
+          receiver = Variable "_call_" ;
+          value = Variable "false"
+        };
+        body
+      ]
+    }
   in
+
   let params = List.filter_map
     (fun x -> match x with
       | (TypeCoercion {inner = Ident name; _})
       | Ident name -> Some name
       | _ -> None
     ) parameters in
-  parameter_list_to_ref_list params (replace_args_with_refs params body)
+  parameter_list_to_ref_list params
+    (wrap_in_while (replace_args_with_refs params body))
+
 
 let parse_file name =
   let input_channel = open_in name in
   let content = really_input_string input_channel (in_channel_length input_channel) in
   close_in input_channel;
   parse_caml_light_ast content
+
 
 let test2 =
   let src = parse_file "../test2.ml" in
@@ -229,7 +286,7 @@ let test2 =
           inner =
            FunctionApplication
             {receiver = Variable "fizzbuzz_a_partir";
-             arguments = [Constant (IntegerLiteral 0)]}}}];
+             arguments = [Constant (IntegerLiteral 1)]}}}];
      is_rec = false}]
      ->
     [ValueDefinition
@@ -247,11 +304,11 @@ let test2 =
              {name;
               parameters;
               body = fonction_vers_while name parameters body}];
-          is_rec = true;
+          is_rec = false;
           inner =
            FunctionApplication
             {receiver = Variable "fizzbuzz_a_partir";
-             arguments = [Constant (IntegerLiteral 0)]}}}];
+             arguments = [Constant (IntegerLiteral 1)]}}}];
      is_rec = false}] |> string_of_ast
   | _ -> failwith "pas le test2"
 
