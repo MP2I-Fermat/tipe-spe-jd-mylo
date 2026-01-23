@@ -380,7 +380,7 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
             else_body = else_body_lin;
           }
       in
-      (condition_lin @ [ (p k, e_elt) ], k + 2)
+      (condition_lin @ [ (p k, e_elt) ], k + 3)
   | Sequence s ->
       let elt_lins, k =
         List.fold_left
