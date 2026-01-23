@@ -82,12 +82,18 @@ and linear_binding =
 
 and linear_form = (variable * linear_element) list
 
+(** Given a linear form l, extracts the name associated with the last linear
+    element in l *)
 let rec last_var (l : linear_form) : variable =
   match l with
   | [] -> failwith "l was empty"
   | (p, _) :: [] -> p
   | x :: q -> last_var q
 
+(** Converts an OCaml expression e to a linear form, associating the generated
+    linear elements with the names a_k, a_(k+1), and so on.
+
+    Returns the linear form and the index after the last used name. *)
 let rec linearize (e : expression) (k : int) : linear_form * int =
   let p (i : int) : variable = "a_" ^ string_of_int i in
 
@@ -549,6 +555,7 @@ let rec element_contains_reference (f : variable) (e : linear_element) : bool =
       || contains_reference f target
       || contains_reference f value
 
+(** contains_reference f l is true iff l contains `Variable f` *)
 and contains_reference (f : variable) (l : linear_form) : bool =
   match l with
   | [] -> false
@@ -759,6 +766,23 @@ let rec delinearize_element (e : linear_element) (prev_vars : linear_form) :
           },
         inlined_vars @ inlined_vars_2 @ inlined_vars_3 )
 
+(** delinearize l prev_vars converts a linear form l to an OCaml expression.
+
+    In addition to the algorithm detailed in the paper, three additional
+    modifications are performed to improve legibility:
+
+    - Use of function bindings: Instead of generating bindings of the form `let
+      x = fun arg1 ... argn -> body`, generate `let x arg1 ... argn = body`
+
+    - Inlining: If a variable is encountered and prev_vars contains a definition
+      for that variable, replace the occurrence of the variable with the
+      definition. This helps to undo the "flattening" introduced by linearize.
+
+    - Use of sequences: Instead of generating `let x = value in e`, if `x` does
+      not appear in `e`, generate `value; e`.
+
+    This function returns the generated expression as well as a list of
+    variables that were inlined. *)
 and delinearize (l : linear_form) (prev_vars : linear_form) :
     expression * variable list =
   match l with
@@ -856,11 +880,15 @@ let rec element_contains_application (f : variable) (e : linear_element) : bool
       || contains_application f target
       || contains_application f value
 
+(** contains_application f l is true iff l contains a FunctionApplication whose
+    receiver is f *)
 and contains_application (f : variable) (l : linear_form) : bool =
   match l with
   | [] -> false
   | (p, e) :: q -> element_contains_application f e || contains_application f q
 
+(** map_locally_terminal_children applies a transformation only to the locally
+    terminal children of f *)
 let map_locally_terminal_children (f : linear_form -> linear_form)
     (e : linear_element) : linear_element =
   match (e : linear_element) with
@@ -889,6 +917,13 @@ let map_locally_terminal_children (f : linear_form -> linear_form)
   (* No locally terminal children *)
   | _ -> e
 
+(** rectify l c returns a linear form equivalent to l in which all calls to
+    functions in c are made terminal.
+
+    The functions in c are assumed to be later redefined to use CPS taking a
+    continuation as their last argument. The bodies of any such functions
+    defined within l are modified accordingly, but the function header is not.
+*)
 let rec rectify (l : linear_form) (cloture_rect : variable list) : linear_form =
   let rec find_first_recursive_element (tail : linear_form) (head : linear_form)
       : linear_form * ((variable * linear_element) * linear_form) option =
@@ -1151,6 +1186,8 @@ let rec push_rectified_element (e : linear_element)
           value = push_rectified_definitions value cloture_rect new_name;
         }
 
+(** push_rectified_definitions l c updates the definition of any variables in c
+    to be CPS style functions, as described in rectify. *)
 and push_rectified_definitions (l : linear_form) (cloture_rect : variable list)
     (new_name : variable -> variable) =
   l
@@ -1247,6 +1284,10 @@ and find_definitions (fns : (variable * linear_element) list) (name : variable)
 
   child_definitions @ self_definitions
 
+(** find_definition fns name finds the unique definition of the linear element
+    with the name name in fns.
+
+    Returns None if zero or multiple definitions are found. *)
 and find_definition (fns : (variable * linear_element) list) (name : variable) :
     linear_element option =
   let root_definitions =
@@ -1262,6 +1303,9 @@ and find_definition (fns : (variable * linear_element) list) (name : variable) :
   let definitions = root_definitions @ inner_definitions in
   match definitions with [ def ] -> Some def | _ -> None
 
+(** cloture_rectifiable fns computes a set that rectifies fns.
+
+    Returns None if such a set could not be computed. *)
 let cloture_rectifiable (fns : (variable * linear_element) list) :
     variable list option =
   let rec get_argument_count (fn : variable) : int option =
@@ -1438,6 +1482,11 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
     Some !cloture
   with Exit -> None
 
+(** find_continuations collects the definitions of all continuations defined in
+    fns.
+
+    The continuations are assumed to have been generated by `rectify`; that is,
+    they are assumed to be named "new_cont". *)
 let find_continuations (fns : (variable * linear_element) list)
     (cloture_rect : variable list) : linear_function_literal list option =
   let exception Exit in
@@ -1519,6 +1568,11 @@ let find_continuations (fns : (variable * linear_element) list)
       |> List.sort_uniq compare)
   with Exit -> None
 
+(** find_initials fns returns the set of all values passed as base cases to the
+    continuations of fns.
+
+    Returns None if a base case was not a constant or if all base cases could
+    not be computed. *)
 let find_initials (fns : (variable * linear_element) list) :
     (variable list * constant list) option =
   let exception Exit in
@@ -1610,6 +1664,12 @@ let find_initials (fns : (variable * linear_element) list) :
     Some (names, constants |> List.sort_uniq compare)
   with Exit -> None
 
+(** Given a computation, if it is semantically the composition of a previous
+    continuation with some new function, return that new function. Else return
+    None.
+
+    For example, the function `fun x -> if y then cont z else cont w` is
+    semantically equivalent to `cont @@ (func x -> if y then z else w)`. *)
 let extract_continuation (cont : linear_function_literal) :
     linear_function_literal option =
   let exception NotSimple in
@@ -1638,6 +1698,7 @@ let extract_continuation (cont : linear_function_literal) :
     Some res
   with NotSimple -> None
 
+(** Returns true iff all the functions of continuations commute. *)
 let commutes (continuations : linear_function_literal list) : bool = true
 
 let rec replace_element_continuations_with_accumulator (e : linear_element)
@@ -1925,6 +1986,13 @@ let rec replace_element_continuations_with_accumulator (e : linear_element)
               vars_to_replace;
         }
 
+(** Given a linear form l that is terminally recursive for a rectifying set
+    cloture_rect, replace CPS with the use of an accumulator. The continuations
+    are assumed to commute.
+
+    Also removes the elements corresponding to the names in vars_to_remove. This
+    allows the variables defining the initial values passed to the continuations
+    to be removed. *)
 and replace_continuations_with_accumulator (l : linear_form)
     (cloture_rect : variable list) (vars_to_remove : variable list) =
   let rec replace_last_parameter (l : pattern list) =
