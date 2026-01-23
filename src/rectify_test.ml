@@ -153,7 +153,7 @@ let rectified =
                                        {
                                          name = new_name name;
                                          parameters = new_parameters;
-                                         body = delinearize new_body;
+                                         body = fst (delinearize new_body []);
                                        }
                                       : Caml_light.binding)
                                   in

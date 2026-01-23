@@ -494,126 +494,240 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
       in
       (receiver_lin @ target_lin @ value_lin @ [ (p k, e_elt) ], k + 4)
 
-let rec delinearize_element (e : linear_element) : expression =
+let rec delinearize_element (e : linear_element) (prev_vars : linear_form) :
+    expression * variable list =
   match e with
-  | Variable v -> Variable v
-  | Constant c -> Constant c
+  | Variable v -> (
+      match List.assoc_opt v prev_vars with
+      | None -> (Variable v, [])
+      | Some definition ->
+          let inlined_elt, inlined_vars =
+            delinearize_element definition
+              (List.filter (fun (name, _) -> name <> v) prev_vars)
+          in
+          ( Parenthesised { inner = inlined_elt; style = Parenthesis },
+            v :: inlined_vars ))
+  | Constant c -> (Constant c, [])
   | Parenthesised { style; inner } ->
-      Parenthesised { style; inner = delinearize inner }
+      let inner_inlined, inlined_vars = delinearize inner prev_vars in
+      (Parenthesised { style; inner = inner_inlined }, inlined_vars)
   | TypeCoercion { typ; inner } ->
-      TypeCoercion { typ; inner = delinearize inner }
-  | ListLiteral l -> ListLiteral (List.map delinearize l)
-  | ArrayLiteral l -> ArrayLiteral (List.map delinearize l)
+      let inner_inlined, inlined_vars = delinearize inner prev_vars in
+      (TypeCoercion { typ; inner = inner_inlined }, inlined_vars)
+  | ListLiteral l ->
+      let terms, inlined_vars =
+        List.fold_right
+          (fun elt (terms, inlined_vars) ->
+            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
+            (elt_inlined :: terms, inlined_vars' @ inlined_vars))
+          l ([], [])
+      in
+
+      (ListLiteral terms, inlined_vars)
+  | ArrayLiteral l ->
+      let terms, inlined_vars =
+        List.fold_right
+          (fun elt (terms, inlined_vars) ->
+            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
+            (elt_inlined :: terms, inlined_vars' @ inlined_vars))
+          l ([], [])
+      in
+
+      (ArrayLiteral terms, inlined_vars)
   | RecordLiteral l ->
-      RecordLiteral
-        (List.map (fun (field, value) -> (field, delinearize value)) l)
+      let terms, inlined_vars =
+        List.fold_right
+          (fun (name, elt) (terms, inlined_vars) ->
+            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
+            ((name, elt_inlined) :: terms, inlined_vars' @ inlined_vars))
+          l ([], [])
+      in
+
+      (RecordLiteral terms, inlined_vars)
   | WhileLoop _ -> failwith "Found linearized while loop"
   | ForLoop _ -> failwith "Found linearized for loop"
-  | Dereference inner -> Dereference (delinearize inner)
+  | Dereference inner ->
+      let inner_inlined, inlined_vars = delinearize inner prev_vars in
+      (Dereference inner_inlined, inlined_vars)
   | FieldAccess { receiver; target } ->
-      FieldAccess { receiver = delinearize receiver; target }
+      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
+      (FieldAccess { receiver = receiver_inlined; target }, inlined_vars)
   | ArrayAccess { receiver; target } ->
-      ArrayAccess
-        { receiver = delinearize receiver; target = delinearize target }
+      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
+      let target_inlined, inlined_vars_2 = delinearize receiver prev_vars in
+      ( ArrayAccess { receiver = receiver_inlined; target = target_inlined },
+        inlined_vars @ inlined_vars_2 )
   | FunctionApplication { receiver; arguments } ->
-      FunctionApplication
-        {
-          receiver = delinearize receiver;
-          arguments = List.map delinearize arguments;
-        }
+      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
+      let arguments_inlined, inlined_vars_2 =
+        List.fold_right
+          (fun elt (terms, inlined_vars) ->
+            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
+            (elt_inlined :: terms, inlined_vars' @ inlined_vars))
+          arguments ([], [])
+      in
+      ( FunctionApplication
+          { receiver = receiver_inlined; arguments = arguments_inlined },
+        inlined_vars @ inlined_vars_2 )
   | PrefixOperation { operation; receiver } ->
-      PrefixOperation { operation; receiver = delinearize receiver }
+      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
+      (PrefixOperation { operation; receiver = receiver_inlined }, inlined_vars)
   | InfixOperation { lhs; operation; rhs } ->
-      InfixOperation { lhs = delinearize lhs; operation; rhs = delinearize rhs }
-  | Negation inner -> Negation (delinearize inner)
-  | Tuple l -> Tuple (List.map delinearize l)
+      let lhs_inlined, inlined_vars = delinearize lhs prev_vars in
+      let rhs_inlined, inlined_vars2 = delinearize rhs prev_vars in
+      ( InfixOperation { lhs = lhs_inlined; operation; rhs = rhs_inlined },
+        inlined_vars @ inlined_vars2 )
+  | Negation inner ->
+      let inner_inlined, inlined_vars = delinearize inner prev_vars in
+      (Negation inner_inlined, inlined_vars)
+  | Tuple l ->
+      let terms, inlined_vars =
+        List.fold_right
+          (fun elt (terms, inlined_vars) ->
+            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
+            (elt_inlined :: terms, inlined_vars' @ inlined_vars))
+          l ([], [])
+      in
+
+      (Tuple terms, inlined_vars)
   | FieldAssignment { receiver; target; value } ->
-      FieldAssignment
-        { receiver = delinearize receiver; target; value = delinearize value }
+      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
+      let value_inlined, inlined_vars_2 = delinearize value prev_vars in
+      ( FieldAssignment
+          { receiver = receiver_inlined; target; value = value_inlined },
+        inlined_vars @ inlined_vars_2 )
   | ArrayAssignment { receiver; target; value } ->
-      ArrayAssignment
-        {
-          receiver = delinearize receiver;
-          target = delinearize target;
-          value = delinearize value;
-        }
+      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
+      let value_inlined, inlined_vars_2 = delinearize value prev_vars in
+      let target_inlined, inlined_vars_3 = delinearize value prev_vars in
+      ( ArrayAssignment
+          {
+            receiver = receiver_inlined;
+            target = target_inlined;
+            value = value_inlined;
+          },
+        inlined_vars @ inlined_vars_2 @ inlined_vars_3 )
   | ReferenceAssignment { receiver; value } ->
-      ReferenceAssignment
-        { receiver = delinearize receiver; value = delinearize value }
+      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
+      let value_inlined, inlined_vars_2 = delinearize value prev_vars in
+      ( ReferenceAssignment
+          { receiver = receiver_inlined; value = value_inlined },
+        inlined_vars @ inlined_vars_2 )
   | If { condition; body; else_body } ->
-      If
-        {
-          condition = delinearize condition;
-          body = delinearize body;
-          else_body =
-            (match else_body with
-            | None -> None
-            | Some b -> Some (delinearize b));
-        }
-  | Sequence s -> Sequence (List.map delinearize s)
+      let condition_inlined, inlined_vars = delinearize condition prev_vars in
+      let body_inlined, inlined_vars_2 = delinearize body prev_vars in
+      let else_inlined, inlined_vars_3 =
+        match else_body with
+        | None -> (None, [])
+        | Some b ->
+            let b_inlined, inlined_vars = delinearize b prev_vars in
+            (Some b_inlined, inlined_vars)
+      in
+      ( If
+          {
+            condition = condition_inlined;
+            body = body_inlined;
+            else_body = else_inlined;
+          },
+        inlined_vars @ inlined_vars_2 @ inlined_vars_3 )
+  | Sequence s ->
+      let terms, inlined_vars =
+        List.fold_right
+          (fun elt (terms, inlined_vars) ->
+            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
+            (elt_inlined :: terms, inlined_vars' @ inlined_vars))
+          s ([], [])
+      in
+
+      (Sequence terms, inlined_vars)
   | Match { value; cases } ->
-      Match
-        {
-          value = delinearize value;
-          cases =
-            List.map (fun (pattern, body) -> (pattern, delinearize body)) cases;
-        }
+      let value_inlined, inlined_vars = delinearize value prev_vars in
+      let cases_inlined, inlined_vars_2 =
+        List.fold_right
+          (fun (pattern, elt) (terms, inlined_vars) ->
+            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
+            ((pattern, elt_inlined) :: terms, inlined_vars' @ inlined_vars))
+          cases ([], [])
+      in
+
+      ( Match { value = value_inlined; cases = cases_inlined },
+        inlined_vars @ inlined_vars_2 )
   | Try _ -> failwith "Found linearized try"
   | FunctionLiteral { style; cases } ->
-      FunctionLiteral
-        {
-          style;
-          cases =
-            List.map (fun (pattern, body) -> (pattern, delinearize body)) cases;
-        }
+      let cases_inlined, inlined_vars =
+        List.fold_right
+          (fun (pattern, elt) (terms, inlined_vars) ->
+            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
+            ((pattern, elt_inlined) :: terms, inlined_vars' @ inlined_vars))
+          cases ([], [])
+      in
+      (FunctionLiteral { style; cases = cases_inlined }, inlined_vars)
   | LetBinding { bindings; is_rec; inner } ->
-      LetBinding
-        {
-          bindings =
-            List.map
-              (fun (binding : linear_binding) ->
-                match binding with
-                | Variable { lhs; value } ->
-                    (Variable { lhs; value = delinearize value } : binding)
-                | Function _ -> failwith "Found function")
-              bindings;
-          is_rec;
-          inner = delinearize inner;
-        }
+      let bindings_inlined, inlined_vars =
+        List.fold_right
+          (fun binding (terms, inlined_vars) ->
+            match binding with
+            | (Variable { lhs; value } : linear_binding) ->
+                let value_inlined, inlined_vars' =
+                  delinearize value prev_vars
+                in
+                ( (Variable { lhs; value = value_inlined } : binding) :: terms,
+                  inlined_vars' @ inlined_vars )
+            | Function { name; parameters; body } ->
+                let body_inlined, inlined_vars' = delinearize body prev_vars in
+                ( Function { name; parameters; body = body_inlined } :: terms,
+                  inlined_vars' @ inlined_vars ))
+          bindings ([], [])
+      in
+      let inner_inlined, inlined_vars_2 = delinearize inner prev_vars in
+      ( LetBinding { bindings = bindings_inlined; is_rec; inner = inner_inlined },
+        inlined_vars @ inlined_vars_2 )
   | StringAccess { receiver; target } ->
-      StringAccess
-        { receiver = delinearize receiver; target = delinearize target }
+      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
+      let target_inlined, inlined_vars_2 = delinearize receiver prev_vars in
+      ( StringAccess { receiver = receiver_inlined; target = target_inlined },
+        inlined_vars @ inlined_vars_2 )
   | StringAssignment { receiver; target; value } ->
-      StringAssignment
-        {
-          receiver = delinearize receiver;
-          target = delinearize target;
-          value = delinearize value;
-        }
+      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
+      let value_inlined, inlined_vars_2 = delinearize value prev_vars in
+      let target_inlined, inlined_vars_3 = delinearize value prev_vars in
+      ( StringAssignment
+          {
+            receiver = receiver_inlined;
+            target = target_inlined;
+            value = value_inlined;
+          },
+        inlined_vars @ inlined_vars_2 @ inlined_vars_3 )
 
-and delinearize (l : linear_form) : expression =
+and delinearize (l : linear_form) (prev_vars : linear_form) :
+    expression * variable list =
   match l with
   | [] -> failwith "Empty linear form"
-  | (p, e) :: [] -> delinearize_element e
+  | (p, e) :: [] -> delinearize_element e prev_vars
   (* Special case for formatting functions nicely *)
   | (p, FunctionLiteral { style; cases = [ (args, body) ] }) :: q ->
-      LetBinding
-        {
-          is_rec = false;
-          bindings =
-            [
-              Function { name = p; parameters = args; body = delinearize body };
-            ];
-          inner = delinearize q;
-        }
+      let q_inlined, inlined_vars = delinearize q prev_vars in
+      let body_inlined, inlined_vars_2 = delinearize body prev_vars in
+      ( LetBinding
+          {
+            is_rec = false;
+            bindings =
+              [ Function { name = p; parameters = args; body = body_inlined } ];
+            inner = q_inlined;
+          },
+        inlined_vars @ inlined_vars_2 )
   | (p, e) :: q ->
-      LetBinding
-        {
-          is_rec = false;
-          bindings =
-            [ Variable { lhs = Ident p; value = delinearize_element e } ];
-          inner = delinearize q;
-        }
+      let q_delinearized, inlined_vars = delinearize q ((p, e) :: prev_vars) in
+      if List.mem p inlined_vars then (q_delinearized, inlined_vars)
+      else
+        let e_inlined, inlined_vars_2 = delinearize_element e prev_vars in
+        ( LetBinding
+            {
+              is_rec = false;
+              bindings = [ Variable { lhs = Ident p; value = e_inlined } ];
+              inner = q_delinearized;
+            },
+          inlined_vars @ inlined_vars_2 )
 
 let rec element_contains_application (f : variable) (e : linear_element) : bool
     =
