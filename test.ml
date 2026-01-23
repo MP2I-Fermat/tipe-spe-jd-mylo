@@ -21,3 +21,8 @@ print_endline (string_of_int (fibonacci 10))
 let rec custom_fold_left (fn : 'acc -> 'el -> 'ac) (init : 'acc) (l : 'el list)
     =
   match l with [] -> init | x :: q -> custom_fold_left fn (fn init x) q
+
+let rec sum_even_numbers (l : int list) =
+  match l with
+  | [] -> 0
+  | x :: q -> if x mod 2 = 0 then x + sum_even_numbers q else sum_even_numbers q

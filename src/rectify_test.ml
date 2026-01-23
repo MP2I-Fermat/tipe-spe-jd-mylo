@@ -32,7 +32,7 @@ let rectified =
          match phrase with
          | ValueDefinition { bindings; is_rec } -> (
              let k = ref 0 in
-             let defined_functions =
+             let initial_functions =
                bindings
                |> List.filter_map (fun (binding : binding) ->
                       match binding with
@@ -51,10 +51,76 @@ let rectified =
 
              let new_name (n : string) = n ^ "_rectified" in
 
-             match cloture_rectifiable defined_functions with
+             match cloture_rectifiable initial_functions with
              (* TODO: Dig down? *)
              | None -> phrase
              | Some clot ->
+                 let rectified_functions =
+                   initial_functions
+                   |> List.map (fun (name, definition) ->
+                          let parameters, linearized_body =
+                            match definition with
+                            | FunctionLiteral { cases = [ case ] } -> case
+                            | _ -> failwith "Bad state"
+                          in
+
+                          let rectified_body = rectify linearized_body clot in
+                          let redefined_body =
+                            push_rectified_definitions rectified_body clot
+                              new_name
+                          in
+
+                          ( new_name name,
+                            FunctionLiteral
+                              {
+                                style = Fun;
+                                cases =
+                                  [
+                                    ( parameters @ [ Ident "cont" ],
+                                      redefined_body );
+                                  ];
+                              } ))
+                 in
+
+                 let new_clot = List.map new_name clot in
+
+                 let accumulator_functions, initial_constant =
+                   match find_continuations rectified_functions clot with
+                   | None -> (rectified_functions, None)
+                   | Some continuations -> (
+                       let extracted_continuations =
+                         List.fold_left
+                           (fun acc continuation ->
+                             match acc with
+                             | None -> None
+                             | Some acc -> (
+                                 match extract_continuation continuation with
+                                 | None -> None
+                                 | Some extracted_continuation ->
+                                     Some (extracted_continuation :: acc)))
+                           (Some []) continuations
+                       in
+                       match extracted_continuations with
+                       | None -> (rectified_functions, None)
+                       | Some extracted_continuations -> (
+                           let initial = find_initials rectified_functions in
+                           match initial with
+                           | None -> (rectified_functions, None)
+                           | Some (variables, initial) ->
+                               if
+                                 commutes extracted_continuations
+                                 && List.length initial == 1
+                               then
+                                 ( rectified_functions
+                                   |> List.map (fun (name, body) ->
+                                          replace_continuations_with_accumulator
+                                            [ (name, body) ]
+                                            new_clot variables
+                                          |> List.hd),
+                                   Some (List.hd initial) )
+                               else (rectified_functions, None)))
+                 in
+
                  (* rmq: clot can only contain functions defined in defined_functions & their bodies *)
                  ValueDefinition
                    {
@@ -65,27 +131,29 @@ let rectified =
                               match binding with
                               | Variable _ -> [ binding ]
                               | Function { name; parameters; body } ->
-                                  let linearized_body =
-                                    match List.assoc name defined_functions with
-                                    | FunctionLiteral
-                                        { cases = [ (_, body_lin) ] } ->
-                                        body_lin
+                                  let redefined =
+                                    match
+                                      List.assoc (new_name name)
+                                        accumulator_functions
+                                    with
+                                    | FunctionLiteral f -> f
                                     | _ ->
                                         failwith
-                                          "Didn't find expected definition"
+                                          "Unable to find redefined definition"
+                                  in
+
+                                  let new_parameters, new_body =
+                                    match redefined.cases with
+                                    | [ c ] -> c
+                                    | _ -> failwith "Bad function"
                                   in
 
                                   let new_fn =
                                     (Function
                                        {
                                          name = new_name name;
-                                         parameters =
-                                           parameters @ [ Ident "cont" ];
-                                         body =
-                                           delinearize
-                                             (push_rectified_definitions
-                                                (rectify linearized_body clot)
-                                                clot new_name);
+                                         parameters = new_parameters;
+                                         body = delinearize new_body;
                                        }
                                       : Caml_light.binding)
                                   in
@@ -115,19 +183,26 @@ let rectified =
                                                        {
                                                          style = Parenthesis;
                                                          inner =
-                                                           FunctionLiteral
-                                                             {
-                                                               style = Fun;
-                                                               cases =
-                                                                 [
-                                                                   ( [
-                                                                       Ident
-                                                                         "res";
-                                                                     ],
-                                                                     Variable
-                                                                       "res" );
-                                                                 ];
-                                                             };
+                                                           (match
+                                                              initial_constant
+                                                            with
+                                                           | None ->
+                                                               FunctionLiteral
+                                                                 {
+                                                                   style = Fun;
+                                                                   cases =
+                                                                     [
+                                                                       ( [
+                                                                           Ident
+                                                                             "res";
+                                                                         ],
+                                                                         Variable
+                                                                           "res"
+                                                                       );
+                                                                     ];
+                                                                 }
+                                                           | Some cst ->
+                                                               Constant cst);
                                                        };
                                                    ];
                                              };

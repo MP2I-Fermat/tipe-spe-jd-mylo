@@ -993,105 +993,97 @@ and push_rectified_definitions (l : linear_form) (cloture_rect : variable list)
            (new_name name, new_new_elt)
          else (name, new_elt))
 
-(*
-  Si f est à rectifier, on autorise les occurrences de f de la forme:
-  1. a = f (nouveau nom) -> Inspect the pairs
-  2. a = f arg1 ... argn (application totale) -> Inspect the containing element if terminal, needs to know containing function
-  3. a = f arg1 ... argi (application partielle) -> Inspect the containing element if terminal, needs to know parent associated value
-  4. g arg1 ... f ... arg n (application totale ou f est paramètre) -> Inspect the containing element if terminal, needs to know parent function
+let rec find_definitions_in_element (fns : (variable * linear_element) list)
+    (name : variable) (e : linear_element) : linear_element list =
+  match e with
+  | Variable _ | Constant _ -> []
+  | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
+      find_definitions fns name inner
+  | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
+      l |> List.map (fun elt -> find_definitions fns name elt) |> List.concat
+  | RecordLiteral r ->
+      r
+      |> List.map (fun (_, elt) -> find_definitions fns name elt)
+      |> List.concat
+  | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
+  | FieldAccess { receiver } -> find_definitions fns name receiver
+  | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
+      find_definitions fns name receiver @ find_definitions fns name target
+  | FunctionApplication { receiver; arguments } ->
+      find_definitions fns name receiver
+      @ (arguments
+        |> List.map (fun arg -> find_definitions fns name arg)
+        |> List.concat)
+  | PrefixOperation { receiver } -> find_definitions fns name receiver
+  | InfixOperation { lhs; rhs } ->
+      find_definitions fns name lhs @ find_definitions fns name rhs
+  | Negation receiver -> find_definitions fns name receiver
+  | FieldAssignment { receiver; value } ->
+      find_definitions fns name receiver @ find_definitions fns name value
+  | ArrayAssignment { receiver; target; value }
+  | StringAssignment { receiver; target; value } ->
+      find_definitions fns name receiver
+      @ find_definitions fns name target
+      @ find_definitions fns name value
+  | ReferenceAssignment { receiver; value } ->
+      find_definitions fns name receiver @ find_definitions fns name value
+  | If { condition; body; else_body } -> (
+      find_definitions fns name condition
+      @ find_definitions fns name body
+      @
+      match else_body with None -> [] | Some b -> find_definitions fns name b)
+  | Match { value; cases } ->
+      find_definitions fns name value
+      @ (cases
+        |> List.map (fun (_, body) -> find_definitions fns name body)
+        |> List.concat)
+  | Try _ -> failwith "Found linearized try"
+  | FunctionLiteral { cases } ->
+      List.map (fun (_, body) -> find_definitions fns name body) cases
+      |> List.concat
+  | LetBinding { bindings; inner } ->
+      find_definitions fns name inner
+      @ (bindings
+        |> List.map (fun (binding : linear_binding) ->
+               match binding with
+               | Variable { value } -> find_definitions fns name value
+               | Function { name; body } -> find_definitions fns name body)
+        |> List.concat)
 
-  Dans les cas 1. et 3., a devient aussi rectifiable.
-  Dans le cas 2, la fonction contenant l'appel devient rectifiable.
-  Dans le cas 4, si on connait la définition de g, le paramètre associé
-  à f devient rectifiable.
-  Dans tous les autres cas, on abandonne.
-*)
+and find_definitions (fns : (variable * linear_element) list) (name : variable)
+    (l : linear_form) : linear_element list =
+  let child_definitions =
+    l
+    |> List.map (fun (_, e) -> find_definitions_in_element fns name e)
+    |> List.flatten
+  in
+  let self_definitions =
+    l
+    |> List.filter_map (fun (variable, elt) ->
+           if variable = name then Some elt else None)
+  in
+
+  child_definitions @ self_definitions
+
+and find_definition (fns : (variable * linear_element) list) (name : variable) :
+    linear_element option =
+  let root_definitions =
+    fns
+    |> List.filter_map (fun (name', def) ->
+           if name' = name then Some def else None)
+  in
+  let inner_definitions =
+    fns |> List.map snd
+    |> List.map (find_definitions_in_element fns name)
+    |> List.concat
+  in
+  let definitions = root_definitions @ inner_definitions in
+  match definitions with [ def ] -> Some def | _ -> None
+
 let cloture_rectifiable (fns : (variable * linear_element) list) :
     variable list option =
-  let rec find_definitions_in_element (fn : variable) (e : linear_element) :
-      linear_element list =
-    match e with
-    | Variable _ | Constant _ -> []
-    | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
-        find_definitions fn inner
-    | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
-        l |> List.map (fun elt -> find_definitions fn elt) |> List.concat
-    | RecordLiteral r ->
-        r |> List.map (fun (_, elt) -> find_definitions fn elt) |> List.concat
-    | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
-    | FieldAccess { receiver } -> find_definitions fn receiver
-    | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
-        find_definitions fn receiver @ find_definitions fn target
-    | FunctionApplication { receiver; arguments } ->
-        find_definitions fn receiver
-        @ (arguments
-          |> List.map (fun arg -> find_definitions fn arg)
-          |> List.concat)
-    | PrefixOperation { receiver } -> find_definitions fn receiver
-    | InfixOperation { lhs; rhs } ->
-        find_definitions fn lhs @ find_definitions fn rhs
-    | Negation receiver -> find_definitions fn receiver
-    | FieldAssignment { receiver; value } ->
-        find_definitions fn receiver @ find_definitions fn value
-    | ArrayAssignment { receiver; target; value }
-    | StringAssignment { receiver; target; value } ->
-        find_definitions fn receiver
-        @ find_definitions fn target @ find_definitions fn value
-    | ReferenceAssignment { receiver; value } ->
-        find_definitions fn receiver @ find_definitions fn value
-    | If { condition; body; else_body } -> (
-        find_definitions fn condition
-        @ find_definitions fn body
-        @ match else_body with None -> [] | Some b -> find_definitions fn b)
-    | Match { value; cases } ->
-        find_definitions fn value
-        @ (cases
-          |> List.map (fun (_, body) -> find_definitions fn body)
-          |> List.concat)
-    | Try _ -> failwith "Found linearized try"
-    | FunctionLiteral { cases } ->
-        List.map (fun (_, body) -> find_definitions fn body) cases
-        |> List.concat
-    | LetBinding { bindings; inner } ->
-        find_definitions fn inner
-        @ (bindings
-          |> List.map (fun (binding : linear_binding) ->
-                 match binding with
-                 | Variable { value } -> find_definitions fn value
-                 | Function { name; body } -> find_definitions fn body)
-          |> List.concat)
-  and find_definitions (fn : variable) (l : linear_form) : linear_element list =
-    let child_definitions =
-      l
-      |> List.map (fun (_, e) -> find_definitions_in_element fn e)
-      |> List.flatten
-    in
-    let self_definitions =
-      l
-      |> List.filter_map (fun (variable, elt) ->
-             if variable = fn then Some elt else None)
-    in
-
-    child_definitions @ self_definitions
-  in
-
-  let find_definition (fn : variable) : linear_element option =
-    let root_definitions =
-      fns
-      |> List.filter_map (fun (name, def) ->
-             if name = fn then Some def else None)
-    in
-    let inner_definitions =
-      fns |> List.map snd
-      |> List.map (find_definitions_in_element fn)
-      |> List.concat
-    in
-    let definitions = root_definitions @ inner_definitions in
-    match definitions with [ def ] -> Some def | _ -> None
-  in
-
   let rec get_argument_count (fn : variable) : int option =
-    match find_definition fn with
+    match find_definition fns fn with
     | Some def -> (
         match def with
         | FunctionLiteral { cases } -> (
@@ -1121,7 +1113,7 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
 
   let rec get_nth_argument_names (fn : variable) (n : int) :
       variable list option =
-    match find_definition fn with
+    match find_definition fns fn with
     | Some def -> (
         match def with
         | FunctionLiteral { cases } ->
@@ -1263,3 +1255,543 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
     done;
     Some !cloture
   with Exit -> None
+
+let find_continuations (fns : (variable * linear_element) list)
+    (cloture_rect : variable list) : linear_function_literal list option =
+  let exception Exit in
+  try
+    let rec find_continuations_in_element (e : linear_element) :
+        linear_function_literal list =
+      match e with
+      | Variable _ | Constant _ -> []
+      | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
+          find_continuations_in inner
+      | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
+          l |> List.map (fun elt -> find_continuations_in elt) |> List.concat
+      | RecordLiteral r ->
+          r
+          |> List.map (fun (_, elt) -> find_continuations_in elt)
+          |> List.concat
+      | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
+      | FieldAccess { receiver } -> find_continuations_in receiver
+      | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
+          find_continuations_in receiver @ find_continuations_in target
+      | FunctionApplication { receiver; arguments } ->
+          find_continuations_in receiver
+          @ (arguments
+            |> List.map (fun arg -> find_continuations_in arg)
+            |> List.concat)
+      | PrefixOperation { receiver } -> find_continuations_in receiver
+      | InfixOperation { lhs; rhs } ->
+          find_continuations_in lhs @ find_continuations_in rhs
+      | Negation receiver -> find_continuations_in receiver
+      | FieldAssignment { receiver; value } ->
+          find_continuations_in receiver @ find_continuations_in value
+      | ArrayAssignment { receiver; target; value }
+      | StringAssignment { receiver; target; value } ->
+          find_continuations_in receiver
+          @ find_continuations_in target
+          @ find_continuations_in value
+      | ReferenceAssignment { receiver; value } ->
+          find_continuations_in receiver @ find_continuations_in value
+      | If { condition; body; else_body } -> (
+          find_continuations_in condition
+          @ find_continuations_in body
+          @
+          match else_body with None -> [] | Some b -> find_continuations_in b)
+      | Match { value; cases } ->
+          find_continuations_in value
+          @ (cases
+            |> List.map (fun (_, body) -> find_continuations_in body)
+            |> List.concat)
+      | Try _ -> failwith "Found linearized try"
+      | FunctionLiteral { cases } ->
+          List.map (fun (_, body) -> find_continuations_in body) cases
+          |> List.concat
+      | LetBinding { bindings; inner } ->
+          find_continuations_in inner
+          @ (bindings
+            |> List.map (fun (binding : linear_binding) ->
+                   match binding with
+                   | Variable { value } -> find_continuations_in value
+                   | Function { name; body } -> find_continuations_in body)
+            |> List.concat)
+    and find_continuations_in (l : linear_form) : linear_function_literal list =
+      match l with
+      | [] -> []
+      | (name, x) :: q ->
+          let x_def =
+            if name = "new_cont" then
+              match x with
+              | FunctionLiteral f -> [ f ]
+              | _ -> failwith "Not a continuation, but named new_cont"
+            else []
+          in
+
+          x_def @ find_continuations_in_element x @ find_continuations_in q
+    in
+    Some
+      (List.fold_left
+         (fun prev (name, body) -> prev @ find_continuations_in_element body)
+         [] fns
+      |> List.sort_uniq compare)
+  with Exit -> None
+
+let find_initials (fns : (variable * linear_element) list) :
+    (variable list * constant list) option =
+  let exception Exit in
+  try
+    let rec find_initials_in_element (e : linear_element) :
+        (variable * constant) list =
+      match e with
+      | Variable _ | Constant _ -> []
+      | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
+          find_initials_in inner
+      | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
+          l |> List.map (fun elt -> find_initials_in elt) |> List.concat
+      | RecordLiteral r ->
+          r |> List.map (fun (_, elt) -> find_initials_in elt) |> List.concat
+      | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
+      | FieldAccess { receiver } -> find_initials_in receiver
+      | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
+          find_initials_in receiver @ find_initials_in target
+      | FunctionApplication { receiver; arguments } ->
+          find_initials_in receiver
+          @ (arguments
+            |> List.map (fun arg -> find_initials_in arg)
+            |> List.concat)
+      | PrefixOperation { receiver } -> find_initials_in receiver
+      | InfixOperation { lhs; rhs } ->
+          find_initials_in lhs @ find_initials_in rhs
+      | Negation receiver -> find_initials_in receiver
+      | FieldAssignment { receiver; value } ->
+          find_initials_in receiver @ find_initials_in value
+      | ArrayAssignment { receiver; target; value }
+      | StringAssignment { receiver; target; value } ->
+          find_initials_in receiver @ find_initials_in target
+          @ find_initials_in value
+      | ReferenceAssignment { receiver; value } ->
+          find_initials_in receiver @ find_initials_in value
+      | If { condition; body; else_body } -> (
+          find_initials_in condition @ find_initials_in body
+          @ match else_body with None -> [] | Some b -> find_initials_in b)
+      | Match { value; cases } ->
+          find_initials_in value
+          @ (cases
+            |> List.map (fun (_, body) -> find_initials_in body)
+            |> List.concat)
+      | Try _ -> failwith "Found linearized try"
+      | FunctionLiteral { cases } ->
+          List.map (fun (_, body) -> find_initials_in body) cases |> List.concat
+      | LetBinding { bindings; inner } ->
+          find_initials_in inner
+          @ (bindings
+            |> List.map (fun (binding : linear_binding) ->
+                   match binding with
+                   | Variable { value } -> find_initials_in value
+                   | Function { name; body } -> find_initials_in body)
+            |> List.concat)
+    and find_initials_in (l : linear_form) : (variable * constant) list =
+      match l with
+      | [] -> []
+      | [
+       ( _,
+         FunctionApplication
+           {
+             receiver = [ (_, Variable "cont") ];
+             arguments = [ [ (_, Variable arg) ] ];
+           } );
+      ] ->
+          let rec find_constant_definition (arg : string) :
+              (variable * constant) list =
+            match find_definition fns arg with
+            | Some (Variable v) ->
+                let res = find_constant_definition v in
+                (arg, snd (List.hd res)) :: res
+            | Some (Constant c) -> [ (arg, c) ]
+            | _ -> raise Exit
+          in
+          find_constant_definition arg
+      | (name, x) :: q ->
+          if name <> "new_cont" then
+            find_initials_in_element x @ find_initials_in q
+          else find_initials_in q
+    in
+    let pairs =
+      List.fold_left
+        (fun prev (name, body) -> prev @ find_initials_in_element body)
+        [] fns
+    in
+    let names = List.map fst pairs in
+    let constants = List.map snd pairs in
+
+    Some (names, constants |> List.sort_uniq compare)
+  with Exit -> None
+
+let extract_continuation (cont : linear_function_literal) :
+    linear_function_literal option =
+  let exception NotSimple in
+  let rec extract_without_continuation (l : linear_form) : linear_form =
+    match l with
+    | [] -> raise NotSimple
+    | [
+     ( _,
+       FunctionApplication
+         { receiver = [ (_, Variable "cont") ]; arguments = [ single_arg ] } );
+    ] ->
+        single_arg
+    (* We ony get terminally recursive elements here *)
+    | e :: q -> e :: extract_without_continuation q
+  in
+  try
+    let res =
+      {
+        style = cont.style;
+        cases =
+          cont.cases
+          |> List.map (fun (parameters, body) ->
+                 (parameters, extract_without_continuation body));
+      }
+    in
+    Some res
+  with NotSimple -> None
+
+let commutes (continuations : linear_function_literal list) : bool = true
+
+let rec replace_element_continuations_with_accumulator (e : linear_element)
+    (cloture_rect : variable list) (vars_to_replace : variable list) =
+  match e with
+  | Variable _ -> e
+  | Constant _ -> e
+  | Parenthesised { inner; style } ->
+      Parenthesised
+        {
+          style;
+          inner =
+            replace_continuations_with_accumulator inner cloture_rect
+              vars_to_replace;
+        }
+  | TypeCoercion { inner; typ } ->
+      TypeCoercion
+        {
+          inner =
+            replace_continuations_with_accumulator inner cloture_rect
+              vars_to_replace;
+          typ;
+        }
+  | ListLiteral l ->
+      ListLiteral
+        (List.map
+           (fun l ->
+             replace_continuations_with_accumulator l cloture_rect
+               vars_to_replace)
+           l)
+  | ArrayLiteral l ->
+      ArrayLiteral
+        (List.map
+           (fun l ->
+             replace_continuations_with_accumulator l cloture_rect
+               vars_to_replace)
+           l)
+  | RecordLiteral r ->
+      RecordLiteral
+        (List.map
+           (fun (n, e) ->
+             ( n,
+               replace_continuations_with_accumulator e cloture_rect
+                 vars_to_replace ))
+           r)
+  | WhileLoop { condition; body } ->
+      WhileLoop
+        {
+          condition =
+            replace_continuations_with_accumulator condition cloture_rect
+              vars_to_replace;
+          body =
+            replace_continuations_with_accumulator body cloture_rect
+              vars_to_replace;
+        }
+  | ForLoop { direction = direction'; variable; start; finish; body } ->
+      ForLoop
+        {
+          direction = direction';
+          variable;
+          start =
+            replace_continuations_with_accumulator start cloture_rect
+              vars_to_replace;
+          finish =
+            replace_continuations_with_accumulator finish cloture_rect
+              vars_to_replace;
+          body =
+            replace_continuations_with_accumulator body cloture_rect
+              vars_to_replace;
+        }
+  | Dereference e ->
+      Dereference
+        (replace_continuations_with_accumulator e cloture_rect vars_to_replace)
+  | FieldAccess { receiver; target } ->
+      FieldAccess
+        {
+          receiver =
+            replace_continuations_with_accumulator receiver cloture_rect
+              vars_to_replace;
+          target;
+        }
+  | ArrayAccess { receiver; target } ->
+      ArrayAccess
+        {
+          receiver =
+            replace_continuations_with_accumulator receiver cloture_rect
+              vars_to_replace;
+          target =
+            replace_continuations_with_accumulator target cloture_rect
+              vars_to_replace;
+        }
+  | FunctionApplication { receiver = [ (_, Variable "cont") ] } ->
+      Variable "acc"
+  | FunctionApplication { receiver; arguments } ->
+      FunctionApplication
+        {
+          receiver =
+            replace_continuations_with_accumulator receiver cloture_rect
+              vars_to_replace;
+          arguments =
+            List.map
+              (fun arg ->
+                replace_continuations_with_accumulator arg cloture_rect
+                  vars_to_replace)
+              arguments;
+        }
+  | PrefixOperation { receiver; operation } ->
+      PrefixOperation
+        {
+          operation;
+          receiver =
+            replace_continuations_with_accumulator receiver cloture_rect
+              vars_to_replace;
+        }
+  | InfixOperation { lhs; rhs; operation } ->
+      InfixOperation
+        {
+          lhs =
+            replace_continuations_with_accumulator lhs cloture_rect
+              vars_to_replace;
+          rhs =
+            replace_continuations_with_accumulator rhs cloture_rect
+              vars_to_replace;
+          operation;
+        }
+  | Negation e ->
+      Negation
+        (replace_continuations_with_accumulator e cloture_rect vars_to_replace)
+  | Tuple t ->
+      Tuple
+        (List.map
+           (fun l ->
+             replace_continuations_with_accumulator l cloture_rect
+               vars_to_replace)
+           t)
+  | FieldAssignment { receiver; target; value } ->
+      FieldAssignment
+        {
+          receiver =
+            replace_continuations_with_accumulator receiver cloture_rect
+              vars_to_replace;
+          target;
+          value =
+            replace_continuations_with_accumulator value cloture_rect
+              vars_to_replace;
+        }
+  | ArrayAssignment { receiver; target; value } ->
+      ArrayAssignment
+        {
+          receiver =
+            replace_continuations_with_accumulator receiver cloture_rect
+              vars_to_replace;
+          target =
+            replace_continuations_with_accumulator target cloture_rect
+              vars_to_replace;
+          value =
+            replace_continuations_with_accumulator value cloture_rect
+              vars_to_replace;
+        }
+  | ReferenceAssignment { receiver; value } ->
+      ReferenceAssignment
+        {
+          receiver =
+            replace_continuations_with_accumulator receiver cloture_rect
+              vars_to_replace;
+          value =
+            replace_continuations_with_accumulator value cloture_rect
+              vars_to_replace;
+        }
+  | If { condition; body; else_body } ->
+      If
+        {
+          condition =
+            replace_continuations_with_accumulator condition cloture_rect
+              vars_to_replace;
+          body =
+            replace_continuations_with_accumulator body cloture_rect
+              vars_to_replace;
+          else_body =
+            Option.map
+              (fun b ->
+                replace_continuations_with_accumulator b cloture_rect
+                  vars_to_replace)
+              else_body;
+        }
+  | Sequence s ->
+      Sequence
+        (List.map
+           (fun e ->
+             replace_continuations_with_accumulator e cloture_rect
+               vars_to_replace)
+           s)
+  | Match { value; cases } ->
+      Match
+        {
+          value =
+            replace_continuations_with_accumulator value cloture_rect
+              vars_to_replace;
+          cases =
+            List.map
+              (fun (patterns, e) ->
+                ( patterns,
+                  replace_continuations_with_accumulator e cloture_rect
+                    vars_to_replace ))
+              cases;
+        }
+  | Try { value; cases } ->
+      Try
+        {
+          value =
+            replace_continuations_with_accumulator value cloture_rect
+              vars_to_replace;
+          cases =
+            List.map
+              (fun (patterns, e) ->
+                ( patterns,
+                  replace_continuations_with_accumulator e cloture_rect
+                    vars_to_replace ))
+              cases;
+        }
+  | FunctionLiteral { style; cases } ->
+      FunctionLiteral
+        {
+          style;
+          cases =
+            List.map
+              (fun (patterns, e) ->
+                ( patterns,
+                  replace_continuations_with_accumulator e cloture_rect
+                    vars_to_replace ))
+              cases;
+        }
+  | LetBinding { bindings; is_rec; inner } ->
+      LetBinding
+        {
+          bindings =
+            List.map
+              (fun (binding : linear_binding) ->
+                match binding with
+                | Variable { lhs; value } ->
+                    (Variable
+                       {
+                         lhs;
+                         value =
+                           replace_continuations_with_accumulator value
+                             cloture_rect vars_to_replace;
+                       }
+                      : linear_binding)
+                | Function { name; parameters; body } ->
+                    Function
+                      {
+                        name;
+                        parameters;
+                        body =
+                          replace_continuations_with_accumulator body
+                            cloture_rect vars_to_replace;
+                      })
+              bindings;
+          is_rec;
+          inner =
+            replace_continuations_with_accumulator inner cloture_rect
+              vars_to_replace;
+        }
+  | StringAccess { receiver; target } ->
+      StringAccess
+        {
+          receiver =
+            replace_continuations_with_accumulator receiver cloture_rect
+              vars_to_replace;
+          target =
+            replace_continuations_with_accumulator target cloture_rect
+              vars_to_replace;
+        }
+  | StringAssignment { receiver; target; value } ->
+      StringAssignment
+        {
+          receiver =
+            replace_continuations_with_accumulator receiver cloture_rect
+              vars_to_replace;
+          target =
+            replace_continuations_with_accumulator target cloture_rect
+              vars_to_replace;
+          value =
+            replace_continuations_with_accumulator value cloture_rect
+              vars_to_replace;
+        }
+
+and replace_continuations_with_accumulator (l : linear_form)
+    (cloture_rect : variable list) (vars_to_remove : variable list) =
+  let rec replace_last_parameter (l : pattern list) =
+    match l with
+    | [] -> []
+    | [ x ] -> [ Ident "acc" ]
+    | x :: q -> x :: replace_last_parameter q
+  in
+
+  l
+  |> List.filter_map (fun (name, elt) ->
+         if List.mem name vars_to_remove then None
+         else
+           Some
+             (if elt = Variable "cont" then (name, Variable "acc")
+              else if name = "new_cont" then
+                match elt with
+                | FunctionLiteral f ->
+                    ( "new_acc",
+                      (* extract_continuation works since we don't call this function unless it worked for all continuations *)
+                      FunctionLiteral (extract_continuation f |> Option.get) )
+                | _ -> failwith "Not a new continuation"
+              else if name = "cont" then
+                ( "acc",
+                  FunctionApplication
+                    {
+                      receiver = [ ("new_acc_ref", Variable "new_acc") ];
+                      arguments = [ [ ("acc_ref", Variable "acc") ] ];
+                    } )
+              else
+                let new_elt =
+                  replace_element_continuations_with_accumulator elt
+                    cloture_rect vars_to_remove
+                in
+                if List.mem name cloture_rect then
+                  let new_new_elt =
+                    match new_elt with
+                    | Variable v -> new_elt
+                    | FunctionLiteral { style; cases } ->
+                        FunctionLiteral
+                          {
+                            style;
+                            cases =
+                              List.map
+                                (fun (arguments, body) ->
+                                  (replace_last_parameter arguments, body))
+                                cases;
+                          }
+                    | _ -> failwith ("Unable to update definition of " ^ name)
+                  in
+                  (name, new_new_elt)
+                else (name, new_elt)))
