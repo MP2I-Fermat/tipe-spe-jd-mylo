@@ -494,6 +494,66 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
       in
       (receiver_lin @ target_lin @ value_lin @ [ (p k, e_elt) ], k + 4)
 
+let rec element_contains_reference (f : variable) (e : linear_element) : bool =
+  match e with
+  | Variable v -> v == f
+  | Constant _ -> false
+  | Parenthesised { inner } | TypeCoercion { inner } ->
+      contains_reference f inner
+  | ListLiteral l | ArrayLiteral l -> List.exists (contains_reference f) l
+  | RecordLiteral l -> l |> List.map snd |> List.exists (contains_reference f)
+  | WhileLoop _ -> failwith "Found linearized while loop"
+  | ForLoop _ -> failwith "Found linearized for loop"
+  | Dereference inner -> contains_reference f inner
+  | FieldAccess { receiver } -> contains_reference f receiver
+  | ArrayAccess { receiver; target } ->
+      contains_reference f receiver || contains_reference f target
+  | FunctionApplication { receiver; arguments } ->
+      contains_reference f receiver
+      || List.exists (contains_reference f) arguments
+  | PrefixOperation { receiver } -> contains_reference f receiver
+  | InfixOperation { lhs; rhs } ->
+      contains_reference f lhs || contains_reference f rhs
+  | Negation inner -> contains_reference f inner
+  | Tuple l -> List.exists (contains_reference f) l
+  | FieldAssignment { receiver; value } ->
+      contains_reference f receiver || contains_reference f value
+  | ArrayAssignment { receiver; target; value } ->
+      contains_reference f receiver
+      || contains_reference f target
+      || contains_reference f value
+  | ReferenceAssignment { receiver; value } ->
+      contains_reference f receiver || contains_reference f value
+  | If { condition; body; else_body } -> (
+      contains_reference f condition
+      || contains_reference f body
+      || match else_body with None -> false | Some b -> contains_reference f b)
+  | Sequence s -> List.exists (contains_reference f) s
+  | Match { value; cases } ->
+      contains_reference f value
+      || cases |> List.map snd |> List.exists (contains_reference f)
+  | Try _ -> failwith "Found linearized try"
+  | FunctionLiteral { cases } ->
+      List.exists (fun (_, body) -> contains_reference f body) cases
+  | LetBinding { bindings; inner } ->
+      contains_reference f inner
+      || bindings
+         |> List.exists (fun (binding : linear_binding) ->
+                match binding with
+                | Variable { value } -> contains_reference f value
+                | Function { body } -> contains_reference f body)
+  | StringAccess { receiver; target } ->
+      contains_reference f receiver || contains_reference f target
+  | StringAssignment { receiver; target; value } ->
+      contains_reference f receiver
+      || contains_reference f target
+      || contains_reference f value
+
+and contains_reference (f : variable) (l : linear_form) : bool =
+  match l with
+  | [] -> false
+  | (p, e) :: q -> element_contains_reference f e || contains_reference f q
+
 let rec delinearize_element (e : linear_element) (prev_vars : linear_form) :
     expression * variable list =
   match e with
@@ -721,13 +781,21 @@ and delinearize (l : linear_form) (prev_vars : linear_form) :
       if List.mem p inlined_vars then (q_delinearized, inlined_vars)
       else
         let e_inlined, inlined_vars_2 = delinearize_element e prev_vars in
-        ( LetBinding
-            {
-              is_rec = false;
-              bindings = [ Variable { lhs = Ident p; value = e_inlined } ];
-              inner = q_delinearized;
-            },
-          inlined_vars @ inlined_vars_2 )
+        if contains_reference p q then
+          ( LetBinding
+              {
+                is_rec = false;
+                bindings = [ Variable { lhs = Ident p; value = e_inlined } ];
+                inner = q_delinearized;
+              },
+            inlined_vars @ inlined_vars_2 )
+        else
+          ( Parenthesised
+              {
+                inner = Sequence [ e_inlined; q_delinearized ];
+                style = Parenthesis;
+              },
+            inlined_vars @ inlined_vars_2 )
 
 let rec element_contains_application (f : variable) (e : linear_element) : bool
     =
