@@ -1,11 +1,18 @@
 open Caml_light
+open Rectify
 
-(* Renvoie l’AST de la fonction récursive f une fois avoir été transformée en
- * boucle while (la sortie est toujours l’AST d’une fonction) *)
+(* Renvoie l’AST de la fonction récursive terminale f une fois avoir été
+ * transformée en boucle while (la sortie est toujours l’AST d’une fonction).
+ * Les appels récursifs sont supposés être faits sur des noms de variables
+ * uniquement (i.e. la fonction appelée ne doit pas être le résultat d’une
+ * expression) et la liste de variables pouvant conduire à un appel récursif
+ * sont listées dans `recursive_call_names`.
+ *)
 let fonction_vers_while
     (name: variable)
     (parameters: pattern list)
-    (body: expression) : expression =
+    (body: expression)
+    (recursive_call_names: variable list) : expression =
 
   (* Renvoie une liste de définitions de refs correspondant aux arguments *)
   let rec parameter_list_to_ref_list (p: string list) (inner_expr: expression) :
@@ -109,28 +116,31 @@ let fonction_vers_while
           target = replace_args_with_refs p target
         }
     | FunctionApplication { receiver ; arguments } ->
-        if receiver = Variable(name) then
-          let seq = Sequence (
+        begin match receiver with
+        | Variable(rec_call_name)
+            when List.mem rec_call_name recursive_call_names ->
+          let seq = Caml_light.Sequence (
             ReferenceAssignment {
               receiver = Variable("_call_");
               value = Variable("true")
             }::
             List.map
             (fun nom ->
-              ReferenceAssignment {
+              Caml_light.ReferenceAssignment {
                 receiver = Variable(nom^"_ref");
                 value = Variable(nom^"_temp")
               }
             )
             p
           )
-        in
-        parameter_list_to_temp_list p arguments seq
-        else
+          in
+          parameter_list_to_temp_list p arguments seq
+        | _ ->
           FunctionApplication {
             receiver = replace_args_with_refs p receiver ;
             arguments = List.map (replace_args_with_refs p) arguments
           }
+        end
     | PrefixOperation { receiver ; operation } ->
         PrefixOperation {
           receiver = replace_args_with_refs p receiver ;
@@ -248,7 +258,7 @@ let fonction_vers_while
   in
 
   let params = List.filter_map
-    (fun x -> match x with
+    (fun (x: pattern) -> match x with
       | (TypeCoercion {inner = Ident name; _})
       | Ident name -> Some name
       | _ -> None
@@ -263,6 +273,92 @@ let parse_file name =
   close_in input_channel;
   parse_caml_light_ast content
 
+
+let whilify (program: phrase list) =
+  program
+  |> List.map (
+    fun phrase ->
+       match phrase with
+       | ValueDefinition { bindings; is_rec } when is_rec && List.length bindings = 1 -> (
+         let one_binding = List.hd bindings in
+
+         let linearised_binding_option =
+           match one_binding with
+           | Variable _ -> None
+           | Function {name; parameters; body } ->
+               let body_lin, _ = linearize body 0 in
+               Some (
+                 name,
+                 FunctionLiteral {
+                   style = Fun;
+                   cases = [ (parameters, body_lin) ];
+                 }
+               )
+           in
+
+           match linearised_binding_option with
+           | None -> phrase
+           | Some linearised_binding -> begin
+             let new_name (n : string) = n ^ "_whilified" in
+
+             match cloture_rectifiable [linearised_binding] with
+             | None -> print_endline "non";phrase
+             | Some clot ->
+               ValueDefinition
+                 {
+                   is_rec = false;
+                   bindings =
+                    [
+                      match linearised_binding with
+                      | name, (
+                          FunctionLiteral {
+                            style; cases = [(parameters, body_lin)]
+                          }
+                        ) ->
+                        let body_delin =
+                         delinearize
+                           (push_rectified_definitions
+                              (rectify body_lin clot)
+                              clot new_name)
+                        in
+                        let body_while =
+                          fonction_vers_while (new_name name) parameters
+                                              body_delin clot in
+                        let new_fn = (
+                          Function {
+                            name = new_name name;
+                            parameters = parameters;
+                            body = body_while
+                          }
+                          : Caml_light.binding)
+                        in
+                        new_fn
+                       | _ -> failwith "Pas une fonction ?"
+                   ]
+                 }
+            end)
+       | _ -> phrase
+  )
+
+
+let main () =
+  let test_source =
+    if Array.length Sys.argv <= 1 then
+      failwith "Merci de donner un argument : le nom de fichier"
+    else begin
+      let test_source_fp = open_in Sys.argv.(1) in
+      let test_source =
+        really_input_string test_source_fp (in_channel_length test_source_fp)
+      in
+      close_in test_source_fp;
+      test_source
+    end
+  in
+  let program = parse_caml_light_ast test_source in
+  whilify program |> string_of_ast
+
+
+(*let () = print_endline (main ());*)
 
 let test2 =
   let src = parse_file "../test2.ml" in
@@ -303,7 +399,7 @@ let test2 =
            [Function
              {name;
               parameters;
-              body = fonction_vers_while name parameters body}];
+              body = fonction_vers_while name parameters body ["fizzbuzz_a_partir"]}];
           is_rec = false;
           inner =
            FunctionApplication
@@ -312,5 +408,4 @@ let test2 =
      is_rec = false}] |> string_of_ast
   | _ -> failwith "pas le test2"
 
-
-let () = print_endline test2;
+let () = print_endline test2
