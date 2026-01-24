@@ -117,6 +117,7 @@ let fonction_vers_while
         }
     | FunctionApplication { receiver ; arguments } ->
         begin match receiver with
+        | Parenthesised { inner=Variable(rec_call_name) ; style=_ }
         | Variable(rec_call_name)
             when List.mem rec_call_name recursive_call_names ->
           let seq = Caml_light.Sequence (
@@ -269,7 +270,8 @@ let fonction_vers_while
 
 let parse_file name =
   let input_channel = open_in name in
-  let content = really_input_string input_channel (in_channel_length input_channel) in
+  let content = really_input_string input_channel
+      (in_channel_length input_channel) in
   close_in input_channel;
   parse_caml_light_ast content
 
@@ -279,7 +281,8 @@ let whilify (program: phrase list) =
   |> List.map (
     fun phrase ->
        match phrase with
-       | ValueDefinition { bindings; is_rec } when is_rec && List.length bindings = 1 -> (
+       | ValueDefinition { bindings; is_rec }
+           when is_rec && List.length bindings = 1 -> (
          let one_binding = List.hd bindings in
 
          let linearised_binding_option =
@@ -297,48 +300,86 @@ let whilify (program: phrase list) =
            in
 
            match linearised_binding_option with
-           | None -> phrase
+           | None -> [phrase]
            | Some linearised_binding -> begin
              let new_name (n : string) = n ^ "_rectified" in
 
              match cloture_rectifiable [linearised_binding] with
-             | None -> print_endline "non";phrase
+             | None ->
+                 print_endline
+                  ("(* Avertissement : cloture_rectifiable a renvoyé None " ^
+                   "pour la fonction" ^ (fst linearised_binding) ^ ")");
+                 [phrase]
              | Some clot ->
-               ValueDefinition
-                 {
+               let name, new_fn, parameters = match linearised_binding with
+               | name, (
+                 FunctionLiteral {
+                   style; cases = [(parameters, body_lin)]
+                 }) ->
+                  let body_delin, _ =
+                   delinearize
+                     (push_rectified_definitions
+                        (rectify body_lin clot)
+                        clot new_name) [] in
+                  let body_while =
+                    fonction_vers_while
+                      (new_name name) (parameters @ [Ident "cont"]) body_delin
+                      (List.map new_name clot) in
+                  name, (Function {
+                      name = name^"_whilified";
+                      parameters = parameters @ [Ident "cont"];
+                      body = body_while
+                   } : Caml_light.binding), parameters
+               | _ -> failwith "Pas une fonction ?"
+
+               in
+               [
+                 ValueDefinition {
                    is_rec = false;
-                   bindings =
-                    [
-                      match linearised_binding with
-                      | name, (
-                          FunctionLiteral {
-                            style; cases = [(parameters, body_lin)]
-                          }
-                        ) ->
-                        let body_delin, _ =
-                         delinearize
-                           (push_rectified_definitions
-                              (rectify body_lin clot)
-                           clot new_name) []
-                        in
-                        let body_while =
-                          fonction_vers_while (new_name name) parameters
-                                              body_delin (List.map new_name clot) in
-                        let new_fn = (
-                          Function {
-                            name = name^"_wilified";
-                            parameters = parameters;
-                            body = body_while
-                          }
-                          : Caml_light.binding)
-                        in
-                        new_fn
-                       | _ -> failwith "Pas une fonction ?"
+                   bindings = [new_fn]
+                 } ; ValueDefinition {
+                   is_rec = false;
+                   bindings = [
+                     Function {
+                       name = name;
+                       parameters =
+                         List.mapi
+                         Caml_light.(fun i x ->
+                            match x with
+                            | Ident(v) -> Ident(v)
+                            | TypeCoercion { inner=Ident(v); typ } ->
+                                TypeCoercion { inner=Ident(v); typ }
+                            | _ -> Ident("arg"^(string_of_int i))
+                         )
+                         parameters;
+                       body = FunctionApplication {
+                         receiver = Variable(name^"_whilified");
+                         arguments =
+                           List.mapi
+                           Caml_light.(fun i x ->
+                             match x with
+                             | Ident(v) -> Variable(v)
+                             | TypeCoercion { inner=Ident(v); typ } ->
+                                 Variable(v)
+                             | _ -> Variable("arg"^(string_of_int i))
+                           )
+                           parameters @ [
+                             Parenthesised {
+                               style = Parenthesis;
+                               inner = FunctionLiteral {
+                                 style = Fun;
+                                 cases = [[Ident "x"], Variable "x"]
+                               }
+                            }
+                          ]
+                       }
+                     }
                    ]
                  }
+              ]
             end)
-       | _ -> phrase
-  )
+       | _ -> [phrase]
+  ) |> List.concat
 
 
 let main () =
@@ -360,6 +401,7 @@ let main () =
 
 let () = print_endline (main ())
 
+(*
 let test2 =
   let src = parse_file "../test2.ml" in
   match src with
@@ -409,3 +451,4 @@ let test2 =
   | _ -> failwith "pas le test2"
 
 (*let () = print_endline test2*)
+  *)
