@@ -299,7 +299,7 @@ let whilify (program: phrase list) =
            match linearised_binding_option with
            | None -> phrase
            | Some linearised_binding -> begin
-             let new_name (n : string) = n ^ "_whilified" in
+             let new_name (n : string) = n ^ "_rectified" in
 
              match cloture_rectifiable [linearised_binding] with
              | None -> print_endline "non";phrase
@@ -315,18 +315,18 @@ let whilify (program: phrase list) =
                             style; cases = [(parameters, body_lin)]
                           }
                         ) ->
-                        let body_delin =
+                        let body_delin, _ =
                          delinearize
                            (push_rectified_definitions
                               (rectify body_lin clot)
-                              clot new_name)
+                           clot new_name) []
                         in
                         let body_while =
                           fonction_vers_while (new_name name) parameters
-                                              body_delin clot in
+                                              body_delin (List.map new_name clot) in
                         let new_fn = (
                           Function {
-                            name = new_name name;
+                            name = name^"_wilified";
                             parameters = parameters;
                             body = body_while
                           }
@@ -358,7 +358,7 @@ let main () =
   whilify program |> string_of_ast
 
 
-(*let () = print_endline (main ());*)
+let () = print_endline (main ())
 
 let test2 =
   let src = parse_file "../test2.ml" in
@@ -408,4 +408,4 @@ let test2 =
      is_rec = false}] |> string_of_ast
   | _ -> failwith "pas le test2"
 
-let () = print_endline test2
+(*let () = print_endline test2*)
