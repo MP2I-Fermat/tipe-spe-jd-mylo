@@ -336,109 +336,106 @@ let parse_file name =
 
 
 let whilify (program: phrase list) =
-  program
-  |> List.map (
-    fun phrase ->
-       match phrase with
-       | ValueDefinition { bindings; is_rec }
-           when is_rec && List.length bindings = 1 -> (
-         let one_binding = List.hd bindings in
+  let interceptor (name: string) (parameters: pattern list) : binding =
+    Function {
+      name = name;
+      parameters =
+        List.mapi
+        Caml_light.(fun i x ->
+           match x with
+           | Ident(v) -> Ident(v)
+           | TypeCoercion { inner=Ident(v); typ } ->
+               TypeCoercion { inner=Ident(v); typ }
+           | _ -> Ident("arg"^(string_of_int i))
+        )
+        parameters;
+      body = FunctionApplication {
+        receiver = Variable(name^"_whilified");
+        arguments = List.mapi
+          Caml_light.(fun i x ->
+            match x with
+            | Ident(v) -> Variable(v)
+            | TypeCoercion { inner=Ident(v); typ } -> Variable(v)
+            | _ -> Variable("arg"^(string_of_int i))
+          ) parameters @ [
+            Parenthesised {
+              style = Parenthesis;
+              inner = FunctionLiteral {
+                style = Fun;
+                cases = [[Ident "x"], Variable "x"]
+              }
+            }
+          ]
+      }
+    }
+  in
+  let whilify_phrase (phrase: phrase) : phrase list =
+    match phrase with
+    | ValueDefinition { bindings; is_rec }
+        when is_rec && List.length bindings = 1 -> (
+      let one_binding = List.hd bindings in
 
-         let linearised_binding_option =
-           match one_binding with
-           | Variable _ -> None
-           | Function {name; parameters; body} ->
-               let body_lin, _ = linearize body 0 in
-               Some (
-                 name,
-                 FunctionLiteral {
-                   style = Fun;
-                   cases = [(parameters, body_lin)];
-                 }
-               )
-           in
+      let linearised_binding_option =
+        match one_binding with
+        | Variable _ -> None
+        | Function {name; parameters; body} ->
+            let body_lin, _ = linearize body 0 in
+            Some (
+              name,
+              FunctionLiteral {
+                style = Fun;
+                cases = [(parameters, body_lin)];
+              }
+            )
+        in
 
-           match linearised_binding_option with
-           | None -> [phrase]
-           | Some linearised_binding -> begin
-             let new_name (n : string) = n ^ "_rectified" in
+        match linearised_binding_option with
+        | None -> [phrase]
+        | Some linearised_binding -> begin
+          let new_name (n : string) = n ^ "_rectified" in
 
-             match cloture_rectifiable [linearised_binding] with
-             | None ->
-                 print_endline
-                  ("(* Avertissement : cloture_rectifiable a renvoyé None " ^
-                   "pour la fonction" ^ (fst linearised_binding) ^ " *)");
-                 [phrase]
-             | Some clot ->
-               let name, new_fn, parameters = match linearised_binding with
-               | name, (
-                 FunctionLiteral {
-                   style; cases = [(parameters, body_lin)]
-                 }) ->
-                  let body_delin, _ =
-                   delinearize
-                     (push_rectified_definitions
-                        (rectify body_lin clot)
-                        clot new_name) [] in
-                  let body_while =
-                    fonction_vers_while
-                      (new_name name) (parameters @ [Ident "cont"]) body_delin
-                      (List.map new_name clot) in
-                  name, (Function {
-                      name = name^"_whilified";
-                      parameters = parameters @ [Ident "cont"];
-                      body = body_while
-                   } : Caml_light.binding), parameters
-               | _ -> failwith "Pas une fonction ?"
+          match cloture_rectifiable [linearised_binding] with
+          | None ->
+              print_endline
+               ("(* Avertissement : cloture_rectifiable a renvoyé None " ^
+                "pour la fonction" ^ (fst linearised_binding) ^ " *)");
+              [phrase]
+          | Some clot ->
+            let name, new_fn, parameters = match linearised_binding with
+            | name, (
+              FunctionLiteral {
+                style; cases = [(parameters, body_lin)]
+              }) ->
+               let body_delin, _ =
+                delinearize
+                  (push_rectified_definitions
+                     (rectify body_lin clot)
+                     clot new_name) [] in
+               let body_while =
+                 fonction_vers_while
+                   (new_name name) (parameters @ [Ident "cont"]) body_delin
+                   (List.map new_name clot) in
+               name, (Function {
+                   name = name^"_whilified";
+                   parameters = parameters @ [Ident "cont"];
+                   body = body_while
+                } : Caml_light.binding), parameters
+            | _ -> failwith "Pas une fonction ?"
 
-               in
-               [
-                 ValueDefinition {
-                   is_rec = false;
-                   bindings = [new_fn]
-                 } ; ValueDefinition {
-                   is_rec = false;
-                   bindings = [
-                     Function {
-                       name = name;
-                       parameters =
-                         List.mapi
-                         Caml_light.(fun i x ->
-                            match x with
-                            | Ident(v) -> Ident(v)
-                            | TypeCoercion { inner=Ident(v); typ } ->
-                                TypeCoercion { inner=Ident(v); typ }
-                            | _ -> Ident("arg"^(string_of_int i))
-                         )
-                         parameters;
-                       body = FunctionApplication {
-                         receiver = Variable(name^"_whilified");
-                         arguments =
-                           List.mapi
-                           Caml_light.(fun i x ->
-                             match x with
-                             | Ident(v) -> Variable(v)
-                             | TypeCoercion { inner=Ident(v); typ } ->
-                                 Variable(v)
-                             | _ -> Variable("arg"^(string_of_int i))
-                           )
-                           parameters @ [
-                             Parenthesised {
-                               style = Parenthesis;
-                               inner = FunctionLiteral {
-                                 style = Fun;
-                                 cases = [[Ident "x"], Variable "x"]
-                               }
-                            }
-                          ]
-                       }
-                     }
-                   ]
-                 }
-              ]
-            end)
-       | _ -> [phrase]
-  ) |> List.concat
+            in
+            [
+              ValueDefinition {
+                is_rec = false;
+                bindings = [new_fn]
+              } ; ValueDefinition {
+                is_rec = false;
+                bindings = [interceptor name parameters]
+              }
+           ]
+         end)
+    | _ -> [phrase]
+  in
+  program |> List.map whilify_phrase |> List.concat
 
 
 let main () =
