@@ -347,13 +347,13 @@ let whilify (program: phrase list) =
          let linearised_binding_option =
            match one_binding with
            | Variable _ -> None
-           | Function {name; parameters; body } ->
+           | Function {name; parameters; body} ->
                let body_lin, _ = linearize body 0 in
                Some (
                  name,
                  FunctionLiteral {
                    style = Fun;
-                   cases = [ (parameters, body_lin) ];
+                   cases = [(parameters, body_lin)];
                  }
                )
            in
@@ -367,7 +367,7 @@ let whilify (program: phrase list) =
              | None ->
                  print_endline
                   ("(* Avertissement : cloture_rectifiable a renvoyé None " ^
-                   "pour la fonction" ^ (fst linearised_binding) ^ ")");
+                   "pour la fonction" ^ (fst linearised_binding) ^ " *)");
                  [phrase]
              | Some clot ->
                let name, new_fn, parameters = match linearised_binding with
