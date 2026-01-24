@@ -22,27 +22,15 @@ let fonction_vers_while
         (LetBinding ({
           bindings = [
             Variable {
-              lhs = Ident "_call_";
+              lhs = Ident "res_ref";
               value = FunctionApplication {
                 receiver = Variable "ref";
-                arguments = [Variable "true"]
+                arguments = [Variable "None"]
               }
             }
           ];
           is_rec = false;
-          inner = (LetBinding ({
-            bindings= [
-              Variable {
-                lhs = Ident "res_ref";
-                value = FunctionApplication {
-                  receiver = Variable "ref";
-                  arguments = [Variable "None"]
-                }
-              }
-            ];
-            is_rec = false;
-            inner = inner_expr
-          }))
+          inner = inner_expr
         }))
     | x::q ->
         parameter_list_to_ref_list q
@@ -174,10 +162,6 @@ let fonction_vers_while
         | Variable(rec_call_name)
             when List.mem rec_call_name recursive_call_names ->
           let seq = Caml_light.Sequence (
-            ReferenceAssignment {
-              receiver = Variable("_call_");
-              value = Variable("true")
-            }::
             List.map
             (fun nom ->
               Caml_light.ReferenceAssignment {
@@ -314,14 +298,12 @@ let fonction_vers_while
   let wrap_in_while (body: expression) : expression =
     Sequence [
       WhileLoop {
-        condition = Dereference(Variable "_call_");
-        body = Sequence [
-          ReferenceAssignment {
-            receiver = Variable "_call_" ;
-            value = Variable "false"
-          };
-          body
-        ]
+        condition = InfixOperation {
+          lhs = Dereference(Variable "res_ref");
+          rhs = Variable "None";
+          operation = Eq
+        };
+        body;
       };
       FunctionApplication {
         receiver = FieldAccess { receiver = Variable "Option"; target = "get"};
