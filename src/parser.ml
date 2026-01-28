@@ -348,7 +348,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
   while LR1StateMap.length a_traiter <> 0 do
     let etat = LR1StateMap.remove_one a_traiter in
     Hashset.add etats etat;
-    (* Les transitions sortants de cet état. *)
+    (* Les transitions sortantes de cet état. *)
     let transitions_etat = Hashtbl.create 2 in
     LR1StateMap.add transitions (AnyLR1State.Any etat) transitions_etat;
     let tnt = liste_terminaux_et_non_terminaux_a_iterer etat in
