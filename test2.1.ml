@@ -35,3 +35,42 @@ let rec map (f: 'a -> 'b) (l: 'a list) =
   match l with
   | [] -> []
   | x::q -> (f x)::(map f q)
+
+
+let rec sum (l : int list) =
+  match l with
+  | [] -> 0
+  | x :: q -> x + sum q
+
+
+type 'a abr =
+    Feuille of 'a
+  | Noeud of 'a * 'a abr * 'a abr
+
+
+let rec recherche_abr (abr: 'a abr) (valeur: 'a) =
+  match abr with
+  | Feuille a -> a = valeur
+  | Noeud(t, g, d) ->
+      begin
+      if valeur <= t then
+        recherche_abr g valeur
+      else
+        recherche_abr d valeur
+      end
+
+let rec insert_abr (abr: 'a abr) (valeur: 'a) =
+  match abr with
+  | Feuille a ->
+      begin
+      if valeur < a then Noeud(valeur, Feuille(valeur), Feuille(a))
+      else if valeur > a then Noeud(a, Feuille(a), Feuille(valeur))
+      else Feuille a
+      end
+  | Noeud(t, g, d) ->
+      begin
+      if valeur <= t then
+        Noeud(t, insert_abr g valeur, d)
+      else
+        Noeud(t, g, insert_abr d valeur)
+      end

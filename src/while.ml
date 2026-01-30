@@ -49,37 +49,33 @@ let fonction_vers_while
         })
   in
 
-  (* Renvoie soit res_ref := Some(inner) soit (inner) en fonction de
-   * `can_return` *)
-  let modify_res (inner: expression) (can_return: bool): expression =
-    if can_return then
-      ReferenceAssignment {
-        receiver = Variable "res_ref";
-        value =
-          Parenthesised {
-            style = Parenthesis;
-            inner = FunctionApplication {
-              receiver = Variable "Some";
-              arguments = [Parenthesised{style=Parenthesis; inner}]
-            }
+  (* res_ref := Some(inner) *)
+  let modify_res (inner: expression) : expression =
+    ReferenceAssignment {
+      receiver = Variable "res_ref";
+      value =
+        Parenthesised {
+          style = Parenthesis;
+          inner = FunctionApplication {
+            receiver = Variable "Some";
+            arguments = [Parenthesised{style=Parenthesis; inner}]
           }
-      }
-    else
-      inner
+        }
+    }
   in
 
   (* Renvoie une liste de définitions de variables temporaires correspondant aux
    * anciennes valeurs des arguments *)
-  let rec parameter_list_to_old_list (p: string list) (inner_expr: expression) :
+  let rec parameter_list_to_let_list (p: string list) (inner_expr: expression) :
       expression =
     match p with
     | [] -> inner_expr
     | x::q ->
-        parameter_list_to_old_list q
+        parameter_list_to_let_list q
         (LetBinding {
           bindings = [
             Variable {
-              lhs = Ident (x^"_old");
+              lhs = Ident x;
               value = Dereference(Variable(x^"_ref"))
             }
           ];
@@ -88,75 +84,39 @@ let fonction_vers_while
         })
   in
 
-  (* Remplace les références aux arguments par les variables `old`
-   * correspondantes.
-   * can_return indique si on doit modifier `res_ref` quand on trouve la valeur
-   * de l’expression *)
-  let rec replace_args_with_old (p: string list) (can_return: bool)
-      (inner_expr: expression) : expression =
+  (* modifie `res_ref` quand on trouve la valeur de l’expression *)
+  let rec replace_result (p: string list) (inner_expr: expression) :
+      expression =
     match inner_expr with
     | Variable(s) ->
-        modify_res
-          (if List.mem s p then
-            Variable(s^"_old")
-          else
-            Variable(s))
-          can_return
-    | Constant(c) -> modify_res (Constant(c)) can_return
+        modify_res (Variable(s))
+    | Constant(c) -> modify_res (Constant(c))
     | Parenthesised { inner ; style } ->
         Parenthesised {
-          inner = replace_args_with_old p can_return inner ;
+          inner = replace_result p inner ;
           style = style
         }
     | TypeCoercion {inner ; typ } ->
         TypeCoercion {
-          inner = replace_args_with_old p can_return inner ;
+          inner = replace_result p inner ;
           typ = typ
         }
     | ListLiteral(l) ->
-        modify_res
-        (ListLiteral (List.map (replace_args_with_old p false) l))
-        can_return
+        modify_res (ListLiteral l)
     | ArrayLiteral(l) ->
-        modify_res
-        (ArrayLiteral (List.map (replace_args_with_old p false) l))
-        can_return
+        modify_res (ArrayLiteral l)
     | RecordLiteral(l) ->
-        modify_res
-        (RecordLiteral
-          (List.map (
-            fun (lbl, expr) -> (lbl, replace_args_with_old p false expr)
-          ) l))
-        can_return
-    | WhileLoop { condition ; body } ->
-        modify_res
-        (WhileLoop {
-          condition = replace_args_with_old p false condition ;
-          body = replace_args_with_old p false body
-        })
-        can_return
-    | ForLoop { direction; variable; start; finish; body } ->
-        modify_res
-        (ForLoop {
-          direction = direction;
-          variable = variable;
-          start = replace_args_with_old p false start;
-          finish = replace_args_with_old p false finish;
-          body = replace_args_with_old p false body
-        })
-        can_return
+        modify_res (RecordLiteral l)
+    | WhileLoop w ->
+        modify_res (WhileLoop w)
+    | ForLoop f ->
+        modify_res (ForLoop f)
     | Dereference(e) ->
-        modify_res (Dereference(replace_args_with_old p false e)) can_return
-    | FieldAccess { receiver ; target } ->
-        modify_res (FieldAccess {
-          receiver = replace_args_with_old p false receiver ;
-          target
-        }) can_return
-    | ArrayAccess { receiver ; target } ->
-        modify_res (ArrayAccess {
-          receiver = replace_args_with_old p false receiver ;
-          target = replace_args_with_old p false target
-        }) can_return
+        modify_res (Dereference(e))
+    | FieldAccess f ->
+        modify_res (FieldAccess f)
+    | ArrayAccess a ->
+        modify_res (ArrayAccess a)
     | FunctionApplication { receiver ; arguments } ->
         begin match receiver with
         | Parenthesised { inner=Variable(rec_call_name) ; style=_ }
@@ -167,7 +127,7 @@ let fonction_vers_while
             (fun (nom, valeur) ->
               Caml_light.ReferenceAssignment {
                 receiver = Variable(nom^"_ref");
-                value = replace_args_with_old p false valeur
+                value = valeur
               }
             )
             (List.combine p arguments)
@@ -178,86 +138,51 @@ let fonction_vers_while
             inner = seq
           }
         | _ ->
-          modify_res (FunctionApplication {
-            receiver = replace_args_with_old p false receiver ;
-            arguments = List.map (replace_args_with_old p false) arguments
-          }) can_return
+          modify_res (FunctionApplication { receiver ; arguments })
         end
-    | PrefixOperation { receiver ; operation } ->
-        modify_res (PrefixOperation {
-          receiver = replace_args_with_old p false receiver ;
-          operation
-        }) can_return
-    | InfixOperation { lhs ; rhs ; operation } ->
-        modify_res (InfixOperation {
-          lhs = replace_args_with_old p false lhs ;
-          rhs = replace_args_with_old p false rhs ;
-          operation
-        }) can_return
+    | PrefixOperation op ->
+        modify_res (PrefixOperation op)
+    | InfixOperation op ->
+        modify_res (InfixOperation op)
     | Negation(e) ->
-        modify_res (Negation(replace_args_with_old p false e)) can_return
+        modify_res (Negation e)
     | Tuple(l) ->
-        modify_res (Tuple (List.map (replace_args_with_old p false) l))
-          can_return
-    | FieldAssignment { receiver ; target ; value } ->
-        modify_res
-        (FieldAssignment {
-          receiver = replace_args_with_old p false receiver ;
-          target;
-          value = replace_args_with_old p false value
-        })
-        can_return
-    | ArrayAssignment { receiver ; target ; value } ->
-        modify_res (ArrayAssignment {
-          receiver = replace_args_with_old p false receiver ;
-          target = replace_args_with_old p false target ;
-          value = replace_args_with_old p false value
-        })
-        can_return
-    | ReferenceAssignment { receiver ; value } ->
-        modify_res (ReferenceAssignment {
-          receiver = replace_args_with_old p false receiver ;
-          value = replace_args_with_old p false value
-        }) can_return
+        modify_res (Tuple l)
+    | FieldAssignment f ->
+        modify_res (FieldAssignment f)
+    | ArrayAssignment a ->
+        modify_res (ArrayAssignment a)
+    | ReferenceAssignment r ->
+        modify_res (ReferenceAssignment r)
     | If { condition ; body ; else_body } ->
         If {
-          condition = replace_args_with_old p false condition ;
-          body = replace_args_with_old p can_return body ;
+          condition = condition ;
+          body = replace_result p body ;
           else_body =
-            match else_body with
-            | None -> None
-            | Some(e) -> Some(replace_args_with_old p can_return e)
+            Option.map (replace_result p) else_body
         }
     | Sequence(l) ->
         let n = List.length l in
-        Sequence (List.mapi (
-          fun i x -> replace_args_with_old p (can_return && i = (n-1)) x
-        ) l)
+        Sequence (
+          List.mapi (fun i x -> if i = (n-1) then replace_result p x else x) l
+        )
     | Match { value ; cases } ->
         Match {
-          value = replace_args_with_old p false value ;
+          value ;
           cases = List.map
-            (fun (pattern, expr) ->
-              (pattern, replace_args_with_old p can_return expr))
+            (fun (pattern, expr) -> (pattern, replace_result p expr))
             cases
         }
     | Try { value ; cases } ->
         Try {
-          value = replace_args_with_old p false value ;
+          value ;
           cases = List.map
-            (fun (pattern, expr) ->
-              (pattern, replace_args_with_old p can_return expr))
+            (fun (pattern, expr) -> (pattern, replace_result p  expr))
             cases
         }
-    | FunctionLiteral { style ; cases } ->
+    | FunctionLiteral f ->
         (* TODO à repenser certainement *)
-        modify_res (FunctionLiteral {
-          style;
-          cases = List.map
-            (fun (pattern, expr) ->
-              (pattern, replace_args_with_old p false expr))
-            cases
-        }) can_return
+        modify_res (FunctionLiteral f)
     | LetBinding {
         bindings : binding node list;
         is_rec : bool;
@@ -270,30 +195,23 @@ let fonction_vers_while
               | Variable { lhs ; value } ->
                   (Variable {
                     lhs ;
-                    value = replace_args_with_old p false value
+                    value ;
                   }: binding)
               | Function { name ; parameters ; body } ->
                   (* TODO à repenser aussi *)
                   Function {
                     name ;
                     parameters ;
-                    body = replace_args_with_old p false body
+                    body ;
                   }
             ) bindings ;
           is_rec ;
-          inner = replace_args_with_old p can_return inner
+          inner = replace_result p inner
         }
-    | StringAccess { receiver ; target } ->
-        modify_res (StringAccess {
-          receiver = replace_args_with_old p false receiver;
-          target = replace_args_with_old p false target
-        }) can_return
-    | StringAssignment { receiver ; target ; value } ->
-        modify_res (StringAssignment {
-          receiver = replace_args_with_old p false receiver;
-          target = replace_args_with_old p false target;
-          value = replace_args_with_old p false value;
-        }) can_return
+    | StringAccess s ->
+        modify_res (StringAccess s)
+    | StringAssignment s ->
+        modify_res (StringAssignment s)
   in
 
   let wrap_in_while (body: expression) : expression =
@@ -324,8 +242,8 @@ let fonction_vers_while
       | Ident name -> Some name
       | _ -> None
     ) parameters in
-  replace_args_with_old params true body
-  |> parameter_list_to_old_list params
+  replace_result params body
+  |> parameter_list_to_let_list params
   |> wrap_in_while
   |> parameter_list_to_ref_list params
 
