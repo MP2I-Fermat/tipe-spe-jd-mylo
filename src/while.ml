@@ -88,9 +88,6 @@ let fonction_vers_while
   let rec replace_result (p: string list) (inner_expr: expression) :
       expression =
     match inner_expr with
-    | Variable(s) ->
-        modify_res (Variable(s))
-    | Constant(c) -> modify_res (Constant(c))
     | Parenthesised { inner ; style } ->
         Parenthesised {
           inner = replace_result p inner ;
@@ -101,22 +98,6 @@ let fonction_vers_while
           inner = replace_result p inner ;
           typ = typ
         }
-    | ListLiteral(l) ->
-        modify_res (ListLiteral l)
-    | ArrayLiteral(l) ->
-        modify_res (ArrayLiteral l)
-    | RecordLiteral(l) ->
-        modify_res (RecordLiteral l)
-    | WhileLoop w ->
-        modify_res (WhileLoop w)
-    | ForLoop f ->
-        modify_res (ForLoop f)
-    | Dereference(e) ->
-        modify_res (Dereference(e))
-    | FieldAccess f ->
-        modify_res (FieldAccess f)
-    | ArrayAccess a ->
-        modify_res (ArrayAccess a)
     | FunctionApplication { receiver ; arguments } ->
         begin match receiver with
         | Parenthesised { inner=Variable(rec_call_name) ; style=_ }
@@ -140,20 +121,6 @@ let fonction_vers_while
         | _ ->
           modify_res (FunctionApplication { receiver ; arguments })
         end
-    | PrefixOperation op ->
-        modify_res (PrefixOperation op)
-    | InfixOperation op ->
-        modify_res (InfixOperation op)
-    | Negation(e) ->
-        modify_res (Negation e)
-    | Tuple(l) ->
-        modify_res (Tuple l)
-    | FieldAssignment f ->
-        modify_res (FieldAssignment f)
-    | ArrayAssignment a ->
-        modify_res (ArrayAssignment a)
-    | ReferenceAssignment r ->
-        modify_res (ReferenceAssignment r)
     | If { condition ; body ; else_body } ->
         If {
           condition = condition ;
@@ -208,10 +175,7 @@ let fonction_vers_while
           is_rec ;
           inner = replace_result p inner
         }
-    | StringAccess s ->
-        modify_res (StringAccess s)
-    | StringAssignment s ->
-        modify_res (StringAssignment s)
+    | v -> modify_res v
   in
 
   let wrap_in_while (body: expression) : expression =
