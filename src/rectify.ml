@@ -503,7 +503,7 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
 
 let rec element_contains_reference (f : variable) (e : linear_element) : bool =
   match e with
-  | Variable v -> v == f
+  | Variable v -> v = f
   | Constant _ -> false
   | Parenthesised { inner } | TypeCoercion { inner } ->
       contains_reference f inner
@@ -1198,6 +1198,21 @@ and rename_elements (l : linear_form) (cloture_rect : variable list)
          if List.mem name cloture_rect then (new_name name, new_elt)
          else (name, new_elt))
 
+let rec get_name (p : pattern) : variable option =
+  match p with
+  | Ident n -> Some n
+  | Underscore -> None
+  | Parenthesised inner -> get_name inner
+  | TypeCoercion { inner } -> get_name inner
+  | Constant _ -> None
+  | Record _ -> None
+  | List _ -> None
+  | Construction _ -> None
+  | Concatenation _ -> None
+  | Tuple _ -> None
+  | Or _ -> None
+  | As { name } -> Some name
+
 let rec find_definitions_in_element (fns : (variable * linear_element) list)
     (name : variable) (e : linear_element) : linear_element list =
   match e with
@@ -1251,8 +1266,22 @@ let rec find_definitions_in_element (fns : (variable * linear_element) list)
       @ (bindings
         |> List.map (fun (binding : linear_binding) ->
                match binding with
-               | Variable { value } -> find_definitions fns name value
-               | Function { name; body } -> find_definitions fns name body)
+               | Variable { lhs; value } ->
+                   (if get_name lhs = Some name then
+                      [ Variable (last_var value) ]
+                    else [])
+                   @ find_definitions fns name value
+               | Function { name = name'; parameters; body } ->
+                   (* It's OK to create a synthetic element here so long as we
+                      don't expect to find it in a later AST search. As it
+                      currently stands, that is indeed the case. *)
+                   (if name' = name then
+                      [
+                        FunctionLiteral
+                          { style = Fun; cases = [ (parameters, body) ] };
+                      ]
+                    else [])
+                   @ find_definitions fns name body)
         |> List.concat)
 
 and find_definitions (fns : (variable * linear_element) list) (name : variable)
@@ -1305,22 +1334,6 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
         | Variable v -> get_argument_count v
         | _ -> None)
     | None -> None
-  in
-
-  let rec get_name (p : pattern) : variable option =
-    match p with
-    | Ident n -> Some n
-    | Underscore -> None
-    | Parenthesised inner -> get_name inner
-    | TypeCoercion { inner } -> get_name inner
-    | Constant _ -> None
-    | Record _ -> None
-    | List _ -> None
-    | Construction _ -> None
-    | Concatenation _ -> None
-    | Tuple _ -> None
-    | Or _ -> None
-    | As { name } -> Some name
   in
 
   let rec get_nth_argument_names (fn : variable) (n : int) :
