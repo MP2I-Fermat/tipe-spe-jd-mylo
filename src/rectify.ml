@@ -1461,11 +1461,7 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
       a_traiter := List.tl !a_traiter;
 
       let current_argument_count =
-        match get_argument_count current with
-        | Some n -> n
-        | None ->
-            print_endline "No current arg count";
-            raise Exit
+        match get_argument_count current with Some n -> n | None -> raise Exit
       in
 
       let rec propagate_from_element (e_name : variable) (e : linear_element)
@@ -1540,9 +1536,7 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
                    | Function { name; body } -> propagate_from body name false)
       and propagate_from (l : linear_form) (enclosing_function : variable)
           (can_leak : bool) : unit =
-        if last_var l = current && not can_leak then (
-          print_endline ("Leak (" ^ enclosing_function ^ ")");
-          raise Exit);
+        if last_var l = current && not can_leak then raise Exit;
         l
         |> List.iter (fun (name, element) ->
                match element with
@@ -1552,9 +1546,7 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
                    if receiver = current then
                      if List.length arguments = current_argument_count then
                        add_fn enclosing_function
-                     else (
-                       print_endline "Not a full application";
-                       raise Exit)
+                     else raise Exit
                    else
                      arguments
                      |> List.iteri (fun i argument ->
@@ -1564,9 +1556,7 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
                               in
                               match ith_names with
                               | Some names -> List.iter add_fn names
-                              | None ->
-                                  print_endline "No arg names";
-                                  raise Exit)
+                              | None -> raise Exit)
                | _ -> ());
 
         l
@@ -1801,8 +1791,112 @@ let extract_continuation_composition (cont : linear_function_literal) :
     Some res
   with NotSimple -> None
 
-(** Returns true iff all the functions of continuations commute. *)
-let commutes (continuations : linear_function_literal list) : bool = true
+(** Returns true only if all the functions of continuations commute.
+
+    For now the check is that:
+    - The value returned is an operator involving the argument that commutes,
+      for example: arg + constant, not arg, -arg
+    - The argument is not used in any other expressions in the continuation
+    - None of the other expressions in the continuation have side effects. For
+      this we just disallow function calls altogether. *)
+let commutes (continuations : linear_function_literal list) : bool =
+  let check_continuation (continuation : linear_function_literal) : bool =
+    let arguments, body = List.hd continuation.cases in
+    let argument = Option.get (get_name (List.hd arguments)) in
+
+    let rec ensure_is_argument (v : variable) : variable list option =
+      if v = argument then Some [ v ]
+      else
+        match find_definition body v with
+        | Some (Variable v2) ->
+            ensure_is_argument v2 |> Option.map (fun vx -> v :: vx)
+        | _ -> None
+    in
+
+    let rec check_return_from (returned_var : variable) : variable list option =
+      let vx =
+        match find_definition body returned_var with
+        | None -> None
+        | Some (Variable v) -> check_return_from v
+        | Some (Negation l) -> ensure_is_argument (last_var l)
+        | Some (PrefixOperation { receiver; operation = Minus | MinusDot }) ->
+            ensure_is_argument (last_var receiver)
+        | Some
+            (InfixOperation
+               { lhs; operation = Plus | PlusDot | Star | StarDot; rhs }) -> (
+            match
+              ( ensure_is_argument (last_var lhs),
+                ensure_is_argument (last_var rhs) )
+            with
+            | Some v, None | None, Some v -> Some v
+            | _ -> None)
+        | _ -> None
+      in
+      match vx with Some vars -> Some (returned_var :: vars) | None -> None
+    in
+
+    match check_return_from (last_var body) with
+    | None -> false
+    | Some vars_referencing_argument ->
+        let rec check_remaining_element (e : linear_element) =
+          match e with
+          | Variable _ | Constant _ -> true
+          | Parenthesised { inner } | TypeCoercion { inner } ->
+              check_remaining inner
+          | ListLiteral l | ArrayLiteral l -> List.for_all check_remaining l
+          | RecordLiteral r ->
+              List.for_all (fun (_, value) -> check_remaining value) r
+          | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
+          | Dereference inner -> check_remaining inner
+          | FieldAccess { receiver } -> check_remaining receiver
+          | ArrayAccess { receiver; target } ->
+              check_remaining receiver && check_remaining target
+          (* No function applications are allowed *)
+          | FunctionApplication _ -> false
+          | PrefixOperation { receiver } -> check_remaining receiver
+          | InfixOperation { lhs; rhs } ->
+              check_remaining lhs && check_remaining rhs
+          | Negation inner -> check_remaining inner
+          | Tuple t -> List.for_all check_remaining t
+          (* Side effects *)
+          | FieldAssignment _ | ArrayAssignment _ | ReferenceAssignment _ ->
+              false
+          | If { condition; body; else_body } -> (
+              check_remaining condition && check_remaining body
+              &&
+              match else_body with None -> true | Some b -> check_remaining b)
+          | Sequence s -> List.for_all check_remaining s
+          | Match { value; cases } ->
+              check_remaining value
+              && List.for_all (fun (_, body) -> check_remaining body) cases
+          | Try _ -> failwith "Found linearized try"
+          | FunctionLiteral _ -> true (* We can't call it anyway *)
+          | LetBinding { bindings; inner } ->
+              check_remaining inner
+              && List.for_all
+                   (fun (binding : linear_binding) ->
+                     match binding with
+                     | Function _ -> true (* We can't call it anyway *)
+                     | Variable { value } -> check_remaining value)
+                   bindings
+          | StringAccess { receiver; target } ->
+              check_remaining receiver && check_remaining target
+          (* Side effects *)
+          | StringAssignment _ -> false
+        and check_remaining (l : linear_form) =
+          List.for_all
+            (fun (name, element) ->
+              (match element with
+              (* If the element references the argument then we must too *)
+              | Variable v when List.mem v vars_referencing_argument ->
+                  List.mem name vars_referencing_argument
+              | _ -> true)
+              && check_remaining_element element)
+            l
+        in
+        check_remaining body
+  in
+  List.for_all check_continuation continuations
 
 let rec replace_element_continuations_with_accumulator (e : linear_element)
     (cloture_rect : variable list) (vars_to_replace : variable list) =
