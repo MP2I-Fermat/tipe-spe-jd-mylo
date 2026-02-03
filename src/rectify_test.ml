@@ -25,13 +25,17 @@ let rectify_bindings (bindings : binding list) : rectify_result =
     |> List.filter_map (fun (binding : binding) ->
            match binding with
            | Variable _ -> None
-           | Function { name; parameters; body } ->
+           | Function { name; parameters; body; return_type } ->
                let body_lin, k' = linearize body !k in
                k := k';
                Some
                  ( name,
                    FunctionLiteral
-                     { style = Fun; cases = [ (parameters, body_lin) ] } ))
+                     {
+                       style = Fun;
+                       cases = [ (parameters, body_lin) ];
+                       return_type_for_delinearize = return_type;
+                     } ))
   in
 
   (* Step 2: Calculate rectifying set *)
@@ -40,7 +44,9 @@ let rectify_bindings (bindings : binding list) : rectify_result =
   | Some [] -> EmptyRectifyingSet
   | Some cloture_rect ->
       (* Step 3: Rectify *)
-      let rectified_functions = rectify linearized_functions cloture_rect in
+      let rectified_functions =
+        rectify linearized_functions cloture_rect linearized_functions
+      in
 
       (* Step 4: Replace continuations with accumulators (if possible) *)
       let accumulator_functions, initial_accumulator_constant =
@@ -108,17 +114,11 @@ let rectify_bindings (bindings : binding list) : rectify_result =
                             parameters = new_parameters;
                             body = fst (delinearize new_linearized_body []);
                             (* The return type depends on the return type of the continuation *)
-                            return_type = None;
+                            return_type =
+                              new_linearized_definition
+                                .return_type_for_delinearize;
                           }
                          : Caml_light.binding)
-                     in
-
-                     let interceptor_parameter_names =
-                       parameters
-                       |> List.mapi (fun i parameter ->
-                              match get_name parameter with
-                              | Some name -> name
-                              | None -> "arg" ^ string_of_int i)
                      in
 
                      let interceptor =
@@ -126,16 +126,23 @@ let rectify_bindings (bindings : binding list) : rectify_result =
                           {
                             name;
                             parameters =
-                              interceptor_parameter_names
-                              |> List.map (fun x -> Ident x);
+                              parameters
+                              |> List.mapi (fun i parameter ->
+                                     match get_name parameter with
+                                     | Some _ -> parameter
+                                     | None -> Ident ("arg" ^ string_of_int i));
                             body =
                               FunctionApplication
                                 {
                                   receiver = Variable (new_name name);
                                   arguments =
-                                    (interceptor_parameter_names
-                                    |> List.map (fun x ->
-                                           (Variable x : Caml_light.expression))
+                                    (parameters
+                                    |> List.mapi (fun i parameter ->
+                                           match get_name parameter with
+                                           | Some name ->
+                                               (Variable name : expression)
+                                           | None ->
+                                               Variable ("arg" ^ string_of_int i))
                                     )
                                     @ [
                                         Parenthesised

@@ -68,6 +68,7 @@ and linear_pattern_cases = (pattern node list * linear_form) list
 and linear_function_literal = {
   style : function_literal_style;
   cases : linear_pattern_cases;
+  return_type_for_delinearize : type_expression option;
 }
 
 and linear_function_ = {
@@ -428,7 +429,14 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
           ([], orig_k + 1)
           cases
       in
-      let e_elt = FunctionLiteral { style; cases = List.rev cases_lins } in
+      let e_elt =
+        FunctionLiteral
+          {
+            style;
+            cases = List.rev cases_lins;
+            return_type_for_delinearize = None;
+          }
+      in
       ([ (p orig_k, e_elt) ], k)
   | LetBinding { bindings; is_rec; inner } ->
       let variable_bindings_lins = ref [] in
@@ -785,7 +793,10 @@ and delinearize (l : linear_form) (prev_vars : linear_form) :
   | [] -> failwith "Empty linear form"
   | (p, e) :: [] -> delinearize_element e prev_vars
   (* Special case for formatting functions nicely *)
-  | (p, FunctionLiteral { style; cases = [ (args, body) ] }) :: q ->
+  | ( p,
+      FunctionLiteral
+        { style; cases = [ (args, body) ]; return_type_for_delinearize } )
+    :: q ->
       let q_inlined, inlined_vars = delinearize q prev_vars in
       let body_inlined, inlined_vars_2 = delinearize body prev_vars in
       ( LetBinding
@@ -798,7 +809,7 @@ and delinearize (l : linear_form) (prev_vars : linear_form) :
                     name = p;
                     parameters = args;
                     body = body_inlined;
-                    return_type = None;
+                    return_type = return_type_for_delinearize;
                   };
               ];
             inner = q_inlined;
@@ -916,6 +927,130 @@ let map_locally_terminal_children (f : linear_form -> linear_form)
   (* No locally terminal children *)
   | _ -> e
 
+let rec get_name (p : pattern) : variable option =
+  match p with
+  | Ident n -> Some n
+  | Underscore -> None
+  | Parenthesised inner -> get_name inner
+  | TypeCoercion { inner } -> get_name inner
+  | Constant _ -> None
+  | Record _ -> None
+  | List _ -> None
+  | Construction _ -> None
+  | Concatenation _ -> None
+  | Tuple _ -> None
+  | Or _ -> None
+  | As { name } -> Some name
+
+let rec find_definitions_in_element (fns : (variable * linear_element) list)
+    (name : variable) (e : linear_element) : linear_element list =
+  match e with
+  | Variable _ | Constant _ -> []
+  | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
+      find_definitions fns name inner
+  | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
+      l |> List.map (fun elt -> find_definitions fns name elt) |> List.concat
+  | RecordLiteral r ->
+      r
+      |> List.map (fun (_, elt) -> find_definitions fns name elt)
+      |> List.concat
+  | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
+  | FieldAccess { receiver } -> find_definitions fns name receiver
+  | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
+      find_definitions fns name receiver @ find_definitions fns name target
+  | FunctionApplication { receiver; arguments } ->
+      find_definitions fns name receiver
+      @ (arguments
+        |> List.map (fun arg -> find_definitions fns name arg)
+        |> List.concat)
+  | PrefixOperation { receiver } -> find_definitions fns name receiver
+  | InfixOperation { lhs; rhs } ->
+      find_definitions fns name lhs @ find_definitions fns name rhs
+  | Negation receiver -> find_definitions fns name receiver
+  | FieldAssignment { receiver; value } ->
+      find_definitions fns name receiver @ find_definitions fns name value
+  | ArrayAssignment { receiver; target; value }
+  | StringAssignment { receiver; target; value } ->
+      find_definitions fns name receiver
+      @ find_definitions fns name target
+      @ find_definitions fns name value
+  | ReferenceAssignment { receiver; value } ->
+      find_definitions fns name receiver @ find_definitions fns name value
+  | If { condition; body; else_body } -> (
+      find_definitions fns name condition
+      @ find_definitions fns name body
+      @
+      match else_body with None -> [] | Some b -> find_definitions fns name b)
+  | Match { value; cases } ->
+      find_definitions fns name value
+      @ (cases
+        |> List.map (fun (_, body) -> find_definitions fns name body)
+        |> List.concat)
+  | Try _ -> failwith "Found linearized try"
+  | FunctionLiteral { cases } ->
+      List.map (fun (_, body) -> find_definitions fns name body) cases
+      |> List.concat
+  | LetBinding { bindings; inner } ->
+      find_definitions fns name inner
+      @ (bindings
+        |> List.map (fun (binding : linear_binding) ->
+               match binding with
+               | Variable { lhs; value } ->
+                   (if get_name lhs = Some name then
+                      [ Variable (last_var value) ]
+                    else [])
+                   @ find_definitions fns name value
+               | Function { name = name'; parameters; body; return_type } ->
+                   (* It's OK to create a synthetic element here so long as we
+                      don't expect to find it in a later AST search. As it
+                      currently stands, that is indeed the case. *)
+                   (if name' = name then
+                      [
+                        FunctionLiteral
+                          {
+                            style = Fun;
+                            cases = [ (parameters, body) ];
+                            return_type_for_delinearize = return_type;
+                          };
+                      ]
+                    else [])
+                   @ find_definitions fns name body)
+        |> List.concat)
+
+and find_definitions (fns : (variable * linear_element) list) (name : variable)
+    (l : linear_form) : linear_element list =
+  let child_definitions =
+    l
+    |> List.map (fun (_, e) -> find_definitions_in_element fns name e)
+    |> List.flatten
+  in
+  let self_definitions =
+    l
+    |> List.filter_map (fun (variable, elt) ->
+           if variable = name then Some elt else None)
+  in
+
+  child_definitions @ self_definitions
+
+(** find_definition fns name finds the unique definition of the linear element
+    with the name name in fns.
+
+    Returns None if zero or multiple definitions are found. *)
+and find_definition (fns : (variable * linear_element) list) (name : variable) :
+    linear_element option =
+  let root_definitions =
+    fns
+    |> List.filter_map (fun (name', def) ->
+           if name' = name then Some def else None)
+  in
+  let inner_definitions =
+    fns |> List.map snd
+    |> List.map (find_definitions_in_element fns name)
+    |> List.concat
+  in
+  let definitions = root_definitions @ inner_definitions in
+  match definitions with [ def ] -> Some def | _ -> None
+
 (** rectify l c returns a linear form equivalent to l in which all calls to
     functions in c are made terminal.
 
@@ -923,7 +1058,8 @@ let map_locally_terminal_children (f : linear_form -> linear_form)
     continuation as their last argument. The bodies of any such functions
     defined within l are modified accordingly, but the function header is not.
 *)
-let rec rectify (l : linear_form) (cloture_rect : variable list) : linear_form =
+let rec rectify (l : linear_form) (cloture_rect : variable list)
+    (fns : linear_form) : linear_form =
   let rec find_first_recursive_element (tail : linear_form) (head : linear_form)
       : linear_form * ((variable * linear_element) * linear_form) option =
     match tail with
@@ -947,111 +1083,127 @@ let rec rectify (l : linear_form) (cloture_rect : variable list) : linear_form =
               } );
         ]
   | Some ((a, e), l_2) -> (
+      let e_rec =
+        match e with
+        | FunctionApplication { receiver = [ (p, Variable f) ]; arguments }
+          when List.mem f cloture_rect ->
+            FunctionApplication
+              {
+                receiver = [ (p, Variable f) ];
+                arguments = arguments @ [ [ ("cont_arg", Variable "cont") ] ];
+              }
+        | FunctionLiteral { style; cases; return_type_for_delinearize } ->
+            FunctionLiteral
+              {
+                style;
+                cases =
+                  List.map
+                    (fun (patterns, body) ->
+                      ( patterns
+                        @ [
+                            (match return_type_for_delinearize with
+                            | None -> Ident "cont"
+                            | Some typ ->
+                                TypeCoercion
+                                  {
+                                    inner = Ident "cont";
+                                    typ =
+                                      Function
+                                        {
+                                          argument = typ;
+                                          result = Argument "ret";
+                                        };
+                                  });
+                          ],
+                        rectify body cloture_rect fns ))
+                    cases;
+                return_type_for_delinearize =
+                  (match return_type_for_delinearize with
+                  | None -> None
+                  | Some _ -> Some (Argument "ret"));
+              }
+        | LetBinding { bindings; inner; is_rec } ->
+            LetBinding
+              {
+                is_rec;
+                bindings =
+                  bindings
+                  |> List.map (fun (binding : linear_binding) ->
+                         match binding with
+                         | Variable _ -> binding
+                         | Function { name; parameters; body; return_type } ->
+                             if not (List.mem name cloture_rect) then binding
+                             else
+                               Function
+                                 {
+                                   name;
+                                   parameters =
+                                     parameters
+                                     @ [
+                                         (match return_type with
+                                         | None -> Ident "cont"
+                                         | Some typ ->
+                                             TypeCoercion
+                                               {
+                                                 inner = Ident "cont";
+                                                 typ =
+                                                   Function
+                                                     {
+                                                       argument = typ;
+                                                       result = Argument "ret";
+                                                     };
+                                               });
+                                       ];
+                                   body = rectify body cloture_rect fns;
+                                   (* Return type now depends on the continuation *)
+                                   return_type = Some (Argument "ret");
+                                 });
+                inner = rectify inner cloture_rect fns;
+              }
+        | _ ->
+            map_locally_terminal_children
+              (fun f -> rectify f cloture_rect fns)
+              e
+      in
       match l_2 with
-      | [] ->
-          let e_rec =
-            match e with
-            | FunctionApplication { receiver = [ (p, Variable f) ]; arguments }
-              when List.mem f cloture_rect ->
-                FunctionApplication
-                  {
-                    receiver = [ (p, Variable f) ];
-                    arguments =
-                      arguments @ [ [ ("cont_arg", Variable "cont") ] ];
-                  }
-            | FunctionLiteral { style; cases } ->
-                FunctionLiteral
-                  {
-                    style;
-                    cases =
-                      List.map
-                        (fun (patterns, body) ->
-                          ( patterns @ [ Ident "cont" ],
-                            rectify body cloture_rect ))
-                        cases;
-                  }
-            | LetBinding { bindings; inner; is_rec } ->
-                LetBinding
-                  {
-                    is_rec;
-                    bindings =
-                      bindings
-                      |> List.map (fun (binding : linear_binding) ->
-                             match binding with
-                             | Variable _ -> binding
-                             | Function { name; parameters; body; return_type }
-                               ->
-                                 if not (List.mem name cloture_rect) then
-                                   binding
-                                 else
-                                   Function
-                                     {
-                                       name;
-                                       parameters =
-                                         parameters @ [ Ident "cont" ];
-                                       body = rectify body cloture_rect;
-                                       (* Return type now depends on the continuation *)
-                                       return_type = None;
-                                     });
-                    inner = rectify inner cloture_rect;
-                  }
-            | _ ->
-                map_locally_terminal_children
-                  (fun f -> rectify f cloture_rect)
-                  e
-          in
-          l_1 @ [ (a, e_rec) ]
+      | [] -> l_1 @ [ (a, e_rec) ]
       | _ ->
-          let l_2_rec = rectify l_2 cloture_rect in
-          let e_rec =
-            match e with
-            | FunctionApplication { receiver = [ (p, Variable f) ]; arguments }
-              when List.mem f cloture_rect ->
-                FunctionApplication
-                  {
-                    receiver = [ (p, Variable f) ];
-                    arguments =
-                      arguments @ [ [ ("cont_arg", Variable "cont") ] ];
-                  }
-            | FunctionLiteral { style; cases } ->
-                FunctionLiteral
-                  {
-                    style;
-                    cases =
-                      List.map
-                        (fun (patterns, body) ->
-                          ( patterns @ [ Ident "cont" ],
-                            rectify body cloture_rect ))
-                        cases;
-                  }
-            | _ ->
-                map_locally_terminal_children
-                  (fun f -> rectify f cloture_rect)
-                  e
+          let e_return_type =
+            match e_rec with
+            | FunctionApplication { receiver = [ (p, _) ] } ->
+                let rec find_return_type (v : variable) : type_expression option
+                    =
+                  match find_definition fns v with
+                  | Some (FunctionLiteral { return_type_for_delinearize }) ->
+                      return_type_for_delinearize
+                  | Some (Variable v2) -> find_return_type v2
+                  | _ -> None
+                in
+                find_return_type p
+            | _ -> None
           in
+
+          let l_2_rec = rectify l_2 cloture_rect fns in
           l_1
           @ [
               ( "new_cont",
                 FunctionLiteral
-                  { style = Fun; cases = [ ([ Ident a ], l_2_rec) ] } );
+                  {
+                    style = Fun;
+                    cases =
+                      [
+                        ( [
+                            (match e_return_type with
+                            | None -> Ident a
+                            | Some typ -> TypeCoercion { inner = Ident a; typ });
+                          ],
+                          l_2_rec );
+                      ];
+                    return_type_for_delinearize = Some (Argument "ret");
+                  } );
               ("cont", Variable "new_cont");
               (a, e_rec);
             ])
-
-let rec get_name (p : pattern) : variable option =
-  match p with
-  | Ident n -> Some n
-  | Underscore -> None
-  | Parenthesised inner -> get_name inner
-  | TypeCoercion { inner } -> get_name inner
-  | Constant _ -> None
-  | Record _ -> None
-  | List _ -> None
-  | Construction _ -> None
-  | Concatenation _ -> None
-  | Tuple _ -> None
-  | Or _ -> None
-  | As { name } -> Some name
 
 let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
     (new_name : variable -> variable) =
@@ -1174,7 +1326,7 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
                 (patterns, rename_elements e cloture_rect new_name))
               cases;
         }
-  | FunctionLiteral { style; cases } ->
+  | FunctionLiteral { style; cases; return_type_for_delinearize } ->
       FunctionLiteral
         {
           style;
@@ -1183,6 +1335,7 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
               (fun (patterns, e) ->
                 (patterns, rename_elements e cloture_rect new_name))
               cases;
+          return_type_for_delinearize;
         }
   | LetBinding { bindings; is_rec; inner } ->
       LetBinding
@@ -1239,111 +1392,6 @@ and rename_elements (l : linear_form) (cloture_rect : variable list)
          let new_elt = rename_elements_in elt cloture_rect new_name in
          if List.mem name cloture_rect then (new_name name, new_elt)
          else (name, new_elt))
-
-let rec find_definitions_in_element (fns : (variable * linear_element) list)
-    (name : variable) (e : linear_element) : linear_element list =
-  match e with
-  | Variable _ | Constant _ -> []
-  | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
-      find_definitions fns name inner
-  | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
-      l |> List.map (fun elt -> find_definitions fns name elt) |> List.concat
-  | RecordLiteral r ->
-      r
-      |> List.map (fun (_, elt) -> find_definitions fns name elt)
-      |> List.concat
-  | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
-  | FieldAccess { receiver } -> find_definitions fns name receiver
-  | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
-      find_definitions fns name receiver @ find_definitions fns name target
-  | FunctionApplication { receiver; arguments } ->
-      find_definitions fns name receiver
-      @ (arguments
-        |> List.map (fun arg -> find_definitions fns name arg)
-        |> List.concat)
-  | PrefixOperation { receiver } -> find_definitions fns name receiver
-  | InfixOperation { lhs; rhs } ->
-      find_definitions fns name lhs @ find_definitions fns name rhs
-  | Negation receiver -> find_definitions fns name receiver
-  | FieldAssignment { receiver; value } ->
-      find_definitions fns name receiver @ find_definitions fns name value
-  | ArrayAssignment { receiver; target; value }
-  | StringAssignment { receiver; target; value } ->
-      find_definitions fns name receiver
-      @ find_definitions fns name target
-      @ find_definitions fns name value
-  | ReferenceAssignment { receiver; value } ->
-      find_definitions fns name receiver @ find_definitions fns name value
-  | If { condition; body; else_body } -> (
-      find_definitions fns name condition
-      @ find_definitions fns name body
-      @
-      match else_body with None -> [] | Some b -> find_definitions fns name b)
-  | Match { value; cases } ->
-      find_definitions fns name value
-      @ (cases
-        |> List.map (fun (_, body) -> find_definitions fns name body)
-        |> List.concat)
-  | Try _ -> failwith "Found linearized try"
-  | FunctionLiteral { cases } ->
-      List.map (fun (_, body) -> find_definitions fns name body) cases
-      |> List.concat
-  | LetBinding { bindings; inner } ->
-      find_definitions fns name inner
-      @ (bindings
-        |> List.map (fun (binding : linear_binding) ->
-               match binding with
-               | Variable { lhs; value } ->
-                   (if get_name lhs = Some name then
-                      [ Variable (last_var value) ]
-                    else [])
-                   @ find_definitions fns name value
-               | Function { name = name'; parameters; body } ->
-                   (* It's OK to create a synthetic element here so long as we
-                      don't expect to find it in a later AST search. As it
-                      currently stands, that is indeed the case. *)
-                   (if name' = name then
-                      [
-                        FunctionLiteral
-                          { style = Fun; cases = [ (parameters, body) ] };
-                      ]
-                    else [])
-                   @ find_definitions fns name body)
-        |> List.concat)
-
-and find_definitions (fns : (variable * linear_element) list) (name : variable)
-    (l : linear_form) : linear_element list =
-  let child_definitions =
-    l
-    |> List.map (fun (_, e) -> find_definitions_in_element fns name e)
-    |> List.flatten
-  in
-  let self_definitions =
-    l
-    |> List.filter_map (fun (variable, elt) ->
-           if variable = name then Some elt else None)
-  in
-
-  child_definitions @ self_definitions
-
-(** find_definition fns name finds the unique definition of the linear element
-    with the name name in fns.
-
-    Returns None if zero or multiple definitions are found. *)
-and find_definition (fns : (variable * linear_element) list) (name : variable) :
-    linear_element option =
-  let root_definitions =
-    fns
-    |> List.filter_map (fun (name', def) ->
-           if name' = name then Some def else None)
-  in
-  let inner_definitions =
-    fns |> List.map snd
-    |> List.map (find_definitions_in_element fns name)
-    |> List.concat
-  in
-  let definitions = root_definitions @ inner_definitions in
-  match definitions with [ def ] -> Some def | _ -> None
 
 (** cloture_rectifiable fns computes a set that rectifies fns.
 
@@ -1744,6 +1792,10 @@ let extract_continuation_composition (cont : linear_function_literal) :
           cont.cases
           |> List.map (fun (parameters, body) ->
                  (parameters, extract_without_continuation body));
+        return_type_for_delinearize =
+          (match List.hd cont.cases with
+          | [ TypeCoercion { typ } ], _ -> Some typ
+          | _ -> None);
       }
     in
     Some res
@@ -1970,7 +2022,7 @@ let rec replace_element_continuations_with_accumulator (e : linear_element)
                     vars_to_replace ))
               cases;
         }
-  | FunctionLiteral { style; cases } ->
+  | FunctionLiteral { style; cases; return_type_for_delinearize } ->
       FunctionLiteral
         {
           style;
@@ -1981,6 +2033,7 @@ let rec replace_element_continuations_with_accumulator (e : linear_element)
                   replace_continuations_with_accumulator e cloture_rect
                     vars_to_replace ))
               cases;
+          return_type_for_delinearize;
         }
   | LetBinding { bindings; is_rec; inner } ->
       LetBinding
@@ -2047,10 +2100,25 @@ let rec replace_element_continuations_with_accumulator (e : linear_element)
     to be removed. *)
 and replace_continuations_with_accumulator (l : linear_form)
     (cloture_rect : variable list) (vars_to_remove : variable list) =
+  let rec get_accumulator_type_from_continuation (l : pattern list) :
+      type_expression option =
+    match l with
+    | [] -> None
+    | [ x ] -> (
+        match x with
+        | TypeCoercion { typ = Function { argument } } -> Some argument
+        | _ -> None)
+    | _ :: q -> get_accumulator_type_from_continuation q
+  in
+
   let rec replace_last_parameter (l : pattern list) =
     match l with
     | [] -> []
-    | [ x ] -> [ Ident "acc" ]
+    | [ x ] -> (
+        match x with
+        | TypeCoercion { typ = Function { argument } } ->
+            [ (TypeCoercion { inner = Ident "acc"; typ = argument } : pattern) ]
+        | _ -> [ Ident "acc" ])
     | x :: q -> x :: replace_last_parameter q
   in
 
@@ -2093,6 +2161,9 @@ and replace_continuations_with_accumulator (l : linear_form)
                                 (fun (arguments, body) ->
                                   (replace_last_parameter arguments, body))
                                 cases;
+                            return_type_for_delinearize =
+                              get_accumulator_type_from_continuation
+                                (fst (List.hd cases));
                           }
                     | _ -> failwith ("Unable to update definition of " ^ name)
                   in
