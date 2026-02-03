@@ -257,6 +257,8 @@ and constant =
   | CharacterLiteral of { style : char_literal_style; value : char }
   | StringLiteral of string
   | Construction of constructor node
+  | True
+  | False
 
 and value_definition = { bindings : binding node list; is_rec : bool }
 and type_definition = typedef node list
@@ -443,6 +445,8 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
     | Node ("CONSTANT", [ Leaf { token_type = "modern_char_literal"; value } ])
       ->
         CharacterLiteral { value = value.[0]; style = New }
+    | Node ("CONSTANT", [ Leaf { token_type = "true" } ]) -> True
+    | Node ("CONSTANT", [ Leaf { token_type = "false" } ]) -> False
     | _ -> failwith "Not a constant"
   and field_pattern (tree : (string, string) syntax_tree) :
       label node * pattern node =
@@ -1486,6 +1490,8 @@ let stringify_ast_into (ast : program) (sink : string -> unit) : unit =
         sink s;
         sink "\""
     | Construction c -> handle_constructor c
+    | True -> sink " true "
+    | False -> sink " false "
   in
 
   let rec handle_pattern (p : pattern) =

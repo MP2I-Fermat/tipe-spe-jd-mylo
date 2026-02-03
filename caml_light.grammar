@@ -426,3 +426,10 @@ CONSTR -> begin end
 # Single = for type aliases
 TYPEDEF -> lowercase_ident eq TYP_EXPR
 TYPEDEF -> TYPE_PARAMS lowercase_ident eq TYP_EXPR
+
+# True and false as constants
+true := true
+false := false
+
+CONSTANT -> true
+CONSTANT -> false
