@@ -147,6 +147,7 @@ and function_ = {
   name : variable node;
   parameters : pattern node list;
   body : expression node;
+  return_type : type_expression option;
 }
 
 and binding =
@@ -610,7 +611,34 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         let expr_node = expression expr in
 
         Function
-          { name = name_node; parameters = argument_nodes; body = expr_node }
+          {
+            name = name_node;
+            parameters = argument_nodes;
+            body = expr_node;
+            return_type = None;
+          }
+    | Node
+        ( "LET_BINDING",
+          [
+            name;
+            arguments;
+            Leaf { token_type = "colon" };
+            return_type;
+            Leaf { token_type = "eq" };
+            expr;
+          ] ) ->
+        let name_node = variable name in
+        let argument_nodes = b_pattern_list arguments in
+        let expr_node = expression expr in
+        let return_type_node = type_expression return_type in
+
+        Function
+          {
+            name = name_node;
+            parameters = argument_nodes;
+            body = expr_node;
+            return_type = Some return_type_node;
+          }
     | _ -> failwith "Not a let binding"
   and let_binding_list (tree : (string, string) syntax_tree) : binding node list
       =
@@ -1548,6 +1576,11 @@ let stringify_ast_into (ast : program) (sink : string -> unit) : unit =
         sink f.name;
         sink " ";
         iter_with_join handle_pattern " " f.parameters;
+        (match f.return_type with
+        | None -> ()
+        | Some return_type ->
+            sink ":";
+            handle_type_expression return_type);
         sink " = ";
         handle_expression f.body
   and handle_expression (e : expression) =

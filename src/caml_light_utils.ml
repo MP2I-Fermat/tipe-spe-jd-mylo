@@ -10,8 +10,14 @@ let rec map_expression (f : expression -> expression) (e : expression)
     match b with
     | Variable { lhs; value } ->
         Variable { lhs; value = map_expression f value ~direction }
-    | Function { name; parameters; body } ->
-        Function { name; parameters; body = map_expression f body ~direction }
+    | Function { name; parameters; body; return_type } ->
+        Function
+          {
+            name;
+            parameters;
+            body = map_expression f body ~direction;
+            return_type;
+          }
   in
 
   let e'' =

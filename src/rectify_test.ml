@@ -117,7 +117,8 @@ let rectified =
                        |> List.map (fun (binding : binding) ->
                               match binding with
                               | Variable _ -> [ binding ]
-                              | Function { name; parameters; body } ->
+                              | Function { name; parameters; body; return_type }
+                                ->
                                   let new_linearized_definition =
                                     match
                                       List.assoc (new_name name)
@@ -143,6 +144,7 @@ let rectified =
                                          body =
                                            fst
                                              (delinearize new_linearized_body []);
+                                         return_type;
                                        }
                                       : Caml_light.binding)
                                   in
@@ -201,6 +203,7 @@ let rectified =
                                                        };
                                                    ];
                                              };
+                                         return_type;
                                        }
                                       : Caml_light.binding)
                                   in

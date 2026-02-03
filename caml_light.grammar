@@ -433,3 +433,6 @@ false := false
 
 CONSTANT -> true
 CONSTANT -> false
+
+# Allow specifying function return types
+LET_BINDING -> VARIABLE B_PATTERN_LIST colon TYP_EXPR eq EXPR

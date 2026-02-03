@@ -74,6 +74,7 @@ and linear_function_ = {
   name : variable node;
   parameters : pattern node list;
   body : linear_form;
+  return_type : type_expression option;
 }
 
 and linear_binding =
@@ -740,9 +741,10 @@ let rec delinearize_element (e : linear_element) (prev_vars : linear_form) :
                 in
                 ( (Variable { lhs; value = value_inlined } : binding) :: terms,
                   inlined_vars' @ inlined_vars )
-            | Function { name; parameters; body } ->
+            | Function { name; parameters; body; return_type } ->
                 let body_inlined, inlined_vars' = delinearize body prev_vars in
-                ( Function { name; parameters; body = body_inlined } :: terms,
+                ( Function { name; parameters; body = body_inlined; return_type }
+                  :: terms,
                   inlined_vars' @ inlined_vars ))
           bindings ([], [])
       in
@@ -796,7 +798,15 @@ and delinearize (l : linear_form) (prev_vars : linear_form) :
           {
             is_rec = false;
             bindings =
-              [ Function { name = p; parameters = args; body = body_inlined } ];
+              [
+                Function
+                  {
+                    name = p;
+                    parameters = args;
+                    body = body_inlined;
+                    return_type = None;
+                  };
+              ];
             inner = q_inlined;
           },
         inlined_vars @ inlined_vars_2 )
@@ -1152,12 +1162,13 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
                          value = rename_elements value cloture_rect new_name;
                        }
                       : linear_binding)
-                | Function { name; parameters; body } ->
+                | Function { name; parameters; body; return_type } ->
                     Function
                       {
                         name;
                         parameters;
                         body = rename_elements body cloture_rect new_name;
+                        return_type;
                       })
               bindings;
           is_rec;
@@ -1922,7 +1933,7 @@ let rec replace_element_continuations_with_accumulator (e : linear_element)
                              cloture_rect vars_to_replace;
                        }
                       : linear_binding)
-                | Function { name; parameters; body } ->
+                | Function { name; parameters; body; return_type } ->
                     Function
                       {
                         name;
@@ -1930,6 +1941,7 @@ let rec replace_element_continuations_with_accumulator (e : linear_element)
                         body =
                           replace_continuations_with_accumulator body
                             cloture_rect vars_to_replace;
+                        return_type;
                       })
               bindings;
           is_rec;
