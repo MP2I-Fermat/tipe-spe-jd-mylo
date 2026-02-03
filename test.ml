@@ -27,3 +27,9 @@ let rec sum_even_numbers (l : int list) : int =
   match l with
   | [] -> 0
   | x :: q -> if x mod 2 = 0 then x + sum_even_numbers q else sum_even_numbers q
+
+let rec is_even_length (l : 'a list) : bool =
+  match l with [] -> true | _ :: q -> not (is_even_length q)
+
+let rec length (l : 'a list) : int =
+  match l with [] -> 0 | _ :: q -> 1 + length q
