@@ -863,16 +863,15 @@ let rec element_contains_application (f : variable) (e : linear_element) : bool
       contains_application f value
       || cases |> List.map snd |> List.exists (contains_application f)
   | Try _ -> failwith "Found linearized try"
-  (* TODO: Formalise "contains" better to explain this *)
-  | FunctionLiteral _ -> false
+  | FunctionLiteral { cases } ->
+      List.exists (fun (_, body) -> contains_application f body) cases
   | LetBinding { bindings; inner } ->
       contains_application f inner
       || bindings
          |> List.exists (fun (binding : linear_binding) ->
                 match binding with
                 | Variable { value } -> contains_application f value
-                (* TODO: Formalise "contains" better to explain this *)
-                | Function _ -> false)
+                | Function { body } -> contains_application f body)
   | StringAccess { receiver; target } ->
       contains_application f receiver || contains_application f target
   | StringAssignment { receiver; target; value } ->
@@ -904,12 +903,6 @@ let map_locally_terminal_children (f : linear_form -> linear_form)
       Match
         {
           value;
-          cases = List.map (fun (pattern, body) -> (pattern, f body)) cases;
-        }
-  | FunctionLiteral { style; cases } ->
-      FunctionLiteral
-        {
-          style;
           cases = List.map (fun (pattern, body) -> (pattern, f body)) cases;
         }
   | LetBinding { is_rec; bindings; inner } ->
@@ -960,6 +953,17 @@ let rec rectify (l : linear_form) (cloture_rect : variable list) : linear_form =
                     arguments =
                       arguments @ [ [ ("cont_arg", Variable "cont") ] ];
                   }
+            | FunctionLiteral { style; cases } ->
+                FunctionLiteral
+                  {
+                    style;
+                    cases =
+                      List.map
+                        (fun (patterns, body) ->
+                          ( patterns @ [ Ident "cont" ],
+                            rectify body cloture_rect ))
+                        cases;
+                  }
             | _ ->
                 map_locally_terminal_children
                   (fun f -> rectify f cloture_rect)
@@ -978,6 +982,17 @@ let rec rectify (l : linear_form) (cloture_rect : variable list) : linear_form =
                     arguments =
                       arguments @ [ [ ("cont_arg", Variable "cont") ] ];
                   }
+            | FunctionLiteral { style; cases } ->
+                FunctionLiteral
+                  {
+                    style;
+                    cases =
+                      List.map
+                        (fun (patterns, body) ->
+                          ( patterns @ [ Ident "cont" ],
+                            rectify body cloture_rect ))
+                        cases;
+                  }
             | _ ->
                 map_locally_terminal_children
                   (fun f -> rectify f cloture_rect)
@@ -992,146 +1007,125 @@ let rec rectify (l : linear_form) (cloture_rect : variable list) : linear_form =
               (a, e_rec);
             ])
 
-let rec push_rectified_element (e : linear_element)
-    (cloture_rect : variable list) (new_name : variable -> variable) =
+let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
+    (new_name : variable -> variable) =
   match e with
-  | Variable _ -> e
+  | Variable v ->
+      if List.mem v cloture_rect then Variable (new_name v) else Variable v
   | Constant _ -> e
   | Parenthesised { inner; style } ->
       Parenthesised
-        {
-          style;
-          inner = push_rectified_definitions inner cloture_rect new_name;
-        }
+        { style; inner = rename_elements inner cloture_rect new_name }
   | TypeCoercion { inner; typ } ->
-      TypeCoercion
-        { inner = push_rectified_definitions inner cloture_rect new_name; typ }
+      TypeCoercion { inner = rename_elements inner cloture_rect new_name; typ }
   | ListLiteral l ->
       ListLiteral
-        (List.map
-           (fun l -> push_rectified_definitions l cloture_rect new_name)
-           l)
+        (List.map (fun l -> rename_elements l cloture_rect new_name) l)
   | ArrayLiteral l ->
       ArrayLiteral
-        (List.map
-           (fun l -> push_rectified_definitions l cloture_rect new_name)
-           l)
+        (List.map (fun l -> rename_elements l cloture_rect new_name) l)
   | RecordLiteral r ->
       RecordLiteral
         (List.map
-           (fun (n, e) ->
-             (n, push_rectified_definitions e cloture_rect new_name))
+           (fun (n, e) -> (n, rename_elements e cloture_rect new_name))
            r)
   | WhileLoop { condition; body } ->
       WhileLoop
         {
-          condition = push_rectified_definitions condition cloture_rect new_name;
-          body = push_rectified_definitions body cloture_rect new_name;
+          condition = rename_elements condition cloture_rect new_name;
+          body = rename_elements body cloture_rect new_name;
         }
   | ForLoop { direction = direction'; variable; start; finish; body } ->
       ForLoop
         {
           direction = direction';
           variable;
-          start = push_rectified_definitions start cloture_rect new_name;
-          finish = push_rectified_definitions finish cloture_rect new_name;
-          body = push_rectified_definitions body cloture_rect new_name;
+          start = rename_elements start cloture_rect new_name;
+          finish = rename_elements finish cloture_rect new_name;
+          body = rename_elements body cloture_rect new_name;
         }
-  | Dereference e ->
-      Dereference (push_rectified_definitions e cloture_rect new_name)
+  | Dereference e -> Dereference (rename_elements e cloture_rect new_name)
   | FieldAccess { receiver; target } ->
       FieldAccess
-        {
-          receiver = push_rectified_definitions receiver cloture_rect new_name;
-          target;
-        }
+        { receiver = rename_elements receiver cloture_rect new_name; target }
   | ArrayAccess { receiver; target } ->
       ArrayAccess
         {
-          receiver = push_rectified_definitions receiver cloture_rect new_name;
-          target = push_rectified_definitions target cloture_rect new_name;
+          receiver = rename_elements receiver cloture_rect new_name;
+          target = rename_elements target cloture_rect new_name;
         }
   | FunctionApplication { receiver; arguments } ->
       FunctionApplication
         {
-          receiver = push_rectified_definitions receiver cloture_rect new_name;
+          receiver = rename_elements receiver cloture_rect new_name;
           arguments =
             List.map
-              (fun arg -> push_rectified_definitions arg cloture_rect new_name)
+              (fun arg -> rename_elements arg cloture_rect new_name)
               arguments;
         }
   | PrefixOperation { receiver; operation } ->
       PrefixOperation
-        {
-          operation;
-          receiver = push_rectified_definitions receiver cloture_rect new_name;
-        }
+        { operation; receiver = rename_elements receiver cloture_rect new_name }
   | InfixOperation { lhs; rhs; operation } ->
       InfixOperation
         {
-          lhs = push_rectified_definitions lhs cloture_rect new_name;
-          rhs = push_rectified_definitions rhs cloture_rect new_name;
+          lhs = rename_elements lhs cloture_rect new_name;
+          rhs = rename_elements rhs cloture_rect new_name;
           operation;
         }
-  | Negation e -> Negation (push_rectified_definitions e cloture_rect new_name)
+  | Negation e -> Negation (rename_elements e cloture_rect new_name)
   | Tuple t ->
-      Tuple
-        (List.map
-           (fun l -> push_rectified_definitions l cloture_rect new_name)
-           t)
+      Tuple (List.map (fun l -> rename_elements l cloture_rect new_name) t)
   | FieldAssignment { receiver; target; value } ->
       FieldAssignment
         {
-          receiver = push_rectified_definitions receiver cloture_rect new_name;
+          receiver = rename_elements receiver cloture_rect new_name;
           target;
-          value = push_rectified_definitions value cloture_rect new_name;
+          value = rename_elements value cloture_rect new_name;
         }
   | ArrayAssignment { receiver; target; value } ->
       ArrayAssignment
         {
-          receiver = push_rectified_definitions receiver cloture_rect new_name;
-          target = push_rectified_definitions target cloture_rect new_name;
-          value = push_rectified_definitions value cloture_rect new_name;
+          receiver = rename_elements receiver cloture_rect new_name;
+          target = rename_elements target cloture_rect new_name;
+          value = rename_elements value cloture_rect new_name;
         }
   | ReferenceAssignment { receiver; value } ->
       ReferenceAssignment
         {
-          receiver = push_rectified_definitions receiver cloture_rect new_name;
-          value = push_rectified_definitions value cloture_rect new_name;
+          receiver = rename_elements receiver cloture_rect new_name;
+          value = rename_elements value cloture_rect new_name;
         }
   | If { condition; body; else_body } ->
       If
         {
-          condition = push_rectified_definitions condition cloture_rect new_name;
-          body = push_rectified_definitions body cloture_rect new_name;
+          condition = rename_elements condition cloture_rect new_name;
+          body = rename_elements body cloture_rect new_name;
           else_body =
             Option.map
-              (fun b -> push_rectified_definitions b cloture_rect new_name)
+              (fun b -> rename_elements b cloture_rect new_name)
               else_body;
         }
   | Sequence s ->
-      Sequence
-        (List.map
-           (fun e -> push_rectified_definitions e cloture_rect new_name)
-           s)
+      Sequence (List.map (fun e -> rename_elements e cloture_rect new_name) s)
   | Match { value; cases } ->
       Match
         {
-          value = push_rectified_definitions value cloture_rect new_name;
+          value = rename_elements value cloture_rect new_name;
           cases =
             List.map
               (fun (patterns, e) ->
-                (patterns, push_rectified_definitions e cloture_rect new_name))
+                (patterns, rename_elements e cloture_rect new_name))
               cases;
         }
   | Try { value; cases } ->
       Try
         {
-          value = push_rectified_definitions value cloture_rect new_name;
+          value = rename_elements value cloture_rect new_name;
           cases =
             List.map
               (fun (patterns, e) ->
-                (patterns, push_rectified_definitions e cloture_rect new_name))
+                (patterns, rename_elements e cloture_rect new_name))
               cases;
         }
   | FunctionLiteral { style; cases } ->
@@ -1141,7 +1135,7 @@ let rec push_rectified_element (e : linear_element)
           cases =
             List.map
               (fun (patterns, e) ->
-                (patterns, push_rectified_definitions e cloture_rect new_name))
+                (patterns, rename_elements e cloture_rect new_name))
               cases;
         }
   | LetBinding { bindings; is_rec; inner } ->
@@ -1155,9 +1149,7 @@ let rec push_rectified_element (e : linear_element)
                     (Variable
                        {
                          lhs;
-                         value =
-                           push_rectified_definitions value cloture_rect
-                             new_name;
+                         value = rename_elements value cloture_rect new_name;
                        }
                       : linear_binding)
                 | Function { name; parameters; body } ->
@@ -1165,51 +1157,34 @@ let rec push_rectified_element (e : linear_element)
                       {
                         name;
                         parameters;
-                        body =
-                          push_rectified_definitions body cloture_rect new_name;
+                        body = rename_elements body cloture_rect new_name;
                       })
               bindings;
           is_rec;
-          inner = push_rectified_definitions inner cloture_rect new_name;
+          inner = rename_elements inner cloture_rect new_name;
         }
   | StringAccess { receiver; target } ->
       StringAccess
         {
-          receiver = push_rectified_definitions receiver cloture_rect new_name;
-          target = push_rectified_definitions target cloture_rect new_name;
+          receiver = rename_elements receiver cloture_rect new_name;
+          target = rename_elements target cloture_rect new_name;
         }
   | StringAssignment { receiver; target; value } ->
       StringAssignment
         {
-          receiver = push_rectified_definitions receiver cloture_rect new_name;
-          target = push_rectified_definitions target cloture_rect new_name;
-          value = push_rectified_definitions value cloture_rect new_name;
+          receiver = rename_elements receiver cloture_rect new_name;
+          target = rename_elements target cloture_rect new_name;
+          value = rename_elements value cloture_rect new_name;
         }
 
-(** push_rectified_definitions l c updates the definition of any variables in c
-    to be CPS style functions, as described in rectify. *)
-and push_rectified_definitions (l : linear_form) (cloture_rect : variable list)
+(** rename_elements l c updates the definition and any references to variables
+    in cloture_rect to their new names as indicated by new_name *)
+and rename_elements (l : linear_form) (cloture_rect : variable list)
     (new_name : variable -> variable) =
   l
   |> List.map (fun (name, elt) ->
-         let new_elt = push_rectified_element elt cloture_rect new_name in
-         if List.mem name cloture_rect then
-           let new_new_elt =
-             match elt with
-             | Variable v -> Variable (new_name v)
-             | FunctionLiteral { style; cases } ->
-                 FunctionLiteral
-                   {
-                     style;
-                     cases =
-                       List.map
-                         (fun (arguments, body) ->
-                           (arguments @ [ Ident "cont" ], body))
-                         cases;
-                   }
-             | _ -> failwith ("Unable to update definition of " ^ name)
-           in
-           (new_name name, new_new_elt)
+         let new_elt = rename_elements_in elt cloture_rect new_name in
+         if List.mem name cloture_rect then (new_name name, new_elt)
          else (name, new_elt))
 
 let rec find_definitions_in_element (fns : (variable * linear_element) list)
@@ -1670,7 +1645,7 @@ let find_initials (fns : (variable * linear_element) list) :
 
     For example, the function `fun x -> if y then cont z else cont w` is
     semantically equivalent to `cont @@ (func x -> if y then z else w)`. *)
-let extract_continuation (cont : linear_function_literal) :
+let extract_continuation_composition (cont : linear_function_literal) :
     linear_function_literal option =
   let exception NotSimple in
   let rec extract_without_continuation (l : linear_form) : linear_form =
@@ -2013,7 +1988,8 @@ and replace_continuations_with_accumulator (l : linear_form)
                 | FunctionLiteral f ->
                     ( "new_acc",
                       (* extract_continuation works since we don't call this function unless it worked for all continuations *)
-                      FunctionLiteral (extract_continuation f |> Option.get) )
+                      FunctionLiteral
+                        (extract_continuation_composition f |> Option.get) )
                 | _ -> failwith "Not a new continuation"
               else if name = "cont" then
                 ( "acc",

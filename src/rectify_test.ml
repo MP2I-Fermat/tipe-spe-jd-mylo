@@ -32,7 +32,9 @@ let rectified =
          match phrase with
          | ValueDefinition { bindings; is_rec } -> (
              let k = ref 0 in
-             let initial_functions =
+
+             (* Step 1: Linearize *)
+             let linearized_functions =
                bindings
                |> List.filter_map (fun (binding : binding) ->
                       match binding with
@@ -49,79 +51,64 @@ let rectified =
                                 } ))
              in
 
-             let new_name (n : string) = n ^ "_rectified" in
-
-             match cloture_rectifiable initial_functions with
+             (* Step 2: Calculate rectifying set *)
+             match cloture_rectifiable linearized_functions with
              (* TODO: Dig down? *)
              | None -> phrase
-             | Some clot ->
+             | Some cloture_rect ->
+                 (* Step 3: Rectify *)
                  let rectified_functions =
-                   initial_functions
-                   |> List.map (fun (name, definition) ->
-                          let parameters, linearized_body =
-                            match definition with
-                            | FunctionLiteral { cases = [ case ] } -> case
-                            | _ -> failwith "Bad state"
-                          in
-
-                          let rectified_body = rectify linearized_body clot in
-                          let redefined_body =
-                            push_rectified_definitions rectified_body clot
-                              new_name
-                          in
-
-                          ( new_name name,
-                            FunctionLiteral
-                              {
-                                style = Fun;
-                                cases =
-                                  [
-                                    ( parameters @ [ Ident "cont" ],
-                                      redefined_body );
-                                  ];
-                              } ))
+                   rectify linearized_functions cloture_rect
                  in
 
-                 let new_clot = List.map new_name clot in
-
-                 let accumulator_functions, initial_constant =
-                   match find_continuations rectified_functions clot with
+                 (* Step 4: Replace continuations with accumulators (if possible) *)
+                 let accumulator_functions, initial_accumulator_constant =
+                   (* Step 4a: Extract all continuations *)
+                   match
+                     find_continuations rectified_functions cloture_rect
+                   with
                    | None -> (rectified_functions, None)
                    | Some continuations -> (
+                       (* Step 4b: Extract composition with previous continuation form each continuation *)
                        let extracted_continuations =
-                         List.fold_left
-                           (fun acc continuation ->
-                             match acc with
-                             | None -> None
-                             | Some acc -> (
-                                 match extract_continuation continuation with
-                                 | None -> None
-                                 | Some extracted_continuation ->
-                                     Some (extracted_continuation :: acc)))
-                           (Some []) continuations
+                         continuations
+                         |> List.filter_map extract_continuation_composition
                        in
-                       match extracted_continuations with
-                       | None -> (rectified_functions, None)
-                       | Some extracted_continuations -> (
-                           let initial = find_initials rectified_functions in
-                           match initial with
-                           | None -> (rectified_functions, None)
-                           | Some (variables, initial) ->
-                               if
-                                 commutes extracted_continuations
-                                 && List.length initial == 1
-                               then
-                                 ( rectified_functions
-                                   |> List.map (fun (name, body) ->
-                                          replace_continuations_with_accumulator
-                                            [ (name, body) ]
-                                            new_clot variables
-                                          |> List.hd),
-                                   Some (List.hd initial) )
-                               else (rectified_functions, None)))
+
+                       if
+                         List.length extracted_continuations
+                         <> List.length continuations
+                       then (rectified_functions, None)
+                       else
+                         (* Step 4c: Find the initial constant to use *)
+                         let initial_constant =
+                           find_initials rectified_functions
+                         in
+                         match initial_constant with
+                         | None -> (rectified_functions, None)
+                         | Some (variables, initial) ->
+                             (* Step 4d: Check continuations can commute *)
+                             if
+                               commutes extracted_continuations
+                               && List.length initial == 1
+                             then
+                               ( rectified_functions
+                                 |> List.map (fun (name, body) ->
+                                        replace_continuations_with_accumulator
+                                          [ (name, body) ]
+                                          cloture_rect variables
+                                        |> List.hd),
+                                 Some (List.hd initial) )
+                             else (rectified_functions, None))
                  in
 
-                 (* rmq: clot can only contain functions defined in defined_functions & their bodies *)
+                 (* Step 5: Rename updated functions *)
+                 let new_name (n : string) = n ^ "_rectified" in
+
+                 let renamed_functions =
+                   rename_elements accumulator_functions cloture_rect new_name
+                 in
+
                  ValueDefinition
                    {
                      is_rec;
@@ -131,10 +118,10 @@ let rectified =
                               match binding with
                               | Variable _ -> [ binding ]
                               | Function { name; parameters; body } ->
-                                  let redefined =
+                                  let new_linearized_definition =
                                     match
                                       List.assoc (new_name name)
-                                        accumulator_functions
+                                        renamed_functions
                                     with
                                     | FunctionLiteral f -> f
                                     | _ ->
@@ -142,20 +129,30 @@ let rectified =
                                           "Unable to find redefined definition"
                                   in
 
-                                  let new_parameters, new_body =
-                                    match redefined.cases with
+                                  let new_parameters, new_linearized_body =
+                                    match new_linearized_definition.cases with
                                     | [ c ] -> c
                                     | _ -> failwith "Bad function"
                                   in
 
-                                  let new_fn =
+                                  let new_definition =
                                     (Function
                                        {
                                          name = new_name name;
                                          parameters = new_parameters;
-                                         body = fst (delinearize new_body []);
+                                         body =
+                                           fst
+                                             (delinearize new_linearized_body []);
                                        }
                                       : Caml_light.binding)
+                                  in
+
+                                  let interceptor_parameter_names =
+                                    parameters
+                                    |> List.mapi (fun i parameter ->
+                                           match get_name parameter with
+                                           | Some name -> name
+                                           | None -> "arg" ^ string_of_int i)
                                   in
 
                                   let interceptor =
@@ -163,28 +160,26 @@ let rectified =
                                        {
                                          name;
                                          parameters =
-                                           List.init (List.length parameters)
-                                             (fun i ->
-                                               Ident ("arg" ^ string_of_int i));
+                                           interceptor_parameter_names
+                                           |> List.map (fun x -> Ident x);
                                          body =
                                            FunctionApplication
                                              {
                                                receiver =
                                                  Variable (new_name name);
                                                arguments =
-                                                 List.init
-                                                   (List.length parameters)
-                                                   (fun i ->
-                                                     (Variable
-                                                        ("arg" ^ string_of_int i)
-                                                       : Caml_light.expression))
+                                                 (interceptor_parameter_names
+                                                 |> List.map (fun x ->
+                                                        (Variable x
+                                                          : Caml_light
+                                                            .expression)))
                                                  @ [
                                                      Parenthesised
                                                        {
                                                          style = Parenthesis;
                                                          inner =
                                                            (match
-                                                              initial_constant
+                                                              initial_accumulator_constant
                                                             with
                                                            | None ->
                                                                FunctionLiteral
@@ -210,7 +205,7 @@ let rectified =
                                       : Caml_light.binding)
                                   in
 
-                                  [ new_fn; interceptor ])
+                                  [ new_definition; interceptor ])
                        |> List.concat;
                    })
          | _ -> phrase)
