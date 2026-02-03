@@ -119,96 +119,101 @@ let rectified =
                               | Variable _ -> [ binding ]
                               | Function { name; parameters; body; return_type }
                                 ->
-                                  let new_linearized_definition =
-                                    match
-                                      List.assoc (new_name name)
-                                        renamed_functions
-                                    with
-                                    | FunctionLiteral f -> f
-                                    | _ ->
-                                        failwith
-                                          "Unable to find redefined definition"
-                                  in
+                                  if not (List.mem name cloture_rect) then
+                                    [ binding ]
+                                  else
+                                    let new_linearized_definition =
+                                      match
+                                        List.assoc (new_name name)
+                                          renamed_functions
+                                      with
+                                      | FunctionLiteral f -> f
+                                      | _ ->
+                                          failwith
+                                            "Unable to find redefined \
+                                             definition"
+                                    in
 
-                                  let new_parameters, new_linearized_body =
-                                    match new_linearized_definition.cases with
-                                    | [ c ] -> c
-                                    | _ -> failwith "Bad function"
-                                  in
+                                    let new_parameters, new_linearized_body =
+                                      match new_linearized_definition.cases with
+                                      | [ c ] -> c
+                                      | _ -> failwith "Bad function"
+                                    in
 
-                                  let new_definition =
-                                    (Function
-                                       {
-                                         name = new_name name;
-                                         parameters = new_parameters;
-                                         body =
-                                           fst
-                                             (delinearize new_linearized_body []);
-                                         return_type;
-                                       }
-                                      : Caml_light.binding)
-                                  in
+                                    let new_definition =
+                                      (Function
+                                         {
+                                           name = new_name name;
+                                           parameters = new_parameters;
+                                           body =
+                                             fst
+                                               (delinearize new_linearized_body
+                                                  []);
+                                           return_type;
+                                         }
+                                        : Caml_light.binding)
+                                    in
 
-                                  let interceptor_parameter_names =
-                                    parameters
-                                    |> List.mapi (fun i parameter ->
-                                           match get_name parameter with
-                                           | Some name -> name
-                                           | None -> "arg" ^ string_of_int i)
-                                  in
+                                    let interceptor_parameter_names =
+                                      parameters
+                                      |> List.mapi (fun i parameter ->
+                                             match get_name parameter with
+                                             | Some name -> name
+                                             | None -> "arg" ^ string_of_int i)
+                                    in
 
-                                  let interceptor =
-                                    (Function
-                                       {
-                                         name;
-                                         parameters =
-                                           interceptor_parameter_names
-                                           |> List.map (fun x -> Ident x);
-                                         body =
-                                           FunctionApplication
-                                             {
-                                               receiver =
-                                                 Variable (new_name name);
-                                               arguments =
-                                                 (interceptor_parameter_names
-                                                 |> List.map (fun x ->
-                                                        (Variable x
-                                                          : Caml_light
-                                                            .expression)))
-                                                 @ [
-                                                     Parenthesised
-                                                       {
-                                                         style = Parenthesis;
-                                                         inner =
-                                                           (match
-                                                              initial_accumulator_constant
-                                                            with
-                                                           | None ->
-                                                               FunctionLiteral
-                                                                 {
-                                                                   style = Fun;
-                                                                   cases =
-                                                                     [
-                                                                       ( [
-                                                                           Ident
-                                                                             "res";
-                                                                         ],
-                                                                         Variable
-                                                                           "res"
-                                                                       );
-                                                                     ];
-                                                                 }
-                                                           | Some cst ->
-                                                               Constant cst);
-                                                       };
-                                                   ];
-                                             };
-                                         return_type;
-                                       }
-                                      : Caml_light.binding)
-                                  in
+                                    let interceptor =
+                                      (Function
+                                         {
+                                           name;
+                                           parameters =
+                                             interceptor_parameter_names
+                                             |> List.map (fun x -> Ident x);
+                                           body =
+                                             FunctionApplication
+                                               {
+                                                 receiver =
+                                                   Variable (new_name name);
+                                                 arguments =
+                                                   (interceptor_parameter_names
+                                                   |> List.map (fun x ->
+                                                          (Variable x
+                                                            : Caml_light
+                                                              .expression)))
+                                                   @ [
+                                                       Parenthesised
+                                                         {
+                                                           style = Parenthesis;
+                                                           inner =
+                                                             (match
+                                                                initial_accumulator_constant
+                                                              with
+                                                             | None ->
+                                                                 FunctionLiteral
+                                                                   {
+                                                                     style = Fun;
+                                                                     cases =
+                                                                       [
+                                                                         ( [
+                                                                             Ident
+                                                                               "res";
+                                                                           ],
+                                                                           Variable
+                                                                             "res"
+                                                                         );
+                                                                       ];
+                                                                   }
+                                                             | Some cst ->
+                                                                 Constant cst);
+                                                         };
+                                                     ];
+                                               };
+                                           return_type;
+                                         }
+                                        : Caml_light.binding)
+                                    in
 
-                                  [ new_definition; interceptor ])
+                                    [ new_definition; interceptor ])
                        |> List.concat;
                    })
          | _ -> phrase)

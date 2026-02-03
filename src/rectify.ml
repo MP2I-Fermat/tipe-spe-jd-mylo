@@ -1347,7 +1347,17 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
     | None -> None
   in
 
-  let cloture = ref (fns |> List.map fst) in
+  let cloture =
+    ref
+      (fns
+      |> List.filter_map (fun (name, definition) ->
+             let contains_other_reference =
+               fns |> List.map fst
+               |> List.exists (fun other_name ->
+                      element_contains_reference other_name definition)
+             in
+             if contains_other_reference then Some name else None))
+  in
   let a_traiter = ref !cloture in
 
   let add_fn (fn : variable) : unit =
