@@ -431,46 +431,40 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
       let e_elt = FunctionLiteral { style; cases = List.rev cases_lins } in
       ([ (p orig_k, e_elt) ], k)
   | LetBinding { bindings; is_rec; inner } ->
-      let bindings_as_assignments =
-        bindings
-        |> List.map (fun (binding : Caml_light.binding) ->
-               match binding with
-               | Function { name; parameters; body } ->
-                   ( Ident name,
-                     Caml_light.FunctionLiteral
-                       { style = Fun; cases = [ (parameters, body) ] } )
-               | Variable { lhs; value } -> (lhs, value))
-      in
-      let bindings_lins, k =
-        List.fold_left
-          (fun (lins, k) (lhs, elt) ->
-            let elt_lin, k = linearize elt k in
-            (elt_lin :: lins, k))
-          ([], k) bindings_as_assignments
-      in
+      let variable_bindings_lins = ref [] in
       let inner_lin, k = linearize inner k in
+      let k_ref = ref k in
       let e_elt =
         LetBinding
           {
             bindings =
-              bindings_lins |> List.rev
-              |> List.mapi (fun i elt_lin ->
-                     let corresponding_pattern =
-                       fst (List.nth bindings_as_assignments i)
-                     in
-                     (Variable
-                        {
-                          lhs = corresponding_pattern;
-                          value = [ (p (k + i), Variable (last_var elt_lin)) ];
-                        }
-                       : linear_binding));
+              bindings
+              |> List.map (fun (binding : binding) ->
+                     match binding with
+                     | Variable { lhs; value } ->
+                         let value_lin, k = linearize value !k_ref in
+                         k_ref := k + 1;
+                         variable_bindings_lins :=
+                           value_lin :: !variable_bindings_lins;
+                         (Variable
+                            {
+                              lhs;
+                              value =
+                                [ (p (k + 1), Variable (last_var value_lin)) ];
+                            }
+                           : linear_binding)
+                     | Function { name; parameters; body; return_type } ->
+                         let body_lin, k = linearize body !k_ref in
+                         k_ref := k;
+                         Function
+                           { name; parameters; body = body_lin; return_type });
             is_rec = false;
             inner = inner_lin;
           }
       in
-      ( [ (p (k + List.length bindings_lins), e_elt) ] :: bindings_lins
+      ( [ (p !k_ref, e_elt) ] :: !variable_bindings_lins
         |> List.rev |> List.concat,
-        k + List.length bindings_lins + 1 )
+        !k_ref + 1 )
   | StringAccess { target; receiver } ->
       let receiver_lin, k = linearize receiver k in
       let receiver_var = last_var receiver_lin in
@@ -917,6 +911,8 @@ let map_locally_terminal_children (f : linear_form -> linear_form)
         }
   | LetBinding { is_rec; bindings; inner } ->
       LetBinding { is_rec; bindings; inner = f inner }
+  | Parenthesised { style; inner } -> Parenthesised { style; inner = f inner }
+  | TypeCoercion { inner; typ } -> TypeCoercion { inner = f inner; typ }
   (* No locally terminal children *)
   | _ -> e
 
@@ -974,6 +970,31 @@ let rec rectify (l : linear_form) (cloture_rect : variable list) : linear_form =
                             rectify body cloture_rect ))
                         cases;
                   }
+            | LetBinding { bindings; inner; is_rec } ->
+                LetBinding
+                  {
+                    is_rec;
+                    bindings =
+                      bindings
+                      |> List.map (fun (binding : linear_binding) ->
+                             match binding with
+                             | Variable _ -> binding
+                             | Function { name; parameters; body; return_type }
+                               ->
+                                 if not (List.mem name cloture_rect) then
+                                   binding
+                                 else
+                                   Function
+                                     {
+                                       name;
+                                       parameters =
+                                         parameters @ [ Ident "cont" ];
+                                       body = rectify body cloture_rect;
+                                       (* Return type now depends on the continuation *)
+                                       return_type = None;
+                                     });
+                    inner = rectify inner cloture_rect;
+                  }
             | _ ->
                 map_locally_terminal_children
                   (fun f -> rectify f cloture_rect)
@@ -1016,6 +1037,21 @@ let rec rectify (l : linear_form) (cloture_rect : variable list) : linear_form =
               ("cont", Variable "new_cont");
               (a, e_rec);
             ])
+
+let rec get_name (p : pattern) : variable option =
+  match p with
+  | Ident n -> Some n
+  | Underscore -> None
+  | Parenthesised inner -> get_name inner
+  | TypeCoercion { inner } -> get_name inner
+  | Constant _ -> None
+  | Record _ -> None
+  | List _ -> None
+  | Construction _ -> None
+  | Concatenation _ -> None
+  | Tuple _ -> None
+  | Or _ -> None
+  | As { name } -> Some name
 
 let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
     (new_name : variable -> variable) =
@@ -1158,14 +1194,20 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
                 | Variable { lhs; value } ->
                     (Variable
                        {
-                         lhs;
+                         lhs =
+                           (match get_name lhs with
+                           | Some name when List.mem name cloture_rect ->
+                               Ident (new_name name)
+                           | _ -> lhs);
                          value = rename_elements value cloture_rect new_name;
                        }
                       : linear_binding)
                 | Function { name; parameters; body; return_type } ->
                     Function
                       {
-                        name;
+                        name =
+                          (if List.mem name cloture_rect then new_name name
+                           else name);
                         parameters;
                         body = rename_elements body cloture_rect new_name;
                         return_type;
@@ -1197,21 +1239,6 @@ and rename_elements (l : linear_form) (cloture_rect : variable list)
          let new_elt = rename_elements_in elt cloture_rect new_name in
          if List.mem name cloture_rect then (new_name name, new_elt)
          else (name, new_elt))
-
-let rec get_name (p : pattern) : variable option =
-  match p with
-  | Ident n -> Some n
-  | Underscore -> None
-  | Parenthesised inner -> get_name inner
-  | TypeCoercion { inner } -> get_name inner
-  | Constant _ -> None
-  | Record _ -> None
-  | List _ -> None
-  | Construction _ -> None
-  | Concatenation _ -> None
-  | Tuple _ -> None
-  | Or _ -> None
-  | As { name } -> Some name
 
 let rec find_definitions_in_element (fns : (variable * linear_element) list)
     (name : variable) (e : linear_element) : linear_element list =
@@ -1386,16 +1413,20 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
       a_traiter := List.tl !a_traiter;
 
       let current_argument_count =
-        match get_argument_count current with Some n -> n | None -> raise Exit
+        match get_argument_count current with
+        | Some n -> n
+        | None ->
+            print_endline "No current arg count";
+            raise Exit
       in
 
       let rec propagate_from_element (e_name : variable) (e : linear_element)
-          (enclosing_function : variable) : unit =
+          (enclosing_function : variable) (can_outer_leak : bool) : unit =
         match e with
         | Variable _ | Constant _ -> ()
-        | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner
-          ->
-            propagate_from inner enclosing_function false
+        | Parenthesised { inner } | TypeCoercion { inner } ->
+            propagate_from inner enclosing_function can_outer_leak
+        | Dereference inner -> propagate_from inner enclosing_function false
         | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
             l
             |> List.iter (fun elt ->
@@ -1434,29 +1465,36 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
             propagate_from value enclosing_function false
         | If { condition; body; else_body } -> (
             propagate_from condition enclosing_function false;
-            propagate_from body enclosing_function false;
+            propagate_from body enclosing_function can_outer_leak;
             match else_body with
             | None -> ()
-            | Some b -> propagate_from b enclosing_function false)
+            | Some b -> propagate_from b enclosing_function can_outer_leak)
         | Match { value; cases } ->
             propagate_from value enclosing_function false;
             cases
             |> List.iter (fun (_, body) ->
-                   propagate_from body enclosing_function false)
+                   propagate_from body enclosing_function can_outer_leak)
         | Try _ -> failwith "Found linearized try"
         | FunctionLiteral { cases } ->
             List.iter (fun (_, body) -> propagate_from body e_name false) cases
         | LetBinding { bindings; inner } ->
-            propagate_from inner enclosing_function false;
+            propagate_from inner enclosing_function can_outer_leak;
             bindings
             |> List.iter (fun (binding : linear_binding) ->
                    match binding with
-                   | Variable { value } ->
-                       propagate_from value enclosing_function false
+                   | Variable { lhs; value } ->
+                       (if last_var value = current then
+                          match get_name lhs with
+                          | None -> raise Exit
+                          | Some var -> add_fn var);
+                       (* We can leak from value since this binding will then be in the rectifying set. *)
+                       propagate_from value enclosing_function true
                    | Function { name; body } -> propagate_from body name false)
       and propagate_from (l : linear_form) (enclosing_function : variable)
           (can_leak : bool) : unit =
-        if last_var l = current && not can_leak then raise Exit;
+        if last_var l = current && not can_leak then (
+          print_endline ("Leak (" ^ enclosing_function ^ ")");
+          raise Exit);
         l
         |> List.iter (fun (name, element) ->
                match element with
@@ -1466,7 +1504,9 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
                    if receiver = current then
                      if List.length arguments = current_argument_count then
                        add_fn enclosing_function
-                     else raise Exit
+                     else (
+                       print_endline "Not a full application";
+                       raise Exit)
                    else
                      arguments
                      |> List.iteri (fun i argument ->
@@ -1476,17 +1516,19 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
                               in
                               match ith_names with
                               | Some names -> List.iter add_fn names
-                              | None -> raise Exit)
+                              | None ->
+                                  print_endline "No arg names";
+                                  raise Exit)
                | _ -> ());
 
         l
         |> List.iter (fun (name, element) ->
-               propagate_from_element name element enclosing_function)
+               propagate_from_element name element enclosing_function can_leak)
       in
 
       fns
       |> List.iter (fun (name, def) ->
-             propagate_from_element name def "UNKNOWN_GLOBAL_ENCLOSURE")
+             propagate_from_element name def "UNKNOWN_GLOBAL_ENCLOSURE" false)
     done;
     Some !cloture
   with Exit -> None
