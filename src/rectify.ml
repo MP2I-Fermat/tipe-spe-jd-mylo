@@ -878,15 +878,15 @@ let rec element_contains_application (f : variable) (e : linear_element) : bool
       contains_application f value
       || cases |> List.map snd |> List.exists (contains_application f)
   | Try _ -> failwith "Found linearized try"
-  | FunctionLiteral { cases } ->
-      List.exists (fun (_, body) -> contains_application f body) cases
+  (* TODO: Formalize "contains" to better explain this. *)
+  | FunctionLiteral { cases } -> false
   | LetBinding { bindings; inner } ->
       contains_application f inner
       || bindings
          |> List.exists (fun (binding : linear_binding) ->
                 match binding with
                 | Variable { value } -> contains_application f value
-                | Function { body } -> contains_application f body)
+                | Function { body } -> false)
   | StringAccess { receiver; target } ->
       contains_application f receiver || contains_application f target
   | StringAssignment { receiver; target; value } ->
@@ -1060,150 +1060,166 @@ and find_definition (fns : (variable * linear_element) list) (name : variable) :
 *)
 let rec rectify (l : linear_form) (cloture_rect : variable list)
     (fns : linear_form) : linear_form =
-  let rec find_first_recursive_element (tail : linear_form) (head : linear_form)
-      : linear_form * ((variable * linear_element) * linear_form) option =
-    match tail with
-    | [] -> (List.rev head, None)
-    | (p, e) :: q ->
-        if List.exists (fun f -> element_contains_application f e) cloture_rect
-        then (List.rev head, Some ((p, e), q))
-        else find_first_recursive_element q ((p, e) :: head)
-  in
-  let l_1, maybe_recursive = find_first_recursive_element l [] in
-  match maybe_recursive with
-  | None ->
-      let head_var = last_var l_1 in
-      l_1
-      @ [
-          ( "cont_res",
-            FunctionApplication
-              {
-                receiver = [ ("cont_call", Variable "cont") ];
-                arguments = [ [ ("cont_arg", Variable head_var) ] ];
-              } );
-        ]
-  | Some ((a, e), l_2) -> (
-      let e_rec =
+  match l with
+  | [] -> failwith "Empty linear form (rectify)"
+  | (name, e) :: q -> (
+      (* If e is a let-binding, update any recursive functions defined in e. *)
+      let e =
         match e with
-        | FunctionApplication { receiver = [ (p, Variable f) ]; arguments }
-          when List.mem f cloture_rect ->
-            FunctionApplication
-              {
-                receiver = [ (p, Variable f) ];
-                arguments = arguments @ [ [ ("cont_arg", Variable "cont") ] ];
-              }
-        | FunctionLiteral { style; cases; return_type_for_delinearize } ->
-            FunctionLiteral
-              {
-                style;
-                cases =
-                  List.map
-                    (fun (patterns, body) ->
-                      ( patterns
-                        @ [
-                            (match return_type_for_delinearize with
-                            | None -> Ident "cont"
-                            | Some typ ->
-                                TypeCoercion
-                                  {
-                                    inner = Ident "cont";
-                                    typ =
-                                      Function
-                                        {
-                                          argument = typ;
-                                          result = Argument "ret";
-                                        };
-                                  });
-                          ],
-                        rectify body cloture_rect fns ))
-                    cases;
-                return_type_for_delinearize =
-                  (match return_type_for_delinearize with
-                  | None -> None
-                  | Some _ -> Some (Argument "ret"));
-              }
         | LetBinding { bindings; inner; is_rec } ->
             LetBinding
               {
-                is_rec;
                 bindings =
-                  bindings
-                  |> List.map (fun (binding : linear_binding) ->
-                         match binding with
-                         | Variable _ -> binding
-                         | Function { name; parameters; body; return_type } ->
-                             if not (List.mem name cloture_rect) then binding
-                             else
-                               Function
-                                 {
-                                   name;
-                                   parameters =
-                                     parameters
-                                     @ [
-                                         (match return_type with
-                                         | None -> Ident "cont"
-                                         | Some typ ->
-                                             TypeCoercion
-                                               {
-                                                 inner = Ident "cont";
-                                                 typ =
-                                                   Function
-                                                     {
-                                                       argument = typ;
-                                                       result = Argument "ret";
-                                                     };
-                                               });
-                                       ];
-                                   body = rectify body cloture_rect fns;
-                                   (* Return type now depends on the continuation *)
-                                   return_type = Some (Argument "ret");
-                                 });
-                inner = rectify inner cloture_rect fns;
+                  List.map
+                    (fun binding ->
+                      match binding with
+                      | Function { name; parameters; body; return_type }
+                        when List.mem name cloture_rect ->
+                          Function
+                            {
+                              name;
+                              parameters =
+                                parameters
+                                @ [
+                                    (match return_type with
+                                    | None -> Ident "cont"
+                                    | Some typ ->
+                                        TypeCoercion
+                                          {
+                                            inner = Ident "cont";
+                                            typ =
+                                              Function
+                                                {
+                                                  argument = typ;
+                                                  result = Argument "ret";
+                                                };
+                                          });
+                                  ];
+                              body = rectify body cloture_rect fns;
+                              return_type =
+                                (match return_type with
+                                | None -> None
+                                | Some _ -> Some (Argument "ret"));
+                            }
+                      | _ -> binding)
+                    bindings;
+                inner;
+                is_rec;
               }
-        | _ ->
-            map_locally_terminal_children
-              (fun f -> rectify f cloture_rect fns)
-              e
+        | _ -> e
       in
-      match l_2 with
-      | [] -> l_1 @ [ (a, e_rec) ]
-      | _ ->
-          let e_return_type =
-            match e_rec with
-            | FunctionApplication { receiver = [ (p, _) ] } ->
-                let rec find_return_type (v : variable) : type_expression option
-                    =
-                  match find_definition fns v with
-                  | Some (FunctionLiteral { return_type_for_delinearize }) ->
-                      return_type_for_delinearize
-                  | Some (Variable v2) -> find_return_type v2
-                  | _ -> None
-                in
-                find_return_type p
-            | _ -> None
-          in
 
-          let l_2_rec = rectify l_2 cloture_rect fns in
-          l_1
-          @ [
-              ( "new_cont",
-                FunctionLiteral
-                  {
-                    style = Fun;
-                    cases =
-                      [
-                        ( [
-                            (match e_return_type with
-                            | None -> Ident a
-                            | Some typ -> TypeCoercion { inner = Ident a; typ });
-                          ],
-                          l_2_rec );
-                      ];
-                    return_type_for_delinearize = Some (Argument "ret");
-                  } );
+      if List.mem name cloture_rect then
+        (* This is a definition of a function that needs rectifying. *)
+        (* Assumption: these definitions do not invoke anything recursively. *)
+        let q_rect =
+          match q with [] -> [] | _ -> rectify q cloture_rect fns
+        in
+        match e with
+        | Variable v -> (name, e) :: q_rect
+        | FunctionLiteral { style; cases; return_type_for_delinearize } ->
+            let e_updated =
+              FunctionLiteral
+                {
+                  style;
+                  cases =
+                    List.map
+                      (fun (patterns, body) ->
+                        ( patterns
+                          @ [
+                              (match return_type_for_delinearize with
+                              | None -> Ident "cont"
+                              | Some typ ->
+                                  TypeCoercion
+                                    {
+                                      inner = Ident "cont";
+                                      typ =
+                                        Function
+                                          {
+                                            argument = typ;
+                                            result = Argument "ret";
+                                          };
+                                    });
+                            ],
+                          rectify body cloture_rect fns ))
+                      cases;
+                  return_type_for_delinearize =
+                    (match return_type_for_delinearize with
+                    | None -> None
+                    | Some _ -> Some (Argument "ret"));
+                }
+            in
+            (name, e_updated) :: q_rect
+        | _ -> failwith "Unknown definition type for rectified function"
+      else if
+        List.exists (fun fn -> element_contains_application fn e) cloture_rect
+      then
+        let e_rect =
+          match e with
+          | FunctionApplication { receiver; arguments } ->
+              FunctionApplication
+                {
+                  receiver;
+                  arguments = arguments @ [ [ ("cont_arg", Variable "cont") ] ];
+                }
+          | _ ->
+              map_locally_terminal_children
+                (fun child -> rectify child cloture_rect fns)
+                e
+        in
+        match q with
+        | [] -> [ (name, e_rect) ]
+        | _ ->
+            let e_return_type =
+              match e_rect with
+              | FunctionApplication { receiver = [ (p, _) ] } ->
+                  let rec find_return_type (v : variable) :
+                      type_expression option =
+                    match find_definition fns v with
+                    | Some (FunctionLiteral { return_type_for_delinearize }) ->
+                        return_type_for_delinearize
+                    | Some (Variable v2) -> find_return_type v2
+                    | _ -> None
+                  in
+                  find_return_type p
+              | _ -> None
+            in
+
+            let q_rect = rectify q cloture_rect fns in
+            let new_cont =
+              FunctionLiteral
+                {
+                  style = Fun;
+                  cases =
+                    [
+                      ( [
+                          (match e_return_type with
+                          | None -> Ident name
+                          | Some typ -> TypeCoercion { inner = Ident name; typ });
+                        ],
+                        q_rect );
+                    ];
+                  return_type_for_delinearize = Some (Argument "ret");
+                }
+            in
+            [
+              ("new_cont", new_cont);
               ("cont", Variable "new_cont");
-              (a, e_rec);
-            ])
+              ("rec_call", e_rect);
+            ]
+      else
+        match q with
+        | [] ->
+            [
+              (name, e);
+              ( "cont_call",
+                FunctionApplication
+                  {
+                    receiver = [ ("cont_ref", Variable "cont") ];
+                    arguments = [ [ ("res_ref", Variable name) ] ];
+                  } );
+            ]
+        | _ -> (name, e) :: rectify q cloture_rect fns)
 
 let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
     (new_name : variable -> variable) =

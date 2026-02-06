@@ -33,3 +33,7 @@ let rec is_even_length (l : 'a list) : bool =
 
 let rec length (l : 'a list) : int =
   match l with [] -> 0 | _ :: q -> 1 + length q
+
+let rec f () : unit =
+  let rec g () : unit = f () in
+  g ()

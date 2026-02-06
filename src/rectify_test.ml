@@ -130,7 +130,13 @@ let rectify_bindings (bindings : binding list) : rectify_result =
                               |> List.mapi (fun i parameter ->
                                      match get_name parameter with
                                      | Some _ -> parameter
-                                     | None -> Ident ("arg" ^ string_of_int i));
+                                     | None -> (
+                                         match parameter with
+                                         | Constant
+                                             (Construction (Unit Parenthesis))
+                                           ->
+                                             parameter
+                                         | _ -> Ident ("arg" ^ string_of_int i)));
                             body =
                               FunctionApplication
                                 {
@@ -141,8 +147,17 @@ let rectify_bindings (bindings : binding list) : rectify_result =
                                            match get_name parameter with
                                            | Some name ->
                                                (Variable name : expression)
-                                           | None ->
-                                               Variable ("arg" ^ string_of_int i))
+                                           | None -> (
+                                               match parameter with
+                                               | Constant
+                                                   (Construction
+                                                      (Unit Parenthesis)) ->
+                                                   Constant
+                                                     (Construction
+                                                        (Unit Parenthesis))
+                                               | _ ->
+                                                   Variable
+                                                     ("arg" ^ string_of_int i)))
                                     )
                                     @ [
                                         Parenthesised
