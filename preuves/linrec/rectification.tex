@@ -13,7 +13,7 @@ lieu de renvoyer son résultat directement. On peut ainsi garantir que tout appe
 récursif est \textit{terminal} (cf. ci-dessous) en passant toute la logique qui
 le suivait précédemment sous forme d'une continuation.
 
-\subsection{R\'ecursivit\'e terminale}
+\subsection{Récursivité terminale}
 
 \begin{definition}
     Ensemble de variables rectifiant une forme linéaire.
@@ -104,27 +104,27 @@ le suivait précédemment sous forme d'une continuation.
 \subsection{Rectification}
 
 \begin{definition}
-    Formes lin\'eaires \'equivalentes
+    Formes linéaires équivalentes
     \newline
-    On dit que deux formes lin\'eaires $l_1$ et $l_2$ sont
-    \textit{\'equivalentes} lorsque Eval($l_1$, $c$) a le m\^eme r\'esultat que
+    On dit que deux formes linéaires $l_1$ et $l_2$ sont
+    \textit{équivalentes} lorsque Eval($l_1$, $c$) a le même résultat que
     Eval($l_2$, $c$) pour tout contexte $c$.
 \end{definition}
 
 On introduit alors un algorithme permettant de \textit{rectifier} une forme
-lin\'eaire $l$, c'est \`a dire de calculer une forme lin\'eaire r\'ecursive
-terminale \'equivalente \`a $l$.
+linéaire $l$, c'est à dire de calculer une forme linéaire récursive
+terminale équivalente à $l$.
 
 \begin{algorithm}[H]
     \caption{Rectifier}
     \Entree{
-        Une forme lin\'eaire correcte $l$, un ensemble de variables
+        Une forme linéaire correcte $l$, un ensemble de variables
         rectifiable $E$, un nom de variable non utilisée dans $l$ $cont$ et une
         fonction injective $nouveau\_nom$ de $E$ dans les noms de variables non
         utilisées.
     }
     \Sortie{
-        Une forme lin\'eaire correcte $l'$ telle que $l'$ ne contient aucun
+        Une forme linéaire correcte $l'$ telle que $l'$ ne contient aucun
         appel à une fonction de $E$ et est récursivement terminale pour toute
         fonction de $nouveau\_nom(E)$.
     }
@@ -138,15 +138,15 @@ terminale \'equivalente \`a $l$.
     \uSinon{
     $e \leftarrow$ Le premier élément de $l$ contenant une application d'une
     fonction de $E$ \\
-    $a \leftarrow$ Le motif associé \`a $e$ dans $l$ \\
+    $a \leftarrow$ Le motif associé à $e$ dans $l$ \\
     $l_1 \leftarrow$ Les éléments de $l$ situés avant $e$ \\
     $l_2 \leftarrow$ Les éléments de $l$ situés après $e$ \\
 
 
 
     \uSi{$l_2$ est vide}{
-    \uSi{$e$ est un appel \`a une fonction $f$ de $E$}{
-        $e_{rec} \leftarrow$ Un appel \`a $nouveau\_nom(f)$ avec en arguments les
+    \uSi{$e$ est un appel à une fonction $f$ de $E$}{
+        $e_{rec} \leftarrow$ Un appel à $nouveau\_nom(f)$ avec en arguments les
         arguments de $e$ suivis de $cont$.
     }\uSinon{
         $e_{rec} \leftarrow$ $e$ avec chacun de ses fils localement terminaux
@@ -158,8 +158,8 @@ terminale \'equivalente \`a $l$.
     $l_{2,rec} \leftarrow$ Rectifier($l_2$, $E$, $cont$) \\
     $cont' \leftarrow$ Un nom de variable non utilisé dans $l$ différent de
     $cont$. \\
-    \uSi{$e$ est un appel \`a une fonction $f$ de $E$}{
-        $e_{rec} \leftarrow$ Un appel \`a $nouveau\_nom(f)$ avec en arguments les
+    \uSi{$e$ est un appel à une fonction $f$ de $E$}{
+        $e_{rec} \leftarrow$ Un appel à $nouveau\_nom(f)$ avec en arguments les
         arguments de $e$ suivis de $cont'$
     }\uSinon{
         $e_{rec} \leftarrow$ $e$ avec chacun de ses fils localement terminaux
