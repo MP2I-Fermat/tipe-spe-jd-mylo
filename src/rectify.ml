@@ -1052,12 +1052,7 @@ and find_definition (fns : (variable * linear_element) list) (name : variable) :
   match definitions with [ def ] -> Some def | _ -> None
 
 (** rectify l c returns a linear form equivalent to l in which all calls to
-    functions in c are made terminal.
-
-    The functions in c are assumed to be later redefined to use CPS taking a
-    continuation as their last argument. The bodies of any such functions
-    defined within l are modified accordingly, but the function header is not.
-*)
+    functions in c are made terminal. *)
 let rec rectify (l : linear_form) (cloture_rect : variable list)
     (fns : linear_form) : linear_form =
   match l with
