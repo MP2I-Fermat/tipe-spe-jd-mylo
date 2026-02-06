@@ -164,12 +164,13 @@ let fonction_vers_while
                     lhs ;
                     value ;
                   }: binding)
-              | Function { name ; parameters ; body } ->
+              | Function { name ; parameters ; body ; return_type } ->
                   (* TODO à repenser aussi *)
                   Function {
                     name ;
                     parameters ;
                     body ;
+                    return_type
                   }
             ) bindings ;
           is_rec ;
@@ -221,9 +222,11 @@ let parse_file name =
 
 
 let whilify (program: phrase list) =
-  let interceptor (name: string) (parameters: pattern list) : binding =
+  let interceptor (name: string) (parameters: pattern list)
+      (return_type: type_expression option) : binding =
     Function {
-      name = name;
+      name;
+      return_type;
       parameters =
         List.mapi
         Caml_light.(fun i x ->
@@ -263,13 +266,14 @@ let whilify (program: phrase list) =
       let linearised_binding_option =
         match one_binding with
         | Variable _ -> None
-        | Function {name; parameters; body} ->
+        | Function {name; parameters; body; return_type} ->
             let body_lin, _ = linearize body 0 in
             Some (
               name,
               FunctionLiteral {
                 style = Fun;
                 cases = [(parameters, body_lin)];
+                return_type_for_delinearize = return_type;
               }
             )
         in
@@ -286,26 +290,30 @@ let whilify (program: phrase list) =
                 "pour la fonction" ^ (fst linearised_binding) ^ " *)");
               [phrase]
           | Some clot ->
-            let name, new_fn, parameters = match linearised_binding with
-            | name, (
-              FunctionLiteral {
-                style; cases = [(parameters, body_lin)]
-              }) ->
-               let body_delin, _ =
-                delinearize
-                  (push_rectified_definitions
-                     (rectify body_lin clot)
-                     clot new_name) [] in
-               let body_while =
-                 fonction_vers_while
-                   (new_name name) (parameters @ [Ident "cont"]) body_delin
-                   (List.map new_name clot) in
-               name, (Function {
-                   name = name^"_whilified";
-                   parameters = parameters @ [Ident "cont"];
-                   body = body_while
-                } : Caml_light.binding), parameters
-            | _ -> failwith "Pas une fonction ?"
+            let name, new_fn, parameters, return_type =
+              match linearised_binding with
+              | name, (
+                FunctionLiteral {
+                  style; cases = [(parameters, body_lin)];
+                  return_type_for_delinearize
+                }) ->
+                 let body_delin, _ =
+                  delinearize
+                    (rename_elements
+                       (rectify body_lin clot body_lin)
+                       clot new_name) [] in
+                 let body_while =
+                   fonction_vers_while
+                     (new_name name) (parameters @ [Ident "cont"]) body_delin
+                     (List.map new_name clot) in
+                 name, (Function {
+                     name = name^"_whilified";
+                     parameters = parameters @ [Ident "cont"];
+                     body = body_while;
+                     return_type = return_type_for_delinearize
+                  } : Caml_light.binding), parameters,
+                  return_type_for_delinearize
+              | _ -> failwith "Pas une fonction ?"
 
             in
             [
@@ -314,7 +322,7 @@ let whilify (program: phrase list) =
                 bindings = [new_fn]
               } ; ValueDefinition {
                 is_rec = false;
-                bindings = [interceptor name parameters]
+                bindings = [interceptor name parameters return_type]
               }
            ]
          end)
