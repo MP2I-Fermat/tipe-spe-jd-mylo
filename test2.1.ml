@@ -1,6 +1,6 @@
 (* Commentaire *)
 
-let rec fizzbuzz_a_partir (max: int) (n: int) =
+let rec fizzbuzz_a_partir (max: int) (n: int) : unit =
   if n > max then
     ()
   else begin
@@ -17,7 +17,7 @@ let rec fizzbuzz_a_partir (max: int) (n: int) =
   end
 
 
-let fizzbuzz max = fizzbuzz_a_partir max 1
+let fizzbuzz (max: int) : unit = fizzbuzz_a_partir max 1
 
 (*
 let rec fibo_jusqua (n: int) (i: int) (last: int) (lastlast: int) =
@@ -31,13 +31,13 @@ let rec fibo_jusqua (n: int) (i: int) (last: int) (lastlast: int) =
 let fibo n = fibo_jusqua n 2 1 1
 *)
 
-let rec map (f: 'a -> 'b) (l: 'a list) =
+let rec map (f: 'a -> 'b) (l: 'a list) : 'b list =
   match l with
   | [] -> []
   | x::q -> (f x)::(map f q)
 
 
-let rec sum (l : int list) =
+let rec sum (l : int list) : int =
   match l with
   | [] -> 0
   | x :: q -> x + sum q
@@ -48,7 +48,7 @@ type 'a abr =
   | Noeud of 'a * 'a abr * 'a abr
 
 
-let rec recherche_abr (abr: 'a abr) (valeur: 'a) =
+let rec recherche_abr (abr: 'a abr) (valeur: 'a) : bool =
   match abr with
   | Feuille a -> a = valeur
   | Noeud(t, g, d) ->
@@ -59,7 +59,7 @@ let rec recherche_abr (abr: 'a abr) (valeur: 'a) =
         recherche_abr d valeur
       end
 
-let rec insert_abr (abr: 'a abr) (valeur: 'a) =
+let rec insert_abr (abr: 'a abr) (valeur: 'a) : 'a abr =
   match abr with
   | Feuille a ->
       begin
