@@ -82,7 +82,7 @@ le suivait précédemment sous forme d'une continuation.
 
     Considérons maintenant
     \begin{align*}
-        g : l \rightarrowtail \textnormal{Eval} \left(
+        g : l \mapsto \textnormal{Eval} \left(
         \begin{aligned}
              & a_1 := \texttt{List.length}\ l                                     \\
              & a_2 := a_1 = 0                                                     \\
@@ -329,16 +329,16 @@ Montrons alors la correction de cet algorithme.
 \subsection{Application}
 
 Soit $E = \{f_1, \ldots, f_n\}$ un ensemble de noms de fonctions
-définies par $f_i: x_1, \ldots, x_n \rightarrowtail \textnormal{Eval}(l_i, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
+définies par $f_i: x_1, \ldots, x_n \mapsto \textnormal{Eval}(l_i, [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n])$
 tel que $E$ soit rectifiable.
 
-Construisons un ensemble de fonctions $\{f_1', \ldots, f_n'\}$ par $f_i' : x_1 \rightarrow x_1, \ldots, x_n, \texttt{cont} \rightarrowtail \textnormal{Eval}(\textnormal{Rectifier}(l_i, E, \texttt{cont}, nouveau\_nom), [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n, \texttt{cont} \rightarrow \texttt{cont}])$
-avec \\ $nouveau\_nom$ défini par $f_i \rightarrowtail f_i'$.
+Construisons un ensemble de fonctions $\{f_1', \ldots, f_n'\}$ par $f_i' : x_1 \rightarrow x_1, \ldots, x_n, \texttt{cont} \mapsto \textnormal{Eval}(\textnormal{Rectifier}(l_i, E, \texttt{cont}, nouveau\_nom), [x_1 \rightarrow x_1, \ldots, x_n \rightarrow x_n, \texttt{cont} \rightarrow \texttt{cont}])$
+avec \\ $nouveau\_nom$ défini par $f_i \mapsto f_i'$.
 
 Montrons alors que, pour tout $f_i \in E$, pour toute fonction $g$ de type
 compatible, $g (f_i\ x_1\ \ldots\ x_n)$ est équivalent à $f_i'\ x_1\ \ldots\ x_n\ g$.
 
-On pourra alors redéfinir les $f_i$ par $f_i: x_1, \ldots, x_n \rightarrowtail f_i'\ x_1\ \ldots\ x_n\ \texttt{(fun x -> x)}$
+On pourra alors redéfinir les $f_i$ par $f_i: x_1, \ldots, x_n \mapsto f_i'\ x_1\ \ldots\ x_n\ \texttt{(fun x -> x)}$
 pour obtenir un programme équivalent mais o\`u les $f_i'$ sont mutuellement
 récursives terminales.
 

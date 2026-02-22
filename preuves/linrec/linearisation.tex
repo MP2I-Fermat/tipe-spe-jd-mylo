@@ -3,43 +3,31 @@
 \subsection{Formes linéaires}
 
 \textit{
-    On suppose dans la suite que les ensembles des expressions et des motifs
-    (patterns) \texttt{OCaml} sont définis par induction.
+    On suppose dans la suite que l'ensemble des expressions \texttt{OCaml} est
+    défini par induction.
 }
 
 \begin{definition}
     Formes linéaires et éléments linéaires
-    \newline
-    On définit par \hl{induction double} les ensembles des formes linéaires
+
+    On définit par induction les ensembles des formes linéaires
     et des éléments linéaires.
 
     \medbreak
 
-    L'ensemble des \textit{éléments linéaires} est défini par les
-    règles suivantes:
+    Une \textit{forme linéaire} est une liste \textbf{non vide} de couples
+    $(a, e)$ où $a$ est un nom de variable et $e$ est un élément linéaire.
 
-    \begin{enumerate}
-        \item Tout constructeur d'arité nulle des expressions \texttt{OCaml}
-              est un constructeur des éléments linéaires.
-        \item Si $C$ est un constructeur d'arité $n$ et de paramètre dans
-              $P$ des expressions \texttt{OCaml}, alors on introduit un
-              constructeur de même nom $C$, de même paramètre $P$, et
-              \hl{d'arité $n$ sur les formes linéaires}.
+    \medbreak
 
-              \textit{
-                  C'est-à-dire qu'on crée un constructeur qui prend en
-                  paramètre un élément de $P$ et $n$ formes linéaires.
-              }
-    \end{enumerate}
-
-    On appelle alors \textit{forme linéaire} une liste \textbf{non vide} de
-    couples $(p, e)$ o\`u $p$ est un motif \texttt{OCaml} et $e$ est un
-    élément linéaire.
+    L'ensemble des \textit{éléments linéaires} est défini par les mêmes règles
+    que l'ensemble des expressions \texttt{OCaml}, avec dans chaque règle tout
+    paramètre inductif (i.e toutes les sous-expressions) remplacées par des
+    formes linéaires.
 \end{definition}
 
 Si $[(a_1, e_1), (a_2, e_2), (a_3, e_3), ...]$ est une forme linéaire on
 notera plut\^ot:
-\footnote{On justifiera cette notation \hyperref[justification_notation_forme_lineaire_simple]{plus tard}.}
 \begin{align*}
      & a_1 := e_1 \\
      & a_2 := e_2 \\
@@ -48,8 +36,10 @@ notera plut\^ot:
 \end{align*}
 
 \begin{remark}
-    Intuitivement, il faut considérer les formes linéaires comme étant
-    simplement une autre représentation des expressions \texttt{OCaml}.
+    Intuitivement, les éléments linéaires correspondent à une opération
+    effectuée par un programme \texttt{OCaml}. Les formes linéaires sont alors
+    une séquence de telles opérations, où l'on stocke dans chaque variable le
+    résultat de l'opération associée.
 \end{remark}
 
 \begin{remark}
@@ -68,10 +58,13 @@ notera plut\^ot:
 \begin{example}
     Quelques formes linéaires
     \begin{align*}
-         & a_1 := [(\_, 1)] + [(\_, 2)]     \\
-         & a_2 := [(\_, 3)] - [(\_, 4)]     \\
-         & a_3 := [(\_, a_1)] * [(\_, a_3)] \\
+         & a_1 := (a_2 := 1) + (a_3 := 2)     \\
+         & a_4 := (a_5 := 3) - (a_6 := 4)     \\
+         & a_7 := (a_8 := a_1) * (a_9 := a_3) \\
     \end{align*}
+
+    Les parenthèses sont données pour clarifier ou se trouve chaque forme
+    linéaire.
 
     Intuitivement, cette forme linéaire correspond \footnote{
         On donnera une définition de la correspondance entre formes
@@ -79,115 +72,84 @@ notera plut\^ot:
     } à l'expression
     \texttt{OCaml} \texttt{(1 + 2) * (3 - 4)}. Comme l'expression est assez
     lourde, lorsqu'on rencontre une forme linéaire réduite à un élément
-    $(p, e)$ et lorsqu'il n'y a pas d'ambigu\"ité, on écrira $e$ a la place de
-    $[(p, e)]$. Ainsi, l'exemple precedent s'écrit aussi :
+    $(a, e)$ et lorsqu'il n'y a pas d'ambiguïté\footnote{
+        On justifiera l'utilisation de ce raccourci
+        \hyperref[justification_notation_forme_lineaire_simple]{plus tard}.
+    }, on écrira $e$ a la place de
+    $[(a, e)]$. Ainsi, l'exemple precedent s'écrit aussi :
     \begin{align*}
          & a_1 := 1 + 2     \\
-         & a_2 := 3 - 4     \\
-         & a_3 := a_1 * a_2 \\
+         & a_4 := 3 - 4     \\
+         & a_7 := a_1 * a_3 \\
     \end{align*}
-
-    On pourra aussi représenter les éléments linéaires par des arbres:
-
-    $$
-        \left[
-            \left(a_1, \Tree [.+ 1 2 ] \right),
-            \left(a_2, \Tree [.- 3 4 ] \right),
-            \left(a_3, \Tree [.* a_1 a_2 ] \right)
-            \right]
-    $$
-
-    \bigbreak
-
-    On rencontrera parfois des formes linéaires un peu plus complexes. Par
-    exemple:
-
-    \begin{align*}
-         & a_1 := \texttt{if} \  [(a_2, 1 + 2), (\_, a_2 = 3)] \  \texttt{then} \  [(\_, 1)] \  \texttt{else} \  [(\_, 2)] \\
-         & a_3 := a_1 * 5
-    \end{align*}
-
-    Cette forme linéaire correspond à \texttt{(if 1 + 2 = 3 then 1 else 2)
-        * 5}. On mélange ici la notation explicite et la notation raccourcie des
-    formes linéaires pour plus de clarté.
-
 \end{example}
 
 \begin{remark}
-    Puisque les éléments linéaires peuvent être vus comme des arbres, on
-    utilisera librement toute la terminologie des arbres pour décrire des
-    éléments linéaires, à ceci près qu'il faut modifier les
-    définitions en considérant que les enfants d'un n{\oe}ud sont des listes
-    d'arbres et non des arbres eux-mêmes.
+    Puisque les éléments linéaires peuvent être vus comme des arbres (tout comme
+    les expressions \texttt{OCaml}), on utilisera librement toute la
+    terminologie des arbres pour décrire des éléments linéaires, à ceci près
+    qu'il faut modifier les définitions en considérant que les fils d'un
+    n{\oe}ud sont des listes d'arbres et non des arbres eux-mêmes.
 \end{remark}
 
-\subsection{évaluation}
+\subsection{Évaluation}
 
 \begin{definition}
-    Contexte d'évaluation
-    \newline
-    On appelle \textit{contexte d'évaluation} (ou \textit{contexte}) toute
-    fonction de $V$ dans $E$ o\`u $V$ est un ensemble de noms de variables et
-    $E$ est l'ensemble de valeurs \texttt{OCaml}.
+    Environnement d'évaluation
+
+    On appelle \textit{environnement d'évaluation} (ou \textit{environnement})
+    toute fonction de $V$ dans $E$ o\`u $V$ est un ensemble de noms de variables
+    et $E$ est l'ensemble de valeurs \texttt{OCaml}.
 \end{definition}
 
 On introduit alors deux algorithmes nous permettant de décrire
-l'\textit{éxécution} d'une forme ou d'un élément linéaire:
+l'\textit{évaluation} d'une forme ou d'un élément linéaire:
 
 \bigbreak
 
 \begin{algorithm}[H]
     \caption{Eval}
-    \Entree{$l$ une forme linéaire, $c$ un contexte}
+    \Entree{$l$ une forme linéaire, $\sigma$ un environnement d'évaluation}
     \Sortie{La valeur \texttt{OCaml} résultant de l'évaluation de $l$, et
         potentiellement des effets de bord.}
 
-    \uSi{$l$ est réduit à un seul couple $(p, e)$}{
-        Renvoyer Eval\_élément($e$, $c$)
+    \uSi{$l$ est réduit à un seul couple $(a, e)$}{
+        Renvoyer Eval\_élément($e$, $\sigma$)
     }\Sinon{
-        $(p, e) \leftarrow$ premier élément de $l$ \\
+        $(a, e) \leftarrow$ premier élément de $l$ \\
         $q \leftarrow$ reste de $l$ \\
 
-        $v \leftarrow$ Eval\_élément($e$, $c$) \\
-        $c' \leftarrow c$ complété avec les variables résultant
-        de l'éxécution du motif $p$ sur $v$ \\
-        Renvoyer Eval($q$, $c'$)
+        $v \leftarrow$ Eval\_élément($e$, $\sigma$) \\
+        Renvoyer Eval($q$, $\sigma[a \rightarrow v]$)
     }
 \end{algorithm}
 
 \begin{algorithm}[H]
     \caption{Eval\_élément}
-    \Entree{$e$ un élément linéaire, $c$ un contexte}
+    \Entree{$e$ un élément linéaire, $\sigma$ un contexte}
     \Sortie{La valeur \texttt{OCaml} résultant de l'évaluation de $e$, et
         potentiellement des effets de bord.}
 
     \uSi{$e$ est une constante}{
         Renvoyer la valeur de $e$
     }\uSinonSi{$e$ est une variable}{
-        Renvoyer $c(e)$
+        Renvoyer $\sigma(e)$
     }\uSinonSi{$e$ est une addition $l_1 + l_2$}{
-        $v_1 \leftarrow$ Eval($l_1$, $c$) \\
-        $v_2 \leftarrow$ Eval($l_2$, $c$) \\
+        $v_1 \leftarrow$ Eval($l_1$, $\sigma$) \\
+        $v_2 \leftarrow$ Eval($l_2$, $\sigma$) \\
         Renvoyer $v_1 + v_2$
     }\uSinonSi{$e$ est une conditionnelle $\textnormal{\texttt{if}} \  l_1 \  \textnormal{\texttt{then}} \  l_2 \  \textnormal{\texttt{else}} \  l_3$}{
-        $v_1 \leftarrow$ Eval($l_1$, $c$)
+        $v_1 \leftarrow$ Eval($l_1$, $\sigma$)
         \uSi{$v_1$}{
-            Renvoyer Eval($l_2$, $c$)
+            Renvoyer Eval($l_2$, $\sigma$)
         }\uSinon{
-            Renvoyer Eval($l_3$, $c$)
+            Renvoyer Eval($l_3$, $\sigma$)
         }
-    }\uSinonSi{$e$ est une assignation $\textnormal{\texttt{let}} \  p = l_1 \  \textnormal{\texttt{in}} \  l_2$}{
-        $v_1 \leftarrow$ Eval($l_1$, $c$) \\
-        $c' \leftarrow c$ complété avec les variables résultant
-        de l'éxécution du motif $p$ sur $v_1$ \\
-        Renvoyer Eval($l_2$, $c'$)
-    }\uSinonSi{$e$ est une fonction \textnormal{\texttt{fun x\_1 \ldots x\_n ->}}\ $l$}{
-    Renvoyer la fonction qui, quand appellée avec les arguments
-    % Cette definition ne marche pas pour les fonctions mutuellement recursives,
-    % car les fonctions definies apres n'existent pas dans le contexte c.
-    % Peut etre les aplatir lors de la linearisation?
-    % (i.e let x = a and y = b devient x, y := a, b)
-    $x_1, \ldots, x_n$, renvoie \hl{Eval($l$, $c\ [\textnormal{\texttt{x\_1}} \rightarrow x_1, \ldots, \textnormal{\texttt{x\_n}} \rightarrow x_n]$)}
+    }\uSinonSi{$e$ est une définition locale $\textnormal{\texttt{let}} \  p = l_1 \  \textnormal{\texttt{in}} \  l_2$}{
+        $v_1 \leftarrow$ Eval($l_1$, $\sigma$) \\
+        Compléter $\sigma$ avec les variables résultant de l'exécution de $p$
+        sur $v_1$ \\
+        Renvoyer Eval($l_2$, $\sigma$)
     }\Sinon{
         \ldots\ // Les autres cas sont tous définis de manière analogue.
     }
@@ -195,116 +157,28 @@ l'\textit{éxécution} d'une forme ou d'un élément linéaire:
 
 \begin{remark}
     \label{justification_notation_forme_lineaire_simple}
-    Le motif $p$ du dernier couple $(p, e)$ de toute forme linéaire
-    n'intervient pas dans l'évaluation de cette forme linéaire. De plus,
-    les variables introduites par $p$ ne peuvent être référencées par un
-    autre élément linéaire car c'est le dernier couple de sa forme
-    linéaire.
-
-
-    Ceci, justifie rétroactivement la notation $e$ pour désigner $[(p, e)]$.
+    Le nom $a$ du dernier couple $(a, e)$ de toute forme linéaire
+    n'intervient pas dans l'évaluation de cette forme linéaire. Ceci justifie
+    rétroactivement la notation $e$ pour désigner $[(a, e)]$.
 \end{remark}
-
-\begin{definition}
-    \hl{Ordre d'éxecution}
-    \newline
-    \textit{L'ordre d'éxecution} d'une forme linéaire $l$ dans un contexte
-    $c$ est la liste $o$ de formes linéaires o\`u $o[i]$ est la forme
-    linéaire passée au $i$ème appel à la fonction Eval lors de l'appel
-    Eval($l$, $c$).
-\end{definition}
-
-\begin{example}
-    Considérons la forme linéaire suivante :
-    \begin{align*}
-         & a_1 := 1 + 2     \\
-         & a_2 := 3 - 4     \\
-         & a_3 := a_1 * a_2 \\
-    \end{align*}
-
-    Cette forme linéaire ne fait pas apparaître de variables qu'elle ne
-    définit pas elle-même. On peut alors l'évaluer dans le contexte vide
-    (i.e la fonction de $\emptyset$ dans $E$) et on obtient l'arbre d'appels
-    récursifs suivant :
-
-    \begin{center}
-        \maxsizebox{\textwidth}{\textheight}{
-            \Tree [.{Eval($[(a_1, 1 + 2), (a_2, 3 - 4), (a_3, a_1 * a_2)]$, $\emptyset$)}
-                    [.{Eval\_elément($1 + 2$, $\emptyset$)}
-                            [.{Eval($1$, $\emptyset$)}
-                                    {Eval\_élément($1$, $\emptyset$)}
-                            ]
-                            [.{Eval($2$, $\emptyset$)}
-                                    {Eval\_élément($2$, $\emptyset$)}
-                            ]
-                    ]
-                    [.{Eval($[(a_2, 3 - 4), (a_3, a_1 * a_2)]$, $[a_1 \rightarrow 3]$)}
-                            [.{Eval\_elément($3 - 4$, $[a_1 \rightarrow 3]$)}
-                                    [.{Eval($3$, $[a_1 \rightarrow 3]$)}
-                                            {Eval\_élément($3$, $[a_1 \rightarrow 3]$)}
-                                    ]
-                                    [.{Eval($4$, $[a_1 \rightarrow 3]$)}
-                                            {Eval\_élément($4$, $[a_1 \rightarrow 3]$)}
-                                    ]
-                            ]
-                            [.{Eval($[(a_3, a_1 * a_2)]$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
-                                    [.{Eval\_elément($a_1 * a_3$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
-                                            [.{Eval($a_1$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
-                                                    {Eval\_élément($a_1$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
-                                            ]
-                                            [.{Eval($a_2$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
-                                                    {Eval\_élément($a_2$, $[a_1 \rightarrow 3, a_2 \rightarrow -1]$)}
-                                            ]
-                                    ]
-                            ]
-                    ]
-            ]
-        }
-    \end{center}
-
-    L'ordre d'éxécution est alors:
-    $$
-        \Bigl[ [(a_1, 1 + 2), (a_2, 3 - 4), (a_3, a_1 * a_2)], 1, 2, [(a_2, 3 - 4), (a_3, a_1 * a_2)], 3, 4, [(a_3, a_1 * a_2)], a_1, a_2 \Bigr]
-    $$
-
-    Il existe aussi des formes linéaires dont l'ordre d'éxécution dépend
-    du contexte. Par exemple:
-
-    \begin{align*}
-         & a_1 := \texttt{if} \  v \  \texttt{then} \ l_1 \  \texttt{else} \  l_2
-    \end{align*}
-
-    L'ordre d'éxécution de cette forme linéaire dans le contexte
-    $[v \rightarrow vrai]$ est:
-    $$
-        \big[ \lbrack (a_1, \texttt{if} \  v \  \texttt{then} \ l_1 \  \texttt{else} \  l_2) \rbrack,\ v,\ l_1 \big]
-    $$
-
-    Cependant, son ordre d'éxécution dans le contexte
-    $[v \rightarrow false]$ est:
-    $$
-        \big[ \lbrack (a_1, \texttt{if} \  v \  \texttt{then} \ l_1 \  \texttt{else} \  l_2) \rbrack,\ v,\ l_2 \big]
-    $$
-\end{example}
 
 \subsection{Formes et éléments terminaux}
 
 \begin{definition}
     Formes linéaires localement terminales
-    \newline
+
     Soit $e$ un élément linéaire et $(l_1, \ldots, l_n)$ ses fils (ce
     sont des formes linéaires). Pour $i \in \lBrack 1; n \rBrack$, on dit que
-    $l_i$ est \textit{localement terminale} lorsque pour tout contexte $c$, si
-    $l_i$ apparaît dans l'ordre d'éxecution, alors l'appel
-    Eval\_élément($e$, $c$) termine immédiatement après l'appel
-    Eval($l_i$, $c'$) (on n'a pas forcément $c' = c$, par exemple si
-    $e = \texttt{let}\ p = l_1\ \texttt{in}\ l_2$).
+    $l_i$ est \textit{localement terminale} lorsque pour tout contexte $\sigma$
+    tel que l'appel Eval\_élément($e$, $\sigma$) conduise à un appel de Eval
+    avec $l_i$ an argument, cet appel est la dernière opération effectuée par
+    Eval\_élément($e$, $\sigma$).
 \end{definition}
 
 \begin{definition}
-    éléments linéaires terminaux
-    \newline
-    On dit qu'un élément linéaire $e$ est terminal dans une forme
+    Éléments linéaires terminaux
+
+    On dit qu'un élément linéaire $e$ est \textit{terminal} dans une forme
     linéaire $l$ lorsque :
     \begin{enumerate}
         \item Toute forme linéaire strictement contenue (au sens des arbres)
@@ -316,47 +190,50 @@ l'\textit{éxécution} d'une forme ou d'un élément linéaire:
 \end{definition}
 
 \begin{remark}
-    Lorsqu'il n'y a pas d'ambigu\"ité, on dira simplement que $e$ est terminal.
+    Lorsqu'il n'y a pas d'ambiguïté, on dira simplement que $e$ est terminal.
 \end{remark}
 
 \begin{remark}
     On vérifie bien que cette définition correspond à la notion intuitive
-    de "dernière instruction exécutée".
+    de << dernière instruction exécutée >>.
 \end{remark}
 
 \begin{example}
     Considérons la forme linéaire
     \begin{align*}
-         & a_1 := \texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]   \\
-         & a_2 := \texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ [(b_2, e_2)] \\
+         & a_1 := \texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ (b_1 := e_1)   \\
+         & a_2 := \texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ (b_2 := e_2) \\
     \end{align*}
 
     On a que :
     \begin{itemize}
-        \item $v$ n'est pas localement terminal car l'appel Eval($v$, $c$) est
-              toujours suivi d'un appel Eval($l_1$, $c$) ou Eval($l_2$, $c$)
-              lors de l'appel Eval\_élément(
-              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$,
-              $c$)
-        \item $l_1$ et $[(b_1, e_1)]$ sont localement terminaux car l'appel \\
+        \item $v$ n'est pas localement terminal car l'appel Eval($v$, $\sigma$)
+              est toujours suivi d'un appel Eval($l_1$, $\sigma$) ou
+              Eval($b_1 := e_1$, $\sigma$) lors de l'appel Eval\_élément(
+              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ (b_1 := e_1)$,
+              $\sigma$)
+        \item $l_1$ et $b_1 := e_1$ sont localement terminaux car l'appel \\
               Eval\_élément(
-              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$,
-              $c$) se termine immédiatement après l'appel Eval($l_1$, $c$)
-              ou Eval($[(b_1, e_1)]$, $c$)
+              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ (b_1 := e_1)$,
+              $\sigma$) se termine immédiatement après l'appel
+              Eval($l_1$, $\sigma$) ou Eval($b_1 := e_1$, $\sigma$)
         \item $e_1$ n'est pas terminal car
-              $\texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ [(b_1, e_1)]$
-              n'apparait pas en dernier dans la forme linéaire le contenant.
-        \item $\texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ [(b_2, e_2)]$ est terminal car
-              la forme linéaire considérée est la racine de l'arbre et
-              $\texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ [(b_2, e_2)]$ est
-              bien le dernier élément linéaire de cette forme linéaire.
-        \item $e_2$ est terminal car $[(b_2, e_2)]$ est localement terminal,
-              $e_2$ apparait bien en dernier dans $[(b_2, e_2)]$ et
-              $\texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ [(b_2, e_2)]$
+              $a_1 := \texttt{if}\ v\ \texttt{then}\ l_1\ \texttt{else}\ (b_1 := e_1)$
+              n'apparaît pas en dernier dans la forme linéaire le contenant (il
+              est suivi par $a_2 := \ldots$).
+        \item $\texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ (b_2 := e_2)$
+              est terminal car la forme linéaire considérée est la racine de
+              l'arbre et $\texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ (b_2 := e_2)$
+              est bien le dernier élément linéaire de cette forme linéaire.
+        \item $e_2$ est terminal car $b_2 := e_2$ est localement terminal,
+              $e_2$ apparaît bien en dernier dans $b_2 := e_2$ et
+              $\texttt{if}\ a_1\ \texttt{then}\ l_3\ \texttt{else}\ (b_2 := e_2)$
               est bien le dernier élément de la forme linéaire considérée.
     \end{itemize}
 
-    Cependant, il se peut qu'une forme linéaire soit bien le dernier passé
+    \medskip
+
+    Il se peut aussi qu'une forme linéaire soit bien la dernière passée
     en argument à Eval sans pour autant qu'elle soit localement terminale:
     \begin{align*}
         a_1 := l_1 + l_2
@@ -371,27 +248,55 @@ l'\textit{éxécution} d'une forme ou d'un élément linéaire:
 
 \subsection{Formes linéaires correctes}
 
+On cherche maintenant à décomposer notre programme en opérations élémentaires.
+On définit pour cela les formes linéaires correctes : les formes linéaires dans
+lesquelles chaque élément linéaire (qui correspondent aux opérations effectuées
+par le programme) correspond plus précisément à une opération
+\textit{élémentaire}.
+
 \begin{definition}
-    élément linéaire correct
-    \newline
+    Forme linéaire simple
+
+    Une forme linéaire $l$ est dite \textit{simple} lorsque $l$ est réduit à un
+    seul couple $(a, e)$ où $e$ est construit à partir d'un constructeur d'arité
+    nulle.
+\end{definition}
+
+\begin{remark}
+    En pratique, cela correspond à dire que $e$ est une constante où une
+    variable.
+\end{remark}
+
+\begin{definition}
+    Élément linéaire correct
+
     On dit qu'un élément linéaire $e$ est \textit{correct} lorsque tous
     ses fils $l$ vérifient au moins une des deux propriétés suivantes:
     \begin{itemize}
+        \item $l$ est simple.
         \item $l$ est localement terminal.
-        \item $l$ est réduit à un seul couple $[(p, e)]$ o\`u $e$ est un
-              constructeur d'arité nulle.
     \end{itemize}
 \end{definition}
 
 \begin{remark}
-    La deuxième propriété correspond à l'idée que l'évaluation de
-    $l$ est "facile" et se fait "d'un coup".
+    La première propriété correspond à l'idée que les fils de $e$ ne font pas
+    d'opérations eux-mêmes, et donc que la seule opération effectuée par $e$ est
+    celle de $e$ lui-même - c'est à dire que $e$ est élémentaire.
+
+    La deuxième propriété est nécessaire afin que les structures conditionnelles
+    (\texttt{if}, \texttt{match}...) restent utiles. En effet, si leurs branches
+    ne pouvaient pas effectuer d'opérations elles-mêmes, ces structures
+    deviendraient inutiles, en particulier en regard des opérations de bord. Ce
+    n'est pas gênant pour l'idée d'opération élémentaire, car une fois que la
+    sous expression est évaluée, l'opération de l'élément linéaire a fini son
+    opération (il ne lui reste plus rien à faire, autrement la sous expression
+    ne serait pas localement terminale).
 \end{remark}
 
 \begin{definition}
     \label{definition_forme_lineaire_correcte}
     Forme linéaire correcte
-    \newline
+
     Une forme linéaire $l$ est dite \textit{correcte} lorsque tout élément
     linéaire $e$ contenu (au sens des arbres, pas des listes) dans $l$ est
     correct.
@@ -403,7 +308,7 @@ l'\textit{éxécution} d'une forme ou d'un élément linéaire:
          & a_1 := 1 + 2                            \\
          & a_2 := a_1 + (3 - 4)                    \\
          & a_3 :=
-        \begin{aligned}
+        \begin{aligned}[t]
              & \texttt{if}\ a_2 = 2  \\
              & \texttt{then} \left(
             \begin{aligned}
@@ -421,8 +326,8 @@ l'\textit{éxécution} d'une forme ou d'un élément linéaire:
 
     Cette forme linéaire n'est pas correcte car:
     \begin{itemize}
-        \item $3 - 4$ n'est pas un constructeur d'arité nulle et n'appartient
-              pas à une forme linéaire localement terminale.
+        \item $3 - 4$ n'est pas simple et n'appartient pas à une forme linéaire
+              localement terminale.
         \item De même pour $a_2 = 2$.
         \item De même pour $\texttt{print\_endline (string\_of\_int}\ a_2\ \texttt{)}$
     \end{itemize}
@@ -437,7 +342,7 @@ l'\textit{éxécution} d'une forme ou d'un élément linéaire:
          & a_3 := a_1 + a_2                        \\
          & a_4 := a_3 = 2                          \\
          & a_5 :=
-        \begin{aligned}
+        \begin{aligned}[t]
              & \texttt{if}\ a_4      \\
              & \texttt{then} \left(
             \begin{aligned}
@@ -461,19 +366,19 @@ l'\textit{éxécution} d'une forme ou d'un élément linéaire:
 
 \textit{
     On suppose défini un algorithme \textnormal{Eval\_OCaml} prenant en
-    entrée une expression \texttt{OCaml} $e$ et un contexte $c$ et qui
-    évalue l'expression $e$ dans $c$, de manière analogue à l'évaluation
+    entrée une expression \texttt{OCaml} $e$ et un environnement $\sigma$ et qui
+    évalue l'expression $e$ dans $\sigma$, de manière analogue à l'évaluation
     des formes linéaires.
 }
 
 \begin{definition}
     \label{definition_correspondance}
     Forme linéaire correspondant à une expression \texttt{OCaml}
-    \newline
+
     On dit qu'une forme linéaire $l$ \textit{correspond} à une expression
-    \texttt{OCaml} $e$ lorsque Eval($l$, $c$) a le même résultat
+    \texttt{OCaml} $e$ lorsque Eval($l$, $\sigma$) a le même résultat
     (c'est-à-dire renvoie la même valeur et a les mêmes effets de bord)
-    que Eval\_OCaml($e$, $c$) pour tout contexte $c$.
+    que Eval\_OCaml($e$, $\sigma$) pour tout environnement $\sigma$.
 
     On dira de même que $e$ correspond à $l$ dans ce cas.
 \end{definition}
@@ -485,119 +390,128 @@ l'\textit{éxécution} d'une forme ou d'un élément linéaire:
 \end{remark}
 
 \begin{definition}
-    Expression linéarisable
-    \newline
+    Expression linéarisables
+
     Une expression \texttt{OCaml} $e$ est dite \textit{linéarisable} lorsque
     il existe une forme linéaire correcte correspondant à $e$.
 \end{definition}
 
 \begin{proposition}
-    Les expressions \textnormal{\texttt{while}}, \textnormal{\texttt{for}} et \textnormal{\texttt{try}} ne sont pas
-    linéarisables.
+    Les expressions \textnormal{\texttt{while}}, \textnormal{\texttt{for}} et
+    \textnormal{\texttt{try}} ne sont pas linéarisables par une forme linéaire
+    utilisant uniquement ces dernières.
 \end{proposition}
 
 \begin{proof}
-    \hl{TODO: Par l'absurde.}
-    Peut etre plutot dire "simplement" linéarisables?
-    Il est en effet possible de lineariser for et while, mais c'est complique et
-    il faut introduire des fonctions auxiliaires.
+    Les expressions \texttt{while} et \texttt{for} n'ont aucun fils localement
+    terminal. Ainsi, tous leurs fils doivent être simples et n'ont donc aucun
+    effet de bord. Or une boucle \texttt{while} ou \texttt{for} sans effets de
+    bord peut être omise du programme sans en changer le comportement. Ainsi si
+    une expression \texttt{OCaml} \texttt{while} ou \texttt{for} est linéarisée,
+    son comportement n'a pas en général pu être reproduit à l'aide d'un élément
+    linéaire \texttt{while} ou \texttt{for}.
+
+
+    Une expression \texttt{try} a pour but de capturer une erreur levée par une
+    expression. Pour reproduire son comportement, il faut alors forcément
+    utiliser un élément linéaire \texttt{try} car c'est la seule construction
+    permettant de capturer des erreurs en \texttt{OCaml}. Or la sous-expression
+    protégée de \texttt{try} n'est pas localement terminale, et donc doit être
+    simple. Or elle ne peut donc pas lever d'erreur et donc ne peut pas
+    reproduire le comportement de l'expression originale.
 \end{proof}
 
 On introduit alors l'algorithme suivant pour linéariser les expressions
-\texttt{OCaml}:
+\texttt{OCaml} n'utilisant pas \texttt{while}, \texttt{for} et \texttt{try}:
 
 \begin{algorithm}[H]
     \caption{Linéariser}
     \Entree{
-        Une expression \texttt{OCaml} $e$ linéarisable, $k$ un entier
-        indiquant le prochain nom de variable non utilisé
+        Une expression \texttt{OCaml} $e$ ne contenant pas \texttt{while},
+        \texttt{for} ou \texttt{try} et $k$ un entier tel qu'aucune variable
+        \texttt{a\_i} pour $i \geq k$ n'apparaît dans $e$.
     }
     \Sortie{
-        Une forme linéaire $l$ correcte correspondant à $e$, $k'$ un entier
-        indiquant le prochain nom de variable non utilisé, et telle que le
-        dernier couple $(p, e)$ de la forme renvoyée est telle que $p$ est un
-        motif identifiant qui prendra la valeur de $e$ lors de l'éxécution
-        de $l$.
+        Une forme linéaire $l$ correcte correspondant à $e$ et $k'$ un entier
+        indiquant le prochain nom de variable non utilisé.
     }
 
     \uSi{$e$ est une constante $c$}{
-        Renvoyer $[(\textnormal{\texttt{a\_}}k,\ $c$)],\ k + 1$
+        Renvoyer $[(\textnormal{\texttt{a\_}}k,\ c)],\ k + 1$
     }\uSinonSi{$e$ est une variable $v$}{
-        Renvoyer $[(\textnormal{\texttt{a\_}}k,\ $v$)],\ k + 1$
+        Renvoyer $[(\textnormal{\texttt{a\_}}k,\ v)],\ k + 1$
     }\uSinonSi{$e$ est une addition $e_1 + e_2$}{
     $l_1, k_1 \leftarrow \textnormal{Linéariser}(e_1, k)$ \\
-    $l_2, k_2 \leftarrow \textnormal{Linéariser}(e_1, k_1)$ \\
+    $l_2, k_2 \leftarrow \textnormal{Linéariser}(e_2, k_1)$ \\
     $a_1 \leftarrow$ le nom du dernier motif dans $l_1$ \\
     $a_2 \leftarrow$ le nom du dernier motif dans $l_2$ \\
-    Renvoyer $l_1.l_2.[(\textnormal{\texttt{a\_}}k_2,\ [(\_, a_1)] + [(\_, a_2)])],\ k_2 + 1$
+    Renvoyer $l_1.l_2.[(\texttt{a\_}k_2,\ [(\texttt{a\_}(k_2 + 1), a_1)] + [(\texttt{a\_}(k_2 + 2), a_2)])],\ k_2 + 3$
     }\uSinonSi{$e$ est une conditionelle \texttt{if} $e_1$ \texttt{then} $e_2$ \texttt{else} $e_3$}{
     $l_1, k_1 \leftarrow \textnormal{Linéariser}(e_1, k)$ \\
-    $l_2, k_2 \leftarrow \textnormal{Linéariser}(e_1, k_1)$ \\
-    $l_3, k_3 \leftarrow \textnormal{Linéariser}(e_1, k_2)$ \\
+    $l_2, k_2 \leftarrow \textnormal{Linéariser}(e_2, k_1)$ \\
+    $l_3, k_3 \leftarrow \textnormal{Linéariser}(e_3, k_2)$ \\
     $a_1 \leftarrow$ le nom du dernier motif dans $l_1$ \\
-    Renvoyer $l_1.[(\texttt{a\_}k_3, \textnormal{\texttt{if}}\ [(\_, a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3)], k_3 + 1$
+    Renvoyer $l_1.[(\texttt{a\_}k_3, \textnormal{\texttt{if}}\ [(\texttt{a\_}(k_3 + 1), a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3)], k_3 + 2$
     }\uSinon{
         \ldots\ // Les autres cas sont définis de manière analogue.
     }
 \end{algorithm}
 
-Montrons la correction de cet algorithme. Soit alors $e$ une expression
-\texttt{OCaml} et $l = \textnormal{Linéariser}(e, k)$ o\`u $k$ est un entier
-indiquant le prochain nom de variable non utilisé dans $e$.
-
 \begin{proposition}
-    $l$ est correcte
+    Soit $e$ une expression \texttt{OCaml} et $l$ la forme linéaire renvoyée par
+    l'exécution de Linéariser sur $e$. $l$ est alors correcte.
 \end{proposition}
 
 \begin{proof}
     Par induction sur $e$.
-    \newline
+
     On traitera trois cas, les autres cas étant tous très similaires.
 
     \begin{itemize}
         \item Si $e$ est une constante $c$: \\
-              Alors $l$ = $[(\textnormal{\texttt{a\_}}k,\ $c$)]$, qui est bien
+              Alors $l$ = $[(\textnormal{\texttt{a\_}}k,\ c)]$, qui est bien
               une forme linéaire correcte.
               \bigskip
+
         \item Si $e$ est une addition $e_1$ + $e_2$ : \\
               Supposons que les formes linéaires $l_1$ et $l_2$ renvoyées par
-              Linéariser($e_1$, $k$) et Linéariser($e_2$, $k$) respectivement
+              Linéariser($e_1$, $k$) et Linéariser($e_2$, $k_1$) respectivement
               sont correctes. \\
-              Alors $l = l_1.l_2.[(\textnormal{\texttt{a\_}}k_2,\ [(\_, a_1)] + [(\_, a_2)])]$.
+              Alors $l = l_1.l_2.[(\texttt{a\_}k_2,\ [(\texttt{a\_}(k_2 + 1), a_1)] + [(\texttt{a\_}(k_2 + 2), a_2)])]$.
               Montrons que $l$ est correcte. Soit alors $e'$ un élément linéaire
               contenu dans $l$. On distingue trois cas possibles:
               \begin{itemize}
-                  \item $e'$ est contenu dans $l_1$ ou $l_2$: \\
+                  \item Si $e'$ est contenu dans $l_1$ ou $l_2$: \\
                         Alors $e'$ est correct car $l_1$ et $l_2$ sont corrects
                         par hypothèse d'induction.
-                  \item $e' = a_1$ ou $a = a_2$ : \\
+                  \item Si $e' = a_1$ ou $a = a_2$ : \\
                         Alors $e'$ est correct car il n'a aucun fils qui est une
                         forme linéaire.
-                  \item $e' = [(\_, a_1)] + [(\_, a_2)]$ : \\
-                        Alors $e'$ est correct car $[(\_, a_1)]$ et $[(\_, a_2)]$
-                        sont réduits à un seul couple avec $a_1$ et $a_2$ sont
-                        des constructeurs d'arité nulle (ce sont des variables).
+                  \item Si $e' = [(\texttt{a\_}(k_2 + 1), a_1)] + [(\texttt{a\_}(k_2 + 2), a_2)]$ : \\
+                        Alors $e'$ est correct car $[(\texttt{a\_}(k_2 + 1), a_1)]$ et $[(\texttt{a\_}(k_2 + 2), a_2)]$
+                        sont simples.
               \end{itemize}
               Ainsi tout élément linéaire contenu dans $l$ est correct, donc $l$
               est correcte.
               \bigskip
+
         \item Si $e$ est une conditionnelle \texttt{if} $e_1$ \texttt{then} $e_2$ \texttt{else} $e_3$ : \\
               Supposons que les formes linéaires $l_1$, $l_2$ et $l_3$ renvoyées
-              par Linéariser($e_1$, $k$), Linéariser($e_2$, $k$) et
-              Linéariser($e_3$, $k$) soient correctes. \\
-              Alors $l = l_1.[(\texttt{a\_}k_3, \textnormal{\texttt{if}}\ [(\_, a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3)]$.
+              par Linéariser($e_1$, $k$), Linéariser($e_2$, $k_1$) et
+              Linéariser($e_3$, $k_3$) soient correctes. \\
+              Alors $l = l_1.[(\texttt{a\_}k_3, \textnormal{\texttt{if}}\ [(\texttt{a\_}(k_3 + 1), a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3)]$.
               Montrons que $l$ est correcte. Soit alors $e'$ contenu dans $l$.
               On distingue trois cas possibles:
               \begin{itemize}
-                  \item $e'$ est contenu dans $l_1$, $l_2$ ou $l_3$ : \\
+                  \item Si $e'$ est contenu dans $l_1$, $l_2$ ou $l_3$ : \\
                         Alors $e'$ est correcte par hypothèse d'induction.
-                  \item $e' = a_1$ : \\
+                  \item Si $e' = a_1$ : \\
                         Alors $e'$ est correct car il n'a aucun fils qui est une
                         forme linéaire.
-                  \item $e' = \textnormal{\texttt{if}}\ [(\_, a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3$ : \\
+                  \item Si $e' = \textnormal{\texttt{if}}\ [(\texttt{a\_}(k_3 + 1), a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3$ : \\
                         $l_2$ et $l_3$ sont localement terminaux et
-                        $[(\_, a_1)]$ est réduit à un seul couple avec $a_1$
-                        constructeur d'arité nulle. Donc $e'$ est correct.
+                        $[(\texttt{a\_}(k_3 + 1), a_1)]$ est simple. Donc $e'$
+                        est correct.
               \end{itemize}
               Ainsi tout élément linéaire contenu dans $l$ est correct, donc $l$
               est correcte.
@@ -607,45 +521,60 @@ indiquant le prochain nom de variable non utilisé dans $e$.
 \end{proof}
 
 \begin{proposition}
-    $l$ correspond à $e$
+    Soit $e$ une expression \texttt{OCaml} et $l$ la forme linéaire renvoyée par
+    l'exécution de Linéariser sur $e$. $l$ correspond alors à $e$.
 \end{proposition}
 
 \begin{proof}
     Par induction sur $e$.
-    \newline
+
     On traitera trois cas, les autres cas étant tous très similaires.
 
     \begin{itemize}
         \item Si $e$ est une constante $c$: \\
-              Alors $l$ = $[(\textnormal{\texttt{a\_}}k,\ $c$)]$. L'appel
-              Eval($l$, $ctx$) renvoie alors la valeur de $c$ sans effets de
-              bord. L'appel Eval\_OCaml($l$, $ctx$) renvoie aussi la valeur de
-              $c$ sans effets de bord. Ainsi $l$ correspond a $e$.
+              Alors $l$ = $[(\textnormal{\texttt{a\_}}k,\ c)]$.  Pour un
+              environnement $\sigma$, L'appel Eval($l$, $\sigma$) renvoie alors
+              la valeur de $c$ sans effets de bord. L'appel
+              Eval\_OCaml($e$, $\sigma$) renvoie aussi la valeur de $c$ sans
+              effets de bord. Ainsi $l$ correspond a $e$.
               \bigskip
+
         \item Si $e$ est une addition $e_1$ + $e_2$ : \\
               Supposons que les formes linéaires $l_1$ et $l_2$ renvoyées par
-              Linéariser($e_1$, $k$) et Linéariser($e_2$, $k$) correspondent à
+              Linéariser($e_1$, $k$) et Linéariser($e_2$, $k_1$) correspondent à
               $e_1$ et $e_2$ respectivement. \\
-              Alors $l = l_1.l_2.[(\textnormal{\texttt{a\_}}k_2,\ [(\_, a_1)] + [(\_, a_2)])]$.
-              Ainsi Eval($l$, $ctx$) évalue d'abord $l_1$, puis $l_2$, puis
-              renvoie la somme des valeurs obtenus (Eval($[(\_, a_i)]$) renvoie
-              immédiatement la valeur de $a_i$). Puisque $l_1$ et $l_2$
-              correspondent à $e_1$ et $e_2$, c'est équivalent à évaluer
-              $e_1$, puis $e_2$, puis renvoyer la somme des valeurs obtenus.
-              C'est le même comportement que Eval\_OCaml($e$, $ctx$), donc $l$
-              correspond bien à $e$.
+              Alors $l = l_1.l_2.[(\texttt{a\_}k_2,\ [(\texttt{a\_}(k_2 + 1), a_1)] + [(\texttt{a\_}(k_2 + 2), a_2)])]$.
+              Ainsi pour un environnement $\sigma$, Eval($l$, $\sigma$) évalue
+              d'abord $l_1$, puis $l_2$ en stockant leurs résultats dans $a_1$
+              et $a_2$ respectivement, puis renvoie la somme des valeurs
+              obtenues (Eval($[(\texttt{a\_}k_i, a_i)]$) renvoie immédiatement
+              la valeur de $a_i$). Puisque $l_1$ et $l_2$ correspondent à $e_1$
+              et $e_2$, c'est équivalent à évaluer $e_1$, puis $e_2$, puis
+              renvoyer la somme des valeurs obtenus. La seule différence entre
+              ce comportement et le comportement d'Eval\_OCaml est que
+              l'évaluation de $l_2$ se fait dans un environnement qui contient
+              les variables \texttt{a\_}$k$ \ldots \texttt{a\_}$k_1$ introduites
+              par $l_1$, mais ce n'est pas un problème car $l_2$ n'y fait pas
+              référence compte tenu des restrictions en entree sur $k$ (les
+              variables \texttt{a\_}$k$ \ldots \texttt{a\_}$k_1$ n'étaient pas
+              dans $e$ et n'ont pas pu être ajoutés par Linéariser($e_2$)).
+              C'est alors le même comportement que Eval\_OCaml($e$, $\sigma$),
+              donc $l$ correspond bien à $e$.
               \bigskip
+
         \item Si $e$ est une conditionnelle \texttt{if} $e_1$ \texttt{then} $e_2$ \texttt{else} $e_3$ : \\
               Supposons que les formes linéaires $l_1$, $l_2$ et $l_3$ renvoyées
-              par Linéariser($e_1$, $k$), Linéariser($e_2$, $k$) et
-              Linéariser($e_3$, $k$) correspondent à $e_1$, $e_2$ et $e_3$
+              par Linéariser($e_1$, $k$), Linéariser($e_2$, $k_1$) et
+              Linéariser($e_3$, $k_3$) correspondent à $e_1$, $e_2$ et $e_3$
               respectivement. \\
-              Alors $l = l_1.[(\texttt{a\_}k_3, \textnormal{\texttt{if}}\ [(\_, a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3)]$.
-              Ainsi Eval($l$, $ctx$) évalue d'abord $l_1$, puis évalue $l_1$ si
-              la valeur obtenue est véridique, et $l_2$ sinon. Comme $l_1$,
-              $l_2$ et $l_3$ correspondent à $e_1$, $e_2$ et $e_3$
-              respectivement, c'est le même comportement que l'appel
-              Eval\_OCaml($e$, $ctx$). Ainsi $l$ correspond bien à $e$.
+              Alors $l = l_1.[(\texttt{a\_}k_3, \textnormal{\texttt{if}}\ [(\texttt{a\_}(k_3 + 1), a_1)]\ \textnormal{\texttt{then}}\ l_2\ \textnormal{\texttt{else}}\ l_3)]$.
+              Ainsi pour un contexte $\sigma$, Eval($l$, $\sigma$) évalue
+              d'abord $l_1$, puis évalue $l_1$ si la valeur obtenue est
+              véridique, et $l_2$ sinon. Comme $l_1$, $l_2$ et $l_3$
+              correspondent à $e_1$, $e_2$ et $e_3$ respectivement, c'est le
+              même comportement que l'appel Eval\_OCaml($e$, $\sigma$) (compte
+              tenu du même argument sur l'environnement partagé que ci-dessus).
+              Ainsi $l$ correspond bien à $e$.
     \end{itemize}
     Les autres cas se traitent de manière similaire.
 \end{proof}
@@ -653,10 +582,104 @@ indiquant le prochain nom de variable non utilisé dans $e$.
 \begin{remark}
     On se permettra de dire \textit{la} forme linéaire associée à une
     expression \texttt{OCaml} $e$ pour désigner la forme linéaire renvoyée
-    par l'appel Linéariser($e$, $k$) o\`u $k$ est un entier indiquant le
-    prochain nom de variable non utilisé dans $e$.
+    par l'appel Linéariser($e$, $k$) o\`u $k$ est un entier choisi de façon
+    appropriée.
 \end{remark}
 
 \subsection{Délinéarisation}
 
-\hl{TODO}
+On introduit l'algorithme suivant pour convertir des formes linéaires en
+expressions \texttt{OCaml}:
+
+\begin{algorithm}[H]
+    \caption{Délinéariser}
+    \Entree{
+        Une forme linéaire $l$
+    }
+    \Sortie{
+        Une expression \texttt{OCaml} correspondant à $l$
+    }
+
+    $(a, e) \leftarrow$ le premier couple de $l$ \\
+    $q \leftarrow$ le reste de $l$
+
+    \uSi{$e$ est une constante $c$}{
+        $e_\texttt{OCaml} \leftarrow c$
+    }\uSinonSi{$e$ est une addition $l_1 + l_2$}{
+        $e_1 \leftarrow $ Délinéariser($l_1$) \\
+        $e_2 \leftarrow $ Délinéariser($l_2$) \\
+        $e_\texttt{OCaml} \leftarrow e_1 + e_2$
+    }\uSinon{
+        \ldots\ // Les autres cas sont définis de manière analogue.
+    }
+
+    \bigskip
+
+    \uSi{$q$ est vide}{
+        Renvoyer $e_\texttt{OCaml}$
+    }\uSinon{
+        $q_\texttt{OCaml} \leftarrow$ Délinéariser($q$) \\
+        Renvoyer $\texttt{let } a \texttt{ = } e_\texttt{OCaml} \texttt{ in } q_\texttt{OCaml}$
+    }
+\end{algorithm}
+
+La correction de cet algorithme se montre de façon symétrique à l'algorithme
+Linéariser (par induction avec des disjonctions de cas sur tous les
+constructeurs possibles).
+
+\bigbreak
+
+L'utilisation des algorithmes Linéariser et Délinéariser nous permet alors de
+passer des expressions \texttt{OCaml} aux formes linéaires et vice-versa.
+Cependant, un aller-retour de ce style introduit beaucoup de bruit au programme
+résultant de l'introduction des variables \texttt{a\_}$k$. Un exemple est donné
+ci-dessous :
+
+\bigskip
+
+\noindent\textbf{Avant:}
+\begin{minted}{ocaml}
+let rec fibonacci (n : int) : int =
+  if n = 0 || n = 1 then
+    1
+  else
+    fibonacci (n - 1) + fibonacci (n - 2)
+\end{minted}
+
+
+\noindent\textbf{Après:}
+\begin{minted}{ocaml}
+let rec fibonacci (n : int) : int =
+  let a_0 = n in
+  let a_1 = 0 in
+  let a_2 = a_0 = a_1 in
+  let a_5 = n in
+  let a_6 = 1 in
+  let a_7 = a_5 = a_6 in
+  let a_10 = a_2 || a_7 in
+  if a_10 then 1
+  else
+    let a_14 = fibonacci in
+    let a_15 = n in
+    let a_16 = 1 in
+    let a_17 = a_15 - a_16 in
+    let a_20 = a_14 a_17 in
+    let a_23 = fibonacci in
+    let a_24 = n in
+    let a_25 = 2 in
+    let a_26 = a_24 - a_25 in
+    let a_29 = a_23 a_26 in
+    a_20 + a_29
+\end{minted}
+
+Afin de pallier à ce problème, nous utilisons en réalité un algorithme
+Délinéariser légèrement modifié afin de réduire le volume de la sortie. En
+particulier:
+\begin{itemize}
+    \item Les occurrences des variables \texttt{a\_}$k$ peuvent être remplacées
+          par leur définition (\textit{inlining}).
+    \item Si une variable \texttt{a\_}$k$ n'apparait pas dans le reste de la
+          forme linéaire, générer une séquence (\texttt{a; b}) à la place d'un
+          \texttt{let}.
+\end{itemize}
+La correction de ces deux changements n'est pas démontrée.

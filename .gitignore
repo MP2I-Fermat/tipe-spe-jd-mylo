@@ -15,3 +15,5 @@ perf.data.*
 *.toc
 
 *.g.ml
+
+_minted/
