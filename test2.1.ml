@@ -19,7 +19,6 @@ let rec fizzbuzz_a_partir (max: int) (n: int) : unit =
 
 let fizzbuzz (max: int) : unit = fizzbuzz_a_partir max 1
 
-(*
 let rec fibo_jusqua (n: int) (i: int) (last: int) (lastlast: int) =
   if n <= 1 then
     1
@@ -29,7 +28,6 @@ let rec fibo_jusqua (n: int) (i: int) (last: int) (lastlast: int) =
     fibo_jusqua n (i+1) (lastlast) (last+lastlast)
 
 let fibo n = fibo_jusqua n 2 1 1
-*)
 
 let rec map (f: 'a -> 'b) (l: 'a list) : 'b list =
   match l with
