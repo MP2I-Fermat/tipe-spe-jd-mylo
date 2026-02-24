@@ -17,3 +17,4 @@ perf.data.*
 *.g.ml
 
 _minted/
+tests/
