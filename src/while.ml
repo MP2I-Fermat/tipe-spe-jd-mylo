@@ -1,5 +1,7 @@
+open Utils
 open Caml_light
 open Rectify
+open Rectify_test
 
 (* Renvoie l’AST de la fonction récursive terminale f une fois avoir été
  * transformée en boucle while (la sortie est toujours l’AST d’une fonction).
@@ -221,8 +223,9 @@ let parse_file name =
   parse_caml_light_ast content
 
 
-let whilify (program: phrase list) =
-  let interceptor (name: string) (parameters: pattern list)
+let whilify_bindings (bindings: binding list) (is_rec: bool) :
+    (binding * bool) list =
+  let create_interceptor (name: string) (parameters: pattern list)
       (return_type: type_expression option) : binding =
     Function {
       name;
@@ -245,108 +248,55 @@ let whilify (program: phrase list) =
             | Ident(v) -> Variable(v)
             | TypeCoercion { inner=Ident(v); typ } -> Variable(v)
             | _ -> Variable("arg"^(string_of_int i))
-          ) parameters @ [
-            Parenthesised {
-              style = Parenthesis;
-              inner = FunctionLiteral {
-                style = Fun;
-                cases = [[Ident "x"], Variable "x"]
-              }
-            }
-          ]
+          ) parameters
       }
     }
   in
+  let whilify_bindings_after_rectification (clot: variable list)
+      ((bindings, new_is_rec): binding list * bool) :
+      (binding * bool) list =
+    if not new_is_rec || not (is_length_1 bindings) then
+      List.map (fun x -> (x, new_is_rec)) bindings
+    else begin
+      match List.hd bindings with
+      | Function { name; parameters; return_type; body } ->
+         let body_while = fonction_vers_while (name^"_whilified") parameters body clot in
+         [
+           Function {
+             name = name^"_whilified";
+             parameters;
+             body = body_while;
+             return_type;
+           }, false;
+           create_interceptor name parameters return_type, false
+         ]
+      | autre -> [autre, new_is_rec]
+    end
+  in
+  match rectify_bindings bindings with
+  | NewBindings (b, clot) ->
+      begin match b with
+      | [] -> []
+      | x::q -> (x, is_rec)::(List.map (fun y -> (y, false)) q)
+      end
+      |> List.map (whilify_bindings_after_rectification clot)
+      |> List.concat
+  | truc -> List.map (fun x -> (x, is_rec)) bindings
+
+
+let whilify_program (program: phrase list) =
   let whilify_phrase (phrase: phrase) : phrase list =
     match phrase with
-    | ValueDefinition { bindings; is_rec }
-        when is_rec && List.length bindings = 1 -> (
-      let one_binding = List.hd bindings in
-
-      let linearised_binding_option =
-        match one_binding with
-        | Variable _ -> None
-        | Function {name; parameters; body; return_type} ->
-            let body_lin, _ = linearize body 0 in
-            Some (
-              name,
-              FunctionLiteral {
-                style = Fun;
-                cases = [(parameters, body_lin)];
-                return_type_for_delinearize = return_type;
-              }
-            )
-        in
-
-        match linearised_binding_option with
-        | None -> [phrase]
-        | Some linearised_binding -> begin
-          let new_name (n : string) = n ^ "_rectified" in
-
-          match cloture_rectifiable [linearised_binding] with
-          | None ->
-              print_endline
-               ("(* Avertissement : cloture_rectifiable a renvoyé None " ^
-                "pour la fonction" ^ (fst linearised_binding) ^ " *)");
-              [phrase]
-          | Some clot ->
-            let name, new_fn, parameters, return_type =
-              match linearised_binding with
-              | name, (
-                FunctionLiteral {
-                  style; cases = [(parameters, body_lin)];
-                  return_type_for_delinearize
-                }) ->
-                 let body_delin, _ =
-                  delinearize
-                    (rename_elements
-                       (rectify body_lin clot body_lin)
-                       clot new_name) [] in
-                 let body_while =
-                   fonction_vers_while
-                     (new_name name) (parameters @ [Ident "cont"]) body_delin
-                     (List.map new_name clot) in
-                 name, (Function {
-                     name = name^"_whilified";
-                     parameters = parameters @ [Ident "cont"];
-                     body = body_while;
-                     return_type = return_type_for_delinearize
-                  } : Caml_light.binding), parameters,
-                  return_type_for_delinearize
-              | _ -> failwith "Pas une fonction ?"
-
-            in
-            [
-              ValueDefinition {
-                is_rec = false;
-                bindings = [new_fn]
-              } ; ValueDefinition {
-                is_rec = false;
-                bindings = [interceptor name parameters return_type]
-              }
-           ]
-         end)
+    | ValueDefinition { bindings; is_rec } -> begin
+        whilify_bindings bindings is_rec
+        |> List.map (fun (new_binding, new_is_rec) ->
+            ValueDefinition {
+              bindings = [new_binding];
+              is_rec = new_is_rec;
+            })
+    end
     | _ -> [phrase]
   in
   program |> List.map whilify_phrase |> List.concat
 
-
-let main () =
-  let test_source =
-    if Array.length Sys.argv <= 1 then
-      failwith "Merci de donner un argument : le nom de fichier"
-    else begin
-      let test_source_fp = open_in Sys.argv.(1) in
-      let test_source =
-        really_input_string test_source_fp (in_channel_length test_source_fp)
-      in
-      close_in test_source_fp;
-      test_source
-    end
-  in
-  let program = parse_caml_light_ast test_source in
-  whilify program |> string_of_ast
-
-
-let () = print_endline (main ())
 

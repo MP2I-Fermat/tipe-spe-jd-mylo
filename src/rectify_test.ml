@@ -1,6 +1,7 @@
 open Caml_light
 open Rectify
 
+(*
 let test_source =
   let test_source_fp = open_in Sys.argv.(1) in
   let test_source =
@@ -10,11 +11,12 @@ let test_source =
   test_source
 
 let program = parse_caml_light_ast test_source
+*)
 
 type rectify_result =
   | CouldNotComputeRectifyingSet
   | EmptyRectifyingSet
-  | NewBindings of binding list
+  | NewBindings of binding list list * variable list
 
 let rectify_bindings (bindings : binding list) : rectify_result =
   let k = ref 0 in
@@ -86,14 +88,15 @@ let rectify_bindings (bindings : binding list) : rectify_result =
       let renamed_functions =
         rename_elements accumulator_functions cloture_rect new_name
       in
+      let new_clot = List.map new_name cloture_rect in
 
       let rectified_bindings =
         bindings
         |> List.map (fun (binding : binding) ->
                match binding with
-               | Variable _ -> [ binding ]
+               | Variable _ -> ( binding, None )
                | Function { name; parameters; body; return_type } ->
-                   if not (List.mem name cloture_rect) then [ binding ]
+                   if not (List.mem name cloture_rect) then ( binding, None )
                    else
                      let new_linearized_definition =
                        match List.assoc (new_name name) renamed_functions with
@@ -186,130 +189,171 @@ let rectify_bindings (bindings : binding list) : rectify_result =
                          : Caml_light.binding)
                      in
 
-                     [ new_definition; interceptor ])
-        |> List.concat
+                     (new_definition, Some interceptor) )
+        (* Rassemble tous les bindings de fonctions mutuellement récursives
+         * puis ajoute les bindings d’intercepteurs juste après *)
+        |> List.fold_left
+           (fun l (new_def, interceptor) -> match l, interceptor with
+            | [], Some i -> [[new_def]; [i]]
+            | [], None -> [[new_def]]
+            | x::q, Some i -> (new_def::x)::[i]::q
+            | x::q, None -> (new_def::x)::q)
+           []
+        |> (fun l -> match l with
+            | [] -> []
+            | x::q -> (List.rev x)::q)
       in
-      NewBindings rectified_bindings
+      NewBindings (rectified_bindings, new_clot)
 
-let rec try_rectify_bindings_deep (bindings : binding list) : binding list =
-  match rectify_bindings bindings with
-  | NewBindings b -> b
+(* La fonction transform bindings prend le bindings et le is_rec et renvoie
+ * les nouveaux bindings et le nouveau is_rec *)
+let rec try_rectify_bindings_deep (bindings : binding list) (is_rec: bool)
+    (transform_bindings: binding list -> bool -> rectify_result * bool) :
+    binding list list * bool =
+  match transform_bindings bindings is_rec with
+  | NewBindings (b, _), new_is_rec -> b, new_is_rec
   (* Only push deeper if we didn't fail to compute a rectifying set. If we did,
-    then we might be hiding recursive calls when we dig deeper (if a local
-      function calls a function defined in a higher scope). *)
-  | CouldNotComputeRectifyingSet -> bindings
-  | EmptyRectifyingSet ->
-      bindings
-      |> List.map (fun (binding : binding) ->
-             match binding with
-             | Variable { lhs; value } ->
-                 (Variable { lhs; value = rectify_bindings_in value } : binding)
-             | Function { name; parameters; body; return_type } ->
-                 Function
-                   {
-                     name;
-                     parameters;
-                     body = rectify_bindings_in body;
-                     return_type;
-                   })
+   * then we might be hiding recursive calls when we dig deeper (if a local
+   * function calls a function defined in a higher scope). *)
+  | CouldNotComputeRectifyingSet, new_is_rec -> [bindings], new_is_rec
+  | EmptyRectifyingSet, new_is_rec ->
+      let rectify_one_binding (binding: binding) =
+        match binding with
+        | Variable { lhs; value } ->
+            [(Variable {
+              lhs; value = rectify_bindings_in value transform_bindings
+             } : binding)]
+        | Function { name; parameters; body; return_type } ->
+            [Function
+              {
+                name;
+                parameters;
+                body = rectify_bindings_in body transform_bindings;
+                return_type;
+              }]
+      in
+      List.map rectify_one_binding bindings, new_is_rec
 
-and rectify_bindings_in (e : expression) : expression =
+and rectify_bindings_in (e : expression)
+    (transform_bindings: binding list -> bool -> rectify_result * bool) :
+    expression =
   match e with
   | Variable _ -> e
   | Constant _ -> e
   | Parenthesised { inner; style } ->
-      Parenthesised { style; inner = rectify_bindings_in inner }
+      Parenthesised { style; inner = rectify_bindings_in inner transform_bindings }
   | TypeCoercion { inner; typ } ->
-      TypeCoercion { inner = rectify_bindings_in inner; typ }
-  | ListLiteral l -> ListLiteral (List.map (fun l -> rectify_bindings_in l) l)
-  | ArrayLiteral l -> ArrayLiteral (List.map (fun l -> rectify_bindings_in l) l)
+      TypeCoercion { inner = rectify_bindings_in inner transform_bindings; typ }
+  | ListLiteral l ->
+      ListLiteral
+        (List.map (fun l -> rectify_bindings_in l transform_bindings) l)
+  | ArrayLiteral l ->
+      ArrayLiteral
+        (List.map (fun l -> rectify_bindings_in l transform_bindings) l)
   | RecordLiteral r ->
-      RecordLiteral (List.map (fun (n, e) -> (n, rectify_bindings_in e)) r)
+      RecordLiteral
+      (List.map (fun (n, e) -> (n, rectify_bindings_in e transform_bindings)) r)
   | WhileLoop { condition; body } ->
       WhileLoop
         {
-          condition = rectify_bindings_in condition;
-          body = rectify_bindings_in body;
+          condition = rectify_bindings_in condition transform_bindings;
+          body = rectify_bindings_in body transform_bindings;
         }
   | ForLoop { direction = direction'; variable; start; finish; body } ->
       ForLoop
         {
           direction = direction';
           variable;
-          start = rectify_bindings_in start;
-          finish = rectify_bindings_in finish;
-          body = rectify_bindings_in body;
+          start = rectify_bindings_in start transform_bindings;
+          finish = rectify_bindings_in finish transform_bindings;
+          body = rectify_bindings_in body transform_bindings;
         }
-  | Dereference e -> Dereference (rectify_bindings_in e)
+  | Dereference e -> Dereference (rectify_bindings_in e transform_bindings)
   | FieldAccess { receiver; target } ->
-      FieldAccess { receiver = rectify_bindings_in receiver; target }
+      FieldAccess {
+        receiver = rectify_bindings_in receiver transform_bindings;
+        target
+      }
   | ArrayAccess { receiver; target } ->
       ArrayAccess
         {
-          receiver = rectify_bindings_in receiver;
-          target = rectify_bindings_in target;
+          receiver = rectify_bindings_in receiver transform_bindings;
+          target = rectify_bindings_in target transform_bindings;
         }
   | FunctionApplication { receiver; arguments } ->
       FunctionApplication
         {
-          receiver = rectify_bindings_in receiver;
-          arguments = List.map (fun arg -> rectify_bindings_in arg) arguments;
+          receiver = rectify_bindings_in receiver transform_bindings;
+          arguments =
+            List.map
+              (fun arg -> rectify_bindings_in arg transform_bindings)
+              arguments;
         }
   | PrefixOperation { receiver; operation } ->
-      PrefixOperation { operation; receiver = rectify_bindings_in receiver }
+      PrefixOperation {
+        operation;
+        receiver = rectify_bindings_in receiver transform_bindings
+      }
   | InfixOperation { lhs; rhs; operation } ->
       InfixOperation
         {
-          lhs = rectify_bindings_in lhs;
-          rhs = rectify_bindings_in rhs;
+          lhs = rectify_bindings_in lhs transform_bindings;
+          rhs = rectify_bindings_in rhs transform_bindings;
           operation;
         }
-  | Negation e -> Negation (rectify_bindings_in e)
-  | Tuple t -> Tuple (List.map (fun l -> rectify_bindings_in l) t)
+  | Negation e -> Negation (rectify_bindings_in e transform_bindings)
+  | Tuple t ->
+      Tuple (List.map ((Fun.flip rectify_bindings_in) transform_bindings) t)
   | FieldAssignment { receiver; target; value } ->
       FieldAssignment
         {
-          receiver = rectify_bindings_in receiver;
+          receiver = rectify_bindings_in receiver transform_bindings;
           target;
-          value = rectify_bindings_in value;
+          value = rectify_bindings_in value transform_bindings;
         }
   | ArrayAssignment { receiver; target; value } ->
       ArrayAssignment
         {
-          receiver = rectify_bindings_in receiver;
-          target = rectify_bindings_in target;
-          value = rectify_bindings_in value;
+          receiver = rectify_bindings_in receiver transform_bindings;
+          target = rectify_bindings_in target transform_bindings;
+          value = rectify_bindings_in value transform_bindings;
         }
   | ReferenceAssignment { receiver; value } ->
       ReferenceAssignment
         {
-          receiver = rectify_bindings_in receiver;
-          value = rectify_bindings_in value;
+          receiver = rectify_bindings_in receiver transform_bindings;
+          value = rectify_bindings_in value transform_bindings;
         }
   | If { condition; body; else_body } ->
       If
         {
-          condition = rectify_bindings_in condition;
-          body = rectify_bindings_in body;
-          else_body = Option.map (fun b -> rectify_bindings_in b) else_body;
+          condition = rectify_bindings_in condition transform_bindings;
+          body = rectify_bindings_in body transform_bindings;
+          else_body = Option.map
+            (fun b -> rectify_bindings_in b transform_bindings) else_body;
         }
-  | Sequence s -> Sequence (List.map (fun e -> rectify_bindings_in e) s)
+  | Sequence s ->
+      Sequence (List.map (fun e -> rectify_bindings_in e transform_bindings) s)
   | Match { value; cases } ->
       Match
         {
-          value = rectify_bindings_in value;
+          value = rectify_bindings_in value transform_bindings;
           cases =
             List.map
-              (fun (patterns, e) -> (patterns, rectify_bindings_in e))
+              (fun (patterns, e) -> (
+                patterns, rectify_bindings_in e transform_bindings
+              ))
               cases;
         }
   | Try { value; cases } ->
       Try
         {
-          value = rectify_bindings_in value;
+          value = rectify_bindings_in value transform_bindings;
           cases =
             List.map
-              (fun (patterns, e) -> (patterns, rectify_bindings_in e))
+              (fun (patterns, e) -> (
+                patterns, rectify_bindings_in e transform_bindings
+              ))
               cases;
         }
   | FunctionLiteral { style; cases } ->
@@ -318,33 +362,55 @@ and rectify_bindings_in (e : expression) : expression =
           style;
           cases =
             List.map
-              (fun (patterns, e) -> (patterns, rectify_bindings_in e))
+              (fun (patterns, e) -> (
+                patterns, rectify_bindings_in e transform_bindings
+              ))
               cases;
         }
   | LetBinding { bindings; is_rec; inner } ->
-      LetBinding
-        {
-          bindings = try_rectify_bindings_deep bindings;
-          is_rec;
-          inner = rectify_bindings_in inner;
-        }
+      let new_bindings_list, new_is_rec =
+        try_rectify_bindings_deep bindings is_rec transform_bindings in
+      let rec flatten (inner_acc: expression)
+          (bindings_list: binding list list) =
+        match bindings_list with
+        | [] -> inner_acc
+        | [new_bindings] ->
+            LetBinding {
+              bindings = new_bindings;
+              is_rec = new_is_rec;
+              inner = inner_acc
+            }
+        | new_bindings::q ->
+            flatten
+            (LetBinding {
+              bindings = new_bindings;
+              is_rec = false;
+              inner = inner_acc
+            })
+            q
+      in
+      flatten (rectify_bindings_in inner transform_bindings)
+        (List.rev new_bindings_list)
   | StringAccess { receiver; target } ->
       StringAccess
         {
-          receiver = rectify_bindings_in receiver;
-          target = rectify_bindings_in target;
+          receiver = rectify_bindings_in receiver transform_bindings;
+          target = rectify_bindings_in target transform_bindings;
         }
   | StringAssignment { receiver; target; value } ->
       StringAssignment
         {
-          receiver = rectify_bindings_in receiver;
-          target = rectify_bindings_in target;
-          value = rectify_bindings_in value;
+          receiver = rectify_bindings_in receiver transform_bindings;
+          target = rectify_bindings_in target transform_bindings;
+          value = rectify_bindings_in value transform_bindings;
         }
 
+(*
 let rectified =
   program
   |> List.map (fun phrase ->
+      (* TODO lorsqu’on réécrira ça : il faudra transformer le bindings list list
+       * en plusieurs ValueDefinition puis flatten *)
          match phrase with
          | ValueDefinition { bindings; is_rec } ->
              ValueDefinition
@@ -353,3 +419,4 @@ let rectified =
 ;;
 
 print_endline (string_of_ast rectified)
+*)

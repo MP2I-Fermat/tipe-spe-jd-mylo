@@ -23,6 +23,25 @@ let rec list_beginning (l : 'a list) (i : int) : 'a list =
     | [] -> failwith "tropcourt"
     | x :: q -> x :: list_beginning q (i - 1)
 
+(* Renvoie true si la liste a une taille égale à 1, false sinon. Cette implem
+ * est en O(1) *)
+let is_length_1 (l: 'a list) : bool =
+  match l with
+  | [_] -> true
+  | _ -> false
+
+(* Affiche une liste *)
+let print_list (l: 'a list) (print_'a: 'a -> unit) =
+  let rec print_list_inner (l': 'a list) =
+    match l' with
+    | [] -> ()
+    | [x] -> print_'a x
+    | x::q -> (print_'a x; print_string "; "; print_list_inner q)
+  in
+  print_string "[";
+  print_list_inner l;
+  print_endline "]"
+
 (* Dépile n éléments de la pile s et les renvoie dans une liste. Le i-ième
  * élément de la liste est le i-ième à avoir été dépilé. Si jamais on
  * ne peut pas dépiler, lève l’erreur Stack.Empty *)
