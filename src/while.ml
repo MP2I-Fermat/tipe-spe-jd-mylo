@@ -150,7 +150,6 @@ let fonction_vers_while
             cases
         }
     | FunctionLiteral f ->
-        (* TODO à repenser certainement *)
         modify_res (FunctionLiteral f)
     | LetBinding {
         bindings : binding node list;
@@ -167,7 +166,7 @@ let fonction_vers_while
                     value ;
                   }: binding)
               | Function { name ; parameters ; body ; return_type } ->
-                  (* TODO à repenser aussi *)
+                  (* TODO à repenser *)
                   Function {
                     name ;
                     parameters ;
