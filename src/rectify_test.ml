@@ -16,7 +16,7 @@ let program = parse_caml_light_ast test_source
 type rectify_result =
   | CouldNotComputeRectifyingSet
   | EmptyRectifyingSet
-  | NewBindings of binding list list * variable list
+  | NewBindings of (binding list * bool) list * variable list  (* clôture rectifiable *)
 
 let rectify_bindings (bindings : binding list) : rectify_result =
   let k = ref 0 in
@@ -194,35 +194,36 @@ let rectify_bindings (bindings : binding list) : rectify_result =
          * puis ajoute les bindings d’intercepteurs juste après *)
         |> List.fold_left
            (fun l (new_def, interceptor) -> match l, interceptor with
-            | [], Some i -> [[new_def]; [i]]
-            | [], None -> [[new_def]]
-            | x::q, Some i -> (new_def::x)::[i]::q
-            | x::q, None -> (new_def::x)::q)
+            | [], Some i -> [[new_def], true; [i], false]
+            | [], None -> [[new_def], true]
+            | (x, _)::q, Some i -> ((new_def::x), true)::([i], false)::q
+            | (x, _)::q, None -> ((new_def::x), true)::q)
            []
         |> (fun l -> match l with
             | [] -> []
-            | x::q -> (List.rev x)::q)
+            | (x, x_is_rec)::q -> (List.rev x, x_is_rec)::q)
       in
       NewBindings (rectified_bindings, new_clot)
 
 (* La fonction transform bindings prend le bindings et le is_rec et renvoie
- * les nouveaux bindings et le nouveau is_rec *)
+ * les nouveaux bindings *)
 let rec try_rectify_bindings_deep (bindings : binding list) (is_rec: bool)
-    (transform_bindings: binding list -> bool -> rectify_result * bool) :
-    binding list list * bool =
+    (transform_bindings: binding list -> bool -> rectify_result) :
+      (binding list * bool) list =
   match transform_bindings bindings is_rec with
-  | NewBindings (b, _), new_is_rec -> b, new_is_rec
+  | NewBindings (b, _) ->
+      b
   (* Only push deeper if we didn't fail to compute a rectifying set. If we did,
    * then we might be hiding recursive calls when we dig deeper (if a local
    * function calls a function defined in a higher scope). *)
-  | CouldNotComputeRectifyingSet, new_is_rec -> [bindings], new_is_rec
-  | EmptyRectifyingSet, new_is_rec ->
+  | CouldNotComputeRectifyingSet -> [bindings, is_rec]
+  | EmptyRectifyingSet ->
       let rectify_one_binding (binding: binding) =
         match binding with
         | Variable { lhs; value } ->
             [(Variable {
               lhs; value = rectify_bindings_in value transform_bindings
-             } : binding)]
+             } : binding)], false
         | Function { name; parameters; body; return_type } ->
             [Function
               {
@@ -230,13 +231,12 @@ let rec try_rectify_bindings_deep (bindings : binding list) (is_rec: bool)
                 parameters;
                 body = rectify_bindings_in body transform_bindings;
                 return_type;
-              }]
+              }], is_rec
       in
-      List.map rectify_one_binding bindings, new_is_rec
+      List.map rectify_one_binding bindings
 
 and rectify_bindings_in (e : expression)
-    (transform_bindings: binding list -> bool -> rectify_result * bool) :
-    expression =
+    (transform_bindings: binding list -> bool -> rectify_result) : expression =
   match e with
   | Variable _ -> e
   | Constant _ -> e
@@ -303,7 +303,7 @@ and rectify_bindings_in (e : expression)
         }
   | Negation e -> Negation (rectify_bindings_in e transform_bindings)
   | Tuple t ->
-      Tuple (List.map ((Fun.flip rectify_bindings_in) transform_bindings) t)
+      Tuple (List.map (fun x -> rectify_bindings_in x transform_bindings) t)
   | FieldAssignment { receiver; target; value } ->
       FieldAssignment
         {
@@ -368,19 +368,19 @@ and rectify_bindings_in (e : expression)
               cases;
         }
   | LetBinding { bindings; is_rec; inner } ->
-      let new_bindings_list, new_is_rec =
+      let new_bindings_list =
         try_rectify_bindings_deep bindings is_rec transform_bindings in
       let rec flatten (inner_acc: expression)
-          (bindings_list: binding list list) =
+          (bindings_list: (binding list * bool) list) =
         match bindings_list with
         | [] -> inner_acc
-        | [new_bindings] ->
+        | [new_bindings, new_is_rec] ->
             LetBinding {
               bindings = new_bindings;
               is_rec = new_is_rec;
               inner = inner_acc
             }
-        | new_bindings::q ->
+        | (new_bindings, _)::q ->
             flatten
             (LetBinding {
               bindings = new_bindings;

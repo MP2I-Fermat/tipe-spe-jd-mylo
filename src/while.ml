@@ -223,7 +223,7 @@ let parse_file name =
 
 
 let whilify_bindings (bindings: binding list) (is_rec: bool) :
-    (binding * bool) list =
+    (binding list * bool) list =
   let create_interceptor (name: string) (parameters: pattern list)
       (return_type: type_expression option) : binding =
     Function {
@@ -251,36 +251,39 @@ let whilify_bindings (bindings: binding list) (is_rec: bool) :
       }
     }
   in
-  let whilify_bindings_after_rectification (clot: variable list)
-      ((bindings, new_is_rec): binding list * bool) :
-      (binding * bool) list =
+  let whilify_bindings_after_rectification (bindings: binding list)
+      (new_is_rec: bool) (clot: variable list) : (binding list * bool) list =
     if not new_is_rec || not (is_length_1 bindings) then
-      List.map (fun x -> (x, new_is_rec)) bindings
+      [bindings, new_is_rec]
     else begin
       match List.hd bindings with
       | Function { name; parameters; return_type; body } ->
-         let body_while = fonction_vers_while (name^"_whilified") parameters body clot in
+         let body_while = fonction_vers_while (name^"_whilified") parameters
+                          body clot in
          [
-           Function {
+           [Function {
              name = name^"_whilified";
              parameters;
              body = body_while;
              return_type;
-           }, false;
-           create_interceptor name parameters return_type, false
+           }], false;
+           [create_interceptor name parameters return_type], false
          ]
-      | autre -> [autre, new_is_rec]
+      | autre -> [[autre], new_is_rec]
     end
   in
-  match rectify_bindings bindings with
-  | NewBindings (b, clot) ->
-      begin match b with
-      | [] -> []
-      | x::q -> (x, is_rec)::(List.map (fun y -> (y, false)) q)
-      end
-      |> List.map (whilify_bindings_after_rectification clot)
-      |> List.concat
-  | truc -> List.map (fun x -> (x, is_rec)) bindings
+
+  let rectify_then_whilify (bindings: binding list) (is_rec': bool) :
+      rectify_result =
+    match rectify_bindings bindings with
+    | NewBindings (b, clot) ->
+      NewBindings (
+        whilify_bindings_after_rectification bindings is_rec' clot, clot
+      )
+    | autre -> autre
+  in
+
+  try_rectify_bindings_deep bindings is_rec rectify_then_whilify
 
 
 let whilify_program (program: phrase list) =
@@ -290,7 +293,7 @@ let whilify_program (program: phrase list) =
         whilify_bindings bindings is_rec
         |> List.map (fun (new_binding, new_is_rec) ->
             ValueDefinition {
-              bindings = [new_binding];
+              bindings = new_binding;
               is_rec = new_is_rec;
             })
     end

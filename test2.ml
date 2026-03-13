@@ -19,3 +19,6 @@ let fizzbuzz (max: int) =
   in
   fizzbuzz_a_partir 1
 
+
+let rec a () = b ()
+    and b () = a ()
