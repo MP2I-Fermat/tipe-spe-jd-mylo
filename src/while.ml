@@ -278,7 +278,9 @@ let whilify_bindings (bindings: binding list) (is_rec: bool) :
     match rectify_bindings bindings with
     | NewBindings (b, clot) ->
       NewBindings (
-        whilify_bindings_after_rectification bindings is_rec' clot, clot
+        List.map (fun (new_bindings, is_rec'') ->
+          whilify_bindings_after_rectification new_bindings is_rec'' clot
+        ) b |> List.flatten, clot
       )
     | autre -> autre
   in
