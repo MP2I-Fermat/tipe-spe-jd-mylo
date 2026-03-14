@@ -146,7 +146,7 @@ let fonction_vers_while
         Try {
           value ;
           cases = List.map
-            (fun (pattern, expr) -> (pattern, replace_result p  expr))
+            (fun (pattern, expr) -> (pattern, replace_result p expr))
             cases
         }
     | FunctionLiteral f ->
@@ -160,11 +160,7 @@ let fonction_vers_while
           bindings = List.map
             (fun (b: binding) ->
               match b with
-              | Variable { lhs ; value } ->
-                  (Variable {
-                    lhs ;
-                    value ;
-                  }: binding)
+              | Variable v -> (Variable v: binding)
               | Function { name ; parameters ; body ; return_type } ->
                   (* TODO à repenser *)
                   Function {
