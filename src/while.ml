@@ -1,7 +1,7 @@
 open Utils
 open Caml_light
 open Rectify
-open Rectify_test
+open Rectify_helper
 
 (* Renvoie l’AST de la fonction récursive terminale f une fois avoir été
  * transformée en boucle while (la sortie est toujours l’AST d’une fonction).
@@ -281,7 +281,7 @@ let whilify_bindings (bindings: binding list) (is_rec: bool) :
     | autre -> autre
   in
 
-  try_rectify_bindings_deep bindings is_rec rectify_then_whilify
+  try_transform_bindings_deep bindings is_rec rectify_then_whilify
 
 
 let whilify_program (program: phrase list) =
