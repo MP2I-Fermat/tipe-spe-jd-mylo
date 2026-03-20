@@ -1,6 +1,7 @@
 open Utils
 open Parser
 open Caml_light
+open Automaton
 
 let string_of_situation
     ((((n, rule), idx), sigma) : (string, string) lr1_situation) : string =
@@ -9,7 +10,11 @@ let string_of_situation
   in
   let rule_beginning = list_beginning rule_chars idx |> String.concat " " in
   let rule_end = list_skip rule_chars idx |> String.concat " " in
-  let sigma_s = TerminalSet.to_seq sigma |> List.of_seq |> String.concat ", " in
+  let sigma_s =
+    TerminalSet.to_seq sigma
+    |> List.of_seq
+    |> List.map (fun s -> match s with Epsilon -> "ε" | Symbol t -> t)
+    |> String.concat ", " in
   n ^ " -> " ^ rule_beginning ^ "^" ^ rule_end ^ " ~ {" ^ sigma_s ^ "}"
 
 let string_of_caml_automaton_state (s : (string, string) lr1_automaton_state) :

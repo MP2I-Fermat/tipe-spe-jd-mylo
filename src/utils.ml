@@ -304,6 +304,19 @@ module TerminalSet = struct
     iter (fun _ -> res.length <- res.length + 1) res;
     res
 
+  let union (s1 : 'a t) (s2 : 'a t) : 'a t =
+    let res =
+      {
+        mapping = s1.mapping;
+        data =
+          Array.init (Array.length s1.data) (fun i ->
+              s1.data.(i) lor s2.data.(i));
+        length = 0;
+      }
+    in
+    iter (fun _ -> res.length <- res.length + 1) res;
+    res
+
   let mem (s : 'a t) (item : 'a) =
     let idx = Hashtbl.find_opt s.mapping.direct item in
     match idx with
@@ -312,6 +325,15 @@ module TerminalSet = struct
         s.data.(idx / available_bits_per_int)
         land (1 lsl (idx mod available_bits_per_int))
         <> 0
+
+  let remove (s: 'a t) (item: 'a) : unit =
+    let i = Hashtbl.find s.mapping.direct item in
+    let prev = s.data.(i / available_bits_per_int) in
+    s.data.(i / available_bits_per_int) <-
+      s.data.(i / available_bits_per_int)
+      land (lnot (1 lsl (i mod available_bits_per_int)));
+    if prev <> s.data.(i / available_bits_per_int) then s.length <- s.length + 1
+
 
   let to_seq (s : 'a t) : 'a Seq.t =
     let res = ref (fun () -> Seq.Nil) in

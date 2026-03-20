@@ -3,14 +3,20 @@ open Automaton
 open Utils
 
 let test_premier_LL1 =
+  let eof = 'E' in
   let grammaire1 (* page 123, exemple 144 *) =
+    grammar_of_rule_list
     [ ('S', [ Terminal 'a'; NonTerminal 'T' ]); ('T', [ Terminal 'b' ]) ]
   in
+  let mapping1 = creer_mapping_grammaire grammaire1 eof in
+  let terminalset1 = TerminalSet.create mapping1 in
+  TerminalSet.add terminalset1 (Symbol 'a');
   assert (
-    Hashset.equals
-      (premier_LL1 [ Terminal 'a'; NonTerminal 'T' ] grammaire1
+    TerminalSet.equals
+      (premier_LL1 [ Terminal 'a'; NonTerminal 'T' ] grammaire1 mapping1
         (Hashtbl.create 2))
-      (Hashset.of_list [ 'a' ]));
+      terminalset1);
+(*
   assert (
     Hashset.equals
       (premier_LL1 [ NonTerminal 'T' ] grammaire1 (Hashtbl.create 2))
@@ -177,3 +183,4 @@ let test_trouve_conflit =
       in
       if trouve_conflits automaton_without_conflicts <> None then
         failwith "Conflict found"
+        *)

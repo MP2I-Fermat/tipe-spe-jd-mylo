@@ -32,13 +32,13 @@ type ('token_type, 'non_terminal) lr0_situation =
 
 (* Représente les situations LR(1), du style α₁…αⱼ↑ α₁₊ⱼ…αₙ ~ {b₁…bₙ} *)
 type ('token_type, 'non_terminal) lr1_situation =
-  ('token_type, 'non_terminal) lr0_situation * 'token_type TerminalSet.t
+  ('token_type, 'non_terminal) lr0_situation * ('token_type or_epsilon) TerminalSet.t
 
 (* Dictionnaire de situations LR(0) à leurs ensembles premiers correspondants.
  * On assure de cette façon l’unicité de la situation pour une règle donnée
  * dans les états des automates LR(1). *)
 type ('token_type, 'non_terminal) lr1_automaton_state =
-  (('token_type, 'non_terminal) lr0_situation, 'token_type TerminalSet.t)
+  (('token_type, 'non_terminal) lr0_situation, ('token_type or_epsilon) TerminalSet.t)
     Hashtbl.t
 
 (* Représente un automate LR(1) *)
@@ -67,10 +67,11 @@ let grammar_of_rule_list (l: ('token_type, 'non_terminal) rule list) :
 (* Renvoie l’ensemble Premier_LL(1)(s) dans la grammaire g *)
 let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
     (g : ('token_type, 'non_terminal) grammar)
-    (mapping : 'token_type TerminalSet.mapping)
+    (mapping : ('token_type or_epsilon) TerminalSet.mapping)
     (cache :
-      (('token_type, 'non_terminal) derivation, 'token_type TerminalSet.t)
-       Hashtbl.t): 'token_type TerminalSet.t =
+      (('token_type, 'non_terminal) derivation,
+       ('token_type or_epsilon) TerminalSet.t) Hashtbl.t
+    ): ('token_type or_epsilon) TerminalSet.t =
   (* Crée un dictionnaire d tel que d[s] est l'ensemble des dérivations w tels
    * que premier(s) est inclus dans premier(w).
    * cf. 4.2.1.3 Théorème 32 (p 63). *)
@@ -88,13 +89,22 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
       if Hashtbl.find_opt cache derivation = None then
         let derivation_contient =
           match derivation with
+          | [] -> []
           | [ Terminal _ ] -> []
           | [ NonTerminal n ] -> (
               match Hashtbl.find_opt g n with
               | Some derivations -> derivations
               | None -> [])
+          |  NonTerminal n :: q -> (
+              match Hashtbl.find_opt g n with
+              | Some derivations ->
+                  if List.mem [] derivations then
+                    q :: (List.filter (fun l -> l = []) derivations)
+                  else
+                    [[NonTerminal n]]
+              | None -> []
+          )
           | x :: q -> [ [ x ] ]
-          | [] -> failwith "Cannot compute premier_LL1 of an empty derivation"
         in
         derivation_contient
         |> List.iter (
@@ -124,8 +134,10 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
       let premier_k = TerminalSet.create mapping in
       Hashtbl.add valeurs k premier_k;
       match k with
+      | [] ->
+          TerminalSet.add premier_k Epsilon
       | [ Terminal a ] ->
-          TerminalSet.add premier_k a;
+          TerminalSet.add premier_k (Symbol a);
           Hashset.add a_traiter k
       | _ -> (
           match Hashtbl.find_opt cache k with
@@ -161,25 +173,31 @@ let premier_LL1 (s : ('token_type, 'non_terminal) derivation)
 
 (* Renvoie l’ensemble Premier_LR(1)(s, σ) dans la grammaire g *)
 let premier_LR1 (s : ('token_type, 'non_terminal) derivation)
-    (sigma : 'token_type TerminalSet.t)
-    (g : ('token_type, 'non_terminal) grammar)
-    (mapping : 'token_type TerminalSet.mapping)
-    (cache :
-      (('token_type, 'non_terminal) derivation, 'token_type TerminalSet.t) Hashtbl.t)
-      : 'token_type TerminalSet.t =
-  match s with [] -> sigma | _ -> premier_LL1 s g mapping cache
+     (sigma : ('token_type or_epsilon) TerminalSet.t)
+     (g : ('token_type, 'non_terminal) grammar)
+     (mapping : ('token_type or_epsilon) TerminalSet.mapping)
+     (cache :
+       (('token_type, 'non_terminal) derivation,
+        ('token_type or_epsilon) TerminalSet.t) Hashtbl.t) :
+     ('token_type or_epsilon) TerminalSet.t =
+  match s with
+  | [] -> sigma
+  | _ ->
+      let pLL1 = premier_LL1 s g mapping cache in
+      TerminalSet.remove pLL1 Epsilon;
+      TerminalSet.union pLL1 sigma
 
 (* Sature e jusqu'à que e soit une fermeture des situations LR(1) de e. *)
 let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
     (g : ('token_type, 'non_terminal) grammar)
-    (mapping : 'token_type TerminalSet.mapping)
+    (mapping : ('token_type or_epsilon) TerminalSet.mapping)
     (premier_cache :
-      (('token_type, 'non_terminal) derivation, 'token_type TerminalSet.t )
+      (('token_type, 'non_terminal) derivation, ('token_type or_epsilon) TerminalSet.t )
        Hashtbl.t)
     : unit =
   (* Si le non-terminal de règle est nt, renvoie la situation nt->^γ~σ2.
    * Renvoie None sinon *)
-  let nouvelle_situation_regle (sigma2 : 'token_type TerminalSet.t)
+  let nouvelle_situation_regle (sigma2 : ('token_type or_epsilon) TerminalSet.t)
       (regle : ('token_type, 'non_terminal) rule) :
       ('token_type, 'non_terminal) lr1_situation =
     ((regle, 0), TerminalSet.copy sigma2)
@@ -189,7 +207,7 @@ let fermer_situations_LR1 (e : ('token_type, 'non_terminal) lr1_automaton_state)
    * la liste des situations T->^γ~premierLR1(β, σ) pour T->γ règle de g *)
   let liste_nouvelles_situations
       (((_, derivation), curseur) : ('token_type, 'non_terminal) lr0_situation)
-      (sigma : 'token_type TerminalSet.t) :
+      (sigma : ('token_type or_epsilon) TerminalSet.t) :
       ('token_type, 'non_terminal) lr1_situation list =
     let regle_fin = list_skip derivation curseur in
     match regle_fin with
@@ -240,7 +258,43 @@ let states_equal (a : ('token_type, 'non_terminal) lr1_automaton_state)
            | None -> false
            | Some v' -> TerminalSet.equals v v')
 
-(* Construit l’automate LR(1) de la grammaire g. eof_token désigne le lexème
+
+(* Crée le mapping du TerminalSet qui sera utilisé pour la grammaire g avec
+ * le lexème EOF lexeme_eof *)
+let creer_mapping_grammaire (g: ('token_type, 'non_terminal) grammar)
+      (lexeme_eof: 'token_type) :
+      ('token_type or_epsilon) TerminalSet.mapping =
+  Symbol lexeme_eof :: Epsilon :: (
+    Hashtbl.to_seq_values g |> List.of_seq |> List.flatten |> List.flatten
+    |> List.filter_map (
+      fun s ->
+        match s with
+        | NonTerminal _ -> None
+        | Terminal t -> Some (Symbol t)
+    )
+  )
+  |> TerminalSet.build_mapping
+
+
+(* Construit l’état initial de l’automate LR(1) de la grammaire g de lexème
+ * EOF lexeme_eof et d’axiome axiome *)
+let creer_etat_initial (g: ('token_type, 'non_terminal) grammar)
+    (axiome: 'non_terminal) (lexeme_eof: 'token_type)
+    (mapping: ('token_type or_epsilon) TerminalSet.mapping):
+    ('token_type, 'non_terminal) lr1_automaton_state =
+  let etat_initial = Hashtbl.create 2 in
+  (match Hashtbl.find_opt g axiome with
+  | Some derivations ->
+      List.iter
+        (fun derivation ->
+          Hashtbl.add etat_initial
+            ((axiome, derivation), 0)
+            (TerminalSet.singleton mapping (Symbol lexeme_eof)))
+        derivations
+  | None -> ());
+  etat_initial
+
+(* Construit l’automate LR(1) de la grammaire g. lexeme_eof désigne le lexème
  * de fin de fichier, il ne doit pas être utilisé dans les règles de la
  * grammaire (mais il devra figurer dans la sortie de l’analyseur lexical) *)
 let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
@@ -314,28 +368,11 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
   in
 
   let premier_cache = Hashtbl.create 2 in
-  let mapping =
-    TerminalSet.build_mapping
-      (lexeme_eof
-      :: (Hashtbl.to_seq_values g |> List.of_seq |> List.flatten
-         |> List.map
-              (List.filter_map (fun s ->
-                   match s with NonTerminal _ -> None | Terminal t -> Some t))
-         |> List.flatten))
-  in
+  let mapping = creer_mapping_grammaire g lexeme_eof in
 
   (* On ajoute toutes les règles pour l'axiome, puis on ferme l'ensemble pour
    * obtenir l’état initial. *)
-  let etat_initial = Hashtbl.create 2 in
-  (match Hashtbl.find_opt g axiome with
-  | Some derivations ->
-      List.iter
-        (fun derivation ->
-          Hashtbl.add etat_initial
-            ((axiome, derivation), 0)
-            (TerminalSet.singleton mapping lexeme_eof))
-        derivations
-  | None -> ());
+  let etat_initial = creer_etat_initial g axiome lexeme_eof mapping in
   fermer_situations_LR1 etat_initial g mapping premier_cache;
 
   (* transitions[state0][symbol] est l’état atteint en lisant symbol depuis
@@ -436,7 +473,8 @@ let trouve_conflits (a : ('token_type, 'non_terminal) lr1_automaton) :
             match List.nth derivation curseur with
             | NonTerminal nt -> ()
             | Terminal t ->
-                if TerminalSet.mem suivants_a_reduire t then raise Conflit)
+                if TerminalSet.mem suivants_a_reduire (Symbol t) then
+                  raise Conflit)
         s;
 
       false
@@ -469,7 +507,7 @@ let trouve_reduction_a_faire
   let situation_a_reduire =
     Hashtbl.to_seq e
     |> seq_find (fun (lr0_situation, sigma) ->
-           a_reduire lr0_situation && TerminalSet.mem sigma t)
+           a_reduire lr0_situation && TerminalSet.mem sigma (Symbol t))
   in
   match situation_a_reduire with
   | None -> None
@@ -588,7 +626,13 @@ let string_of_situation
   let rule_beginning = implode (list_beginning rule_chars idx) in
   let rule_end = implode (list_skip rule_chars idx) in
   let sigma_s =
-    TerminalSet.to_seq sigma |> List.of_seq |> List.map string_of_char
+    TerminalSet.to_seq sigma |> List.of_seq
+    |> List.map (
+      fun symb_or_epsilon ->
+        match symb_or_epsilon with
+        | Epsilon -> "ε"
+        | Symbol t -> string_of_char t
+      )
     |> String.concat ", "
   in
   ns ^ " -> " ^ rule_beginning ^ "^" ^ rule_end ^ " ~ {" ^ sigma_s ^ "}"
