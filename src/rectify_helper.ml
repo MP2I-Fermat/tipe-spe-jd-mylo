@@ -4,8 +4,7 @@ open Rectify
 type rectify_result =
   | CouldNotComputeRectifyingSet
   | EmptyRectifyingSet
-  | NewBindings of
-      (binding list * bool) list * variable list (* clôture rectifiable *)
+  | NewBindings of (binding list * bool) list * recursive_call_info option
 
 let rectify_bindings (bindings : binding list) : rectify_result =
   let k = ref 0 in
@@ -32,8 +31,8 @@ let rectify_bindings (bindings : binding list) : rectify_result =
   (* Step 2: Calculate rectifying set *)
   match cloture_rectifiable linearized_functions with
   | None -> CouldNotComputeRectifyingSet
-  | Some [] -> EmptyRectifyingSet
-  | Some cloture_rect ->
+  | Some { rectifying_set = [] } -> EmptyRectifyingSet
+  | Some { rectifying_set = cloture_rect } ->
       (* Step 3: Rectify *)
       let rectified_functions =
         rectify linearized_functions cloture_rect linearized_functions
@@ -77,7 +76,6 @@ let rectify_bindings (bindings : binding list) : rectify_result =
       let renamed_functions =
         rename_elements accumulator_functions cloture_rect new_name
       in
-      let new_clot = List.map new_name cloture_rect in
 
       let rectified_bindings =
         bindings
@@ -195,7 +193,7 @@ let rectify_bindings (bindings : binding list) : rectify_result =
         | [] -> []
         | (x, x_is_rec) :: q -> (List.rev x, x_is_rec) :: q
       in
-      NewBindings (rectified_bindings, new_clot)
+      NewBindings (rectified_bindings, cloture_rectifiable renamed_functions)
 
 (* La fonction transform bindings prend le bindings et le is_rec et renvoie
  * les nouveaux bindings *)

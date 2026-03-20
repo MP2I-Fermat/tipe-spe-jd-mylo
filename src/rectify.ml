@@ -1404,11 +1404,17 @@ and rename_elements (l : linear_form) (cloture_rect : variable list)
          if List.mem name cloture_rect then (new_name name, new_elt)
          else (name, new_elt))
 
+type recursive_call_info = {
+  rectifying_set : variable list;
+  recursively_defined_functions : variable list;
+  all_recursive_functions_are_toplevel : bool;
+}
+
 (** cloture_rectifiable fns computes a set that rectifies fns.
 
     Returns None if such a set could not be computed. *)
 let cloture_rectifiable (fns : (variable * linear_element) list) :
-    variable list option =
+    recursive_call_info option =
   let rec get_argument_count (fn : variable) : int option =
     match find_definition fns fn with
     | Some def -> (
@@ -1459,20 +1465,25 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
   in
   let a_traiter = ref !cloture in
 
+  let all_recursive_functions_are_toplevel = ref true in
+  let recursively_defined_functions = ref [] in
+
   let add_fn (fn : variable) : unit =
     if not (List.mem fn !cloture) then (
       cloture := fn :: !cloture;
       a_traiter := fn :: !a_traiter)
   in
 
-  let exception Exit in
+  let exception Exit of string in
   try
     while !a_traiter <> [] do
       let current = List.hd !a_traiter in
       a_traiter := List.tl !a_traiter;
 
       let current_argument_count =
-        match get_argument_count current with Some n -> n | None -> raise Exit
+        match get_argument_count current with
+        | Some n -> n
+        | None -> raise (Exit ("Unable to get argument count for " ^ current))
       in
 
       let rec propagate_from_element (e_name : variable) (e : linear_element)
@@ -1540,14 +1551,18 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
                    | Variable { lhs; value } ->
                        (if last_var value = current then
                           match get_name lhs with
-                          | None -> raise Exit
+                          | None ->
+                              raise
+                                (Exit
+                                   "Unable to get unique name for variable LHS")
                           | Some var -> add_fn var);
                        (* We can leak from value since this binding will then be in the rectifying set. *)
                        propagate_from value enclosing_function true
                    | Function { name; body } -> propagate_from body name false)
       and propagate_from (l : linear_form) (enclosing_function : variable)
           (can_leak : bool) : unit =
-        if last_var l = current && not can_leak then raise Exit;
+        if last_var l = current && not can_leak then
+          raise (Exit ("Reference to " ^ current ^ " was leaked"));
         l
         |> List.iter (fun (name, element) ->
                match element with
@@ -1555,9 +1570,19 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
                | FunctionApplication { receiver; arguments } ->
                    let receiver = last_var receiver in
                    if receiver = current then
-                     if List.length arguments = current_argument_count then
-                       add_fn enclosing_function
-                     else raise Exit
+                     if List.length arguments = current_argument_count then (
+                       add_fn enclosing_function;
+                       all_recursive_functions_are_toplevel :=
+                         !all_recursive_functions_are_toplevel
+                         && List.assq_opt enclosing_function fns <> None;
+                       if
+                         not
+                           (List.mem enclosing_function
+                              !recursively_defined_functions)
+                       then
+                         recursively_defined_functions :=
+                           enclosing_function :: !recursively_defined_functions)
+                     else raise (Exit ("Call to " ^ current ^ " was partial"))
                    else
                      arguments
                      |> List.iteri (fun i argument ->
@@ -1567,7 +1592,11 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
                               in
                               match ith_names with
                               | Some names -> List.iter add_fn names
-                              | None -> raise Exit)
+                              | None ->
+                                  raise
+                                    (Exit
+                                       ("Unable to get argument names for "
+                                      ^ receiver)))
                | _ -> ());
 
         l
@@ -1579,8 +1608,14 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
       |> List.iter (fun (name, def) ->
              propagate_from_element name def "UNKNOWN_GLOBAL_ENCLOSURE" false)
     done;
-    Some !cloture
-  with Exit -> None
+    Some
+      {
+        rectifying_set = !cloture;
+        all_recursive_functions_are_toplevel =
+          !all_recursive_functions_are_toplevel;
+        recursively_defined_functions = !recursively_defined_functions;
+      }
+  with Exit s -> None
 
 (** find_continuations collects the definitions of all continuations defined in
     fns.

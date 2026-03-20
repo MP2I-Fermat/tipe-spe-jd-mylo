@@ -248,14 +248,17 @@ let whilify_bindings (bindings: binding list) (is_rec: bool) :
     }
   in
   let whilify_bindings_after_rectification (bindings: binding list)
-      (new_is_rec: bool) (clot: variable list) : (binding list * bool) list =
-    if not new_is_rec || not (is_length_1 bindings) then
+      (new_is_rec: bool) (clot: recursive_call_info) : (binding list * bool) list =
+    if
+      not new_is_rec
+      || not (clot.all_recursive_functions_are_toplevel && is_length_1 clot.recursively_defined_functions)
+    then
       [bindings, new_is_rec]
     else begin
       match List.hd bindings with
       | Function { name; parameters; return_type; body } ->
          let body_while = fonction_vers_while (name^"_whilified") parameters
-                          body clot in
+                          body clot.rectifying_set in
          [
            [Function {
              name = name^"_whilified";
@@ -272,11 +275,11 @@ let whilify_bindings (bindings: binding list) (is_rec: bool) :
   let rectify_then_whilify (bindings: binding list) (is_rec': bool) :
       rectify_result =
     match rectify_bindings bindings with
-    | NewBindings (b, clot) ->
+    | NewBindings (b, Some clot) ->
       NewBindings (
         List.map (fun (new_bindings, is_rec'') ->
           whilify_bindings_after_rectification new_bindings is_rec'' clot
-        ) b |> List.flatten, clot
+        ) b |> List.flatten, None
       )
     | autre -> autre
   in
