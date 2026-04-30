@@ -564,6 +564,9 @@ and contains_reference (f : variable) (l : linear_form) : bool =
   | [] -> false
   | (p, e) :: q -> element_contains_reference f e || contains_reference f q
 
+(** Given an element and the definitions of variables that may appear in the
+    element, returns an expression equivalent to the element and list of
+    variables that were inlined from their definitions. *)
 let rec delinearize_element (e : linear_element) (prev_vars : linear_form) :
     expression * variable list =
   match e with
@@ -575,6 +578,7 @@ let rec delinearize_element (e : linear_element) (prev_vars : linear_form) :
             delinearize_element definition
               (List.filter (fun (name, _) -> name <> v) prev_vars)
           in
+          (* Add parenthesis to prevent any precedence issues. *)
           ( Parenthesised { inner = inlined_elt; style = Parenthesis },
             v :: inlined_vars ))
   | Constant c -> (Constant c, [])
@@ -942,56 +946,53 @@ let rec get_name (p : pattern) : variable option =
   | Or _ -> None
   | As { name } -> Some name
 
-let rec find_definitions_in_element (fns : (variable * linear_element) list)
-    (name : variable) (e : linear_element) : linear_element list =
+let rec find_definitions_in_element (name : variable) (e : linear_element) :
+    linear_element list =
   match e with
   | Variable _ | Constant _ -> []
   | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
-      find_definitions fns name inner
+      find_definitions name inner
   | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
-      l |> List.map (fun elt -> find_definitions fns name elt) |> List.concat
+      l |> List.map (fun elt -> find_definitions name elt) |> List.concat
   | RecordLiteral r ->
-      r
-      |> List.map (fun (_, elt) -> find_definitions fns name elt)
-      |> List.concat
+      r |> List.map (fun (_, elt) -> find_definitions name elt) |> List.concat
   | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
-  | FieldAccess { receiver } -> find_definitions fns name receiver
+  | FieldAccess { receiver } -> find_definitions name receiver
   | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
-      find_definitions fns name receiver @ find_definitions fns name target
+      find_definitions name receiver @ find_definitions name target
   | FunctionApplication { receiver; arguments } ->
-      find_definitions fns name receiver
+      find_definitions name receiver
       @ (arguments
-        |> List.map (fun arg -> find_definitions fns name arg)
+        |> List.map (fun arg -> find_definitions name arg)
         |> List.concat)
-  | PrefixOperation { receiver } -> find_definitions fns name receiver
+  | PrefixOperation { receiver } -> find_definitions name receiver
   | InfixOperation { lhs; rhs } ->
-      find_definitions fns name lhs @ find_definitions fns name rhs
-  | Negation receiver -> find_definitions fns name receiver
+      find_definitions name lhs @ find_definitions name rhs
+  | Negation receiver -> find_definitions name receiver
   | FieldAssignment { receiver; value } ->
-      find_definitions fns name receiver @ find_definitions fns name value
+      find_definitions name receiver @ find_definitions name value
   | ArrayAssignment { receiver; target; value }
   | StringAssignment { receiver; target; value } ->
-      find_definitions fns name receiver
-      @ find_definitions fns name target
-      @ find_definitions fns name value
+      find_definitions name receiver
+      @ find_definitions name target
+      @ find_definitions name value
   | ReferenceAssignment { receiver; value } ->
-      find_definitions fns name receiver @ find_definitions fns name value
+      find_definitions name receiver @ find_definitions name value
   | If { condition; body; else_body } -> (
-      find_definitions fns name condition
-      @ find_definitions fns name body
-      @
-      match else_body with None -> [] | Some b -> find_definitions fns name b)
+      find_definitions name condition
+      @ find_definitions name body
+      @ match else_body with None -> [] | Some b -> find_definitions name b)
   | Match { value; cases } ->
-      find_definitions fns name value
+      find_definitions name value
       @ (cases
-        |> List.map (fun (_, body) -> find_definitions fns name body)
+        |> List.map (fun (_, body) -> find_definitions name body)
         |> List.concat)
   | Try _ -> failwith "Found linearized try"
   | FunctionLiteral { cases } ->
-      List.map (fun (_, body) -> find_definitions fns name body) cases
+      List.map (fun (_, body) -> find_definitions name body) cases
       |> List.concat
   | LetBinding { bindings; inner } ->
-      find_definitions fns name inner
+      find_definitions name inner
       @ (bindings
         |> List.map (fun (binding : linear_binding) ->
                match binding with
@@ -999,7 +1000,7 @@ let rec find_definitions_in_element (fns : (variable * linear_element) list)
                    (if get_name lhs = Some name then
                       [ Variable (last_var value) ]
                     else [])
-                   @ find_definitions fns name value
+                   @ find_definitions name value
                | Function { name = name'; parameters; body; return_type } ->
                    (* It's OK to create a synthetic element here so long as we
                       don't expect to find it in a later AST search. As it
@@ -1014,14 +1015,13 @@ let rec find_definitions_in_element (fns : (variable * linear_element) list)
                           };
                       ]
                     else [])
-                   @ find_definitions fns name body)
+                   @ find_definitions name body)
         |> List.concat)
 
-and find_definitions (fns : (variable * linear_element) list) (name : variable)
-    (l : linear_form) : linear_element list =
+and find_definitions (name : variable) (l : linear_form) : linear_element list =
   let child_definitions =
     l
-    |> List.map (fun (_, e) -> find_definitions_in_element fns name e)
+    |> List.map (fun (_, e) -> find_definitions_in_element name e)
     |> List.flatten
   in
   let self_definitions =
@@ -1045,7 +1045,7 @@ and find_definition (fns : (variable * linear_element) list) (name : variable) :
   in
   let inner_definitions =
     fns |> List.map snd
-    |> List.map (find_definitions_in_element fns name)
+    |> List.map (find_definitions_in_element name)
     |> List.concat
   in
   let definitions = root_definitions @ inner_definitions in
