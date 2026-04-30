@@ -1574,7 +1574,7 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
                        add_fn enclosing_function;
                        all_recursive_functions_are_toplevel :=
                          !all_recursive_functions_are_toplevel
-                         && List.assq_opt enclosing_function fns <> None;
+                         && List.assoc_opt enclosing_function fns <> None;
                        if
                          not
                            (List.mem enclosing_function
