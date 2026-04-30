@@ -1844,6 +1844,9 @@ let commutes (continuations : linear_function_literal list) : bool =
     let arguments, body = List.hd continuation.cases in
     let argument = Option.get (get_name (List.hd arguments)) in
 
+    (* If v is defined to be equal to argument, return a list of all the
+       variables in the definition chain between v and argument, else return
+       None. *)
     let rec ensure_is_argument (v : variable) : variable list option =
       if v = argument then Some [ v ]
       else
@@ -1853,26 +1856,31 @@ let commutes (continuations : linear_function_literal list) : bool =
         | _ -> None
     in
 
+    (* If returned_var is defined in a valid way (see the doc comment for
+       commutes), return a list of all the variables on the definition chain
+       between the argument and the returned value, else return None. *)
     let rec check_return_from (returned_var : variable) : variable list option =
-      let vx =
-        match find_definition body returned_var with
-        | None -> None
-        | Some (Variable v) -> check_return_from v
-        | Some (Negation l) -> ensure_is_argument (last_var l)
-        | Some (PrefixOperation { receiver; operation = Minus | MinusDot }) ->
-            ensure_is_argument (last_var receiver)
-        | Some
-            (InfixOperation
-               { lhs; operation = Plus | PlusDot | Star | StarDot; rhs }) -> (
-            match
-              ( ensure_is_argument (last_var lhs),
-                ensure_is_argument (last_var rhs) )
-            with
-            | Some v, None | None, Some v -> Some v
-            | _ -> None)
-        | _ -> None
-      in
-      match vx with Some vars -> Some (returned_var :: vars) | None -> None
+      if returned_var = argument then Some [ returned_var ]
+      else
+        let vx =
+          match find_definition body returned_var with
+          | None -> None
+          | Some (Variable v) -> check_return_from v
+          | Some (Negation l) -> ensure_is_argument (last_var l)
+          | Some (PrefixOperation { receiver; operation = Minus | MinusDot }) ->
+              ensure_is_argument (last_var receiver)
+          | Some
+              (InfixOperation
+                 { lhs; operation = Plus | PlusDot | Star | StarDot; rhs }) -> (
+              match
+                ( ensure_is_argument (last_var lhs),
+                  ensure_is_argument (last_var rhs) )
+              with
+              | Some v, None | None, Some v -> Some v
+              | _ -> None)
+          | _ -> None
+        in
+        match vx with Some vars -> Some (returned_var :: vars) | None -> None
     in
 
     match check_return_from (last_var body) with
