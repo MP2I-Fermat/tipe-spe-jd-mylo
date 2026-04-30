@@ -1624,84 +1624,78 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
     they are assumed to be named "new_cont". *)
 let find_continuations (fns : (variable * linear_element) list)
     (cloture_rect : variable list) : linear_function_literal list option =
-  let exception Exit in
-  try
-    let rec find_continuations_in_element (e : linear_element) :
-        linear_function_literal list =
-      match e with
-      | Variable _ | Constant _ -> []
-      | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
-          find_continuations_in inner
-      | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
-          l |> List.map (fun elt -> find_continuations_in elt) |> List.concat
-      | RecordLiteral r ->
-          r
-          |> List.map (fun (_, elt) -> find_continuations_in elt)
-          |> List.concat
-      | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
-      | FieldAccess { receiver } -> find_continuations_in receiver
-      | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
-          find_continuations_in receiver @ find_continuations_in target
-      | FunctionApplication { receiver; arguments } ->
-          find_continuations_in receiver
-          @ (arguments
-            |> List.map (fun arg -> find_continuations_in arg)
-            |> List.concat)
-      | PrefixOperation { receiver } -> find_continuations_in receiver
-      | InfixOperation { lhs; rhs } ->
-          find_continuations_in lhs @ find_continuations_in rhs
-      | Negation receiver -> find_continuations_in receiver
-      | FieldAssignment { receiver; value } ->
-          find_continuations_in receiver @ find_continuations_in value
-      | ArrayAssignment { receiver; target; value }
-      | StringAssignment { receiver; target; value } ->
-          find_continuations_in receiver
-          @ find_continuations_in target
-          @ find_continuations_in value
-      | ReferenceAssignment { receiver; value } ->
-          find_continuations_in receiver @ find_continuations_in value
-      | If { condition; body; else_body } -> (
-          find_continuations_in condition
-          @ find_continuations_in body
-          @
-          match else_body with None -> [] | Some b -> find_continuations_in b)
-      | Match { value; cases } ->
-          find_continuations_in value
-          @ (cases
-            |> List.map (fun (_, body) -> find_continuations_in body)
-            |> List.concat)
-      | Try _ -> failwith "Found linearized try"
-      | FunctionLiteral { cases } ->
-          List.map (fun (_, body) -> find_continuations_in body) cases
-          |> List.concat
-      | LetBinding { bindings; inner } ->
-          find_continuations_in inner
-          @ (bindings
-            |> List.map (fun (binding : linear_binding) ->
-                   match binding with
-                   | Variable { value } -> find_continuations_in value
-                   | Function { name; body } -> find_continuations_in body)
-            |> List.concat)
-    and find_continuations_in (l : linear_form) : linear_function_literal list =
-      match l with
-      | [] -> []
-      | (name, x) :: q ->
-          let x_def =
-            if name = "new_cont" then
-              match x with
-              | FunctionLiteral f -> [ f ]
-              | _ -> failwith "Not a continuation, but named new_cont"
-            else []
-          in
+  let rec find_continuations_in_element (e : linear_element) :
+      linear_function_literal list =
+    match e with
+    | Variable _ | Constant _ -> []
+    | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
+        find_continuations_in inner
+    | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
+        l |> List.map (fun elt -> find_continuations_in elt) |> List.concat
+    | RecordLiteral r ->
+        r |> List.map (fun (_, elt) -> find_continuations_in elt) |> List.concat
+    | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
+    | FieldAccess { receiver } -> find_continuations_in receiver
+    | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
+        find_continuations_in receiver @ find_continuations_in target
+    | FunctionApplication { receiver; arguments } ->
+        find_continuations_in receiver
+        @ (arguments
+          |> List.map (fun arg -> find_continuations_in arg)
+          |> List.concat)
+    | PrefixOperation { receiver } -> find_continuations_in receiver
+    | InfixOperation { lhs; rhs } ->
+        find_continuations_in lhs @ find_continuations_in rhs
+    | Negation receiver -> find_continuations_in receiver
+    | FieldAssignment { receiver; value } ->
+        find_continuations_in receiver @ find_continuations_in value
+    | ArrayAssignment { receiver; target; value }
+    | StringAssignment { receiver; target; value } ->
+        find_continuations_in receiver
+        @ find_continuations_in target
+        @ find_continuations_in value
+    | ReferenceAssignment { receiver; value } ->
+        find_continuations_in receiver @ find_continuations_in value
+    | If { condition; body; else_body } -> (
+        find_continuations_in condition
+        @ find_continuations_in body
+        @ match else_body with None -> [] | Some b -> find_continuations_in b)
+    | Match { value; cases } ->
+        find_continuations_in value
+        @ (cases
+          |> List.map (fun (_, body) -> find_continuations_in body)
+          |> List.concat)
+    | Try _ -> failwith "Found linearized try"
+    | FunctionLiteral { cases } ->
+        List.map (fun (_, body) -> find_continuations_in body) cases
+        |> List.concat
+    | LetBinding { bindings; inner } ->
+        find_continuations_in inner
+        @ (bindings
+          |> List.map (fun (binding : linear_binding) ->
+                 match binding with
+                 | Variable { value } -> find_continuations_in value
+                 | Function { name; body } -> find_continuations_in body)
+          |> List.concat)
+  and find_continuations_in (l : linear_form) : linear_function_literal list =
+    match l with
+    | [] -> []
+    | (name, x) :: q ->
+        let x_def =
+          if name = "new_cont" then
+            match x with
+            | FunctionLiteral f -> [ f ]
+            | _ -> failwith "Not a continuation, but named new_cont"
+          else []
+        in
 
-          x_def @ find_continuations_in_element x @ find_continuations_in q
-    in
-    Some
-      (List.fold_left
-         (fun prev (name, body) -> prev @ find_continuations_in_element body)
-         [] fns
-      |> List.sort_uniq compare)
-  with Exit -> None
+        x_def @ find_continuations_in_element x @ find_continuations_in q
+  in
+  Some
+    (List.fold_left
+       (fun prev (name, body) -> prev @ find_continuations_in_element body)
+       [] fns
+    |> List.sort_uniq compare)
 
 (** find_initials fns returns the set of all values passed as base cases to the
     continuations of fns.
