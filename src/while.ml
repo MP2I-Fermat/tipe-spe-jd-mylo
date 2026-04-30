@@ -218,8 +218,7 @@ let parse_file name =
   parse_caml_light_ast content
 
 
-let whilify_bindings (bindings: binding list) (is_rec: bool) :
-    (binding list * bool) list =
+let whilify_bindings (def : value_definition) : value_definition list =
   let create_interceptor (name: string) (parameters: pattern list)
       (return_type: type_expression option) : binding =
     Function {
@@ -247,56 +246,56 @@ let whilify_bindings (bindings: binding list) (is_rec: bool) :
       }
     }
   in
-  let whilify_bindings_after_rectification (bindings: binding list)
-      (new_is_rec: bool) (clot: recursive_call_info) : (binding list * bool) list =
+  let whilify_bindings_after_rectification (def : value_definition)
+      (info: recursive_call_info) : value_definition list =
     if
-      not new_is_rec
-      || not (clot.all_recursive_functions_are_toplevel && is_length_1 clot.recursively_defined_functions)
+      not def.is_rec
+      || not (info.all_recursive_functions_are_toplevel && is_length_1 info.recursively_defined_functions)
     then
-      [bindings, new_is_rec]
+      [ def ]
     else begin
-      match List.hd bindings with
+      match List.hd def.bindings with
       | Function { name; parameters; return_type; body } ->
          let body_while = fonction_vers_while (name^"_whilified") parameters
-                          body clot.rectifying_set in
-         [
-           [Function {
-             name = name^"_whilified";
-             parameters;
-             body = body_while;
-             return_type;
-           }], false;
-           [create_interceptor name parameters return_type], false
-         ]
-      | autre -> [[autre], new_is_rec]
+                          body info.rectifying_set in
+          [
+            {
+              bindings = [
+                Function {
+                  name = name^"_whilified";
+                  parameters;
+                  body = body_while;
+                  return_type;
+                }
+              ];
+              is_rec = false
+            };
+            {bindings = [create_interceptor name parameters return_type]; is_rec = false}
+          ]
+      | _ -> [ def ]
     end
   in
 
-  let rectify_then_whilify (bindings: binding list) (is_rec': bool) :
-      rectify_result =
-    match rectify_bindings bindings with
+  let rectify_then_whilify (def : value_definition) : rectify_result =
+    match rectify_bindings def.bindings with
     | NewBindings (b, Some clot) ->
       NewBindings (
-        List.map (fun (new_bindings, is_rec'') ->
-          whilify_bindings_after_rectification new_bindings is_rec'' clot
-        ) b |> List.flatten, None
+        List.map (fun def -> whilify_bindings_after_rectification def clot) b
+          |> List.flatten,
+        None
       )
     | autre -> autre
   in
 
-  try_transform_bindings_deep bindings is_rec rectify_then_whilify
+  try_transform_bindings_deep def rectify_then_whilify
 
 
 let whilify_program (program: phrase list) =
   let whilify_phrase (phrase: phrase) : phrase list =
     match phrase with
-    | ValueDefinition { bindings; is_rec } -> begin
-        whilify_bindings bindings is_rec
-        |> List.map (fun (new_binding, new_is_rec) ->
-            ValueDefinition {
-              bindings = new_binding;
-              is_rec = new_is_rec;
-            })
+    | ValueDefinition v -> begin
+        whilify_bindings v
+        |> List.map (fun v -> ValueDefinition v)
     end
     | _ -> [phrase]
   in

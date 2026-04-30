@@ -4,7 +4,7 @@ open Rectify
 type rectify_result =
   | CouldNotComputeRectifyingSet
   | EmptyRectifyingSet
-  | NewBindings of (binding list * bool) list * recursive_call_info option
+  | NewBindings of value_definition list * recursive_call_info option
 
 let rectify_bindings (bindings : binding list) : rectify_result =
   let k = ref 0 in
@@ -182,59 +182,72 @@ let rectify_bindings (bindings : binding list) : rectify_result =
         |> List.fold_left
              (fun l (new_def, interceptor) ->
                match (l, interceptor) with
-               | [], Some i -> [ ([ new_def ], true); ([ i ], false) ]
-               | [], None -> [ ([ new_def ], true) ]
-               | (x, _) :: q, Some i ->
-                   (new_def :: x, true) :: ([ i ], false) :: q
-               | (x, _) :: q, None -> (new_def :: x, true) :: q)
+               | [], Some i ->
+                   [
+                     { bindings = [ new_def ]; is_rec = true };
+                     { bindings = [ i ]; is_rec = false };
+                   ]
+               | [], None -> [ { bindings = [ new_def ]; is_rec = true } ]
+               | { bindings } :: q, Some i ->
+                   { bindings = new_def :: bindings; is_rec = true }
+                   :: { bindings = [ i ]; is_rec = false }
+                   :: q
+               | { bindings } :: q, None ->
+                   { bindings = new_def :: bindings; is_rec = true } :: q)
              []
         |> fun l ->
         match l with
         | [] -> []
-        | (x, x_is_rec) :: q -> (List.rev x, x_is_rec) :: q
+        | { bindings; is_rec } :: q ->
+            { bindings = List.rev bindings; is_rec } :: q
       in
       NewBindings (rectified_bindings, cloture_rectifiable renamed_functions)
 
 (* La fonction transform bindings prend le bindings et le is_rec et renvoie
  * les nouveaux bindings *)
-let rec try_transform_bindings_deep (bindings : binding list) (is_rec : bool)
-    (transform_bindings : binding list -> bool -> rectify_result) :
-    (binding list * bool) list =
-  match transform_bindings bindings is_rec with
+let rec try_transform_bindings_deep (def : value_definition)
+    (transform_bindings : value_definition -> rectify_result) :
+    value_definition list =
+  match transform_bindings def with
   | NewBindings (b, _) -> b
   (* Only push deeper if we didn't fail to compute a rectifying set. If we did,
    * then we might be hiding recursive calls when we dig deeper (if a local
    * function calls a function defined in a higher scope). *)
-  | CouldNotComputeRectifyingSet -> [ (bindings, is_rec) ]
+  | CouldNotComputeRectifyingSet -> [ def ]
   | EmptyRectifyingSet ->
       let transform_one_binding (binding : binding) =
         match binding with
         | Variable { lhs; value } ->
-            ( [
-                (Variable
-                   {
-                     lhs;
-                     value = transform_bindings_in value transform_bindings;
-                   }
-                  : binding);
-              ],
-              false )
+            {
+              bindings =
+                [
+                  Variable
+                    {
+                      lhs;
+                      value = transform_bindings_in value transform_bindings;
+                    };
+                ];
+              is_rec = false;
+            }
         | Function { name; parameters; body; return_type } ->
-            ( [
-                Function
-                  {
-                    name;
-                    parameters;
-                    body = transform_bindings_in body transform_bindings;
-                    return_type;
-                  };
-              ],
-              is_rec )
+            {
+              bindings =
+                [
+                  Function
+                    {
+                      name;
+                      parameters;
+                      body = transform_bindings_in body transform_bindings;
+                      return_type;
+                    };
+                ];
+              is_rec = def.is_rec;
+            }
       in
-      List.map transform_one_binding bindings
+      List.map transform_one_binding def.bindings
 
 and transform_bindings_in (e : expression)
-    (transform_bindings : binding list -> bool -> rectify_result) : expression =
+    (transform_bindings : value_definition -> rectify_result) : expression =
   match e with
   | Variable _ -> e
   | Constant _ -> e
@@ -370,23 +383,17 @@ and transform_bindings_in (e : expression)
         }
   | LetBinding { bindings; is_rec; inner } ->
       let new_bindings_list =
-        try_transform_bindings_deep bindings is_rec transform_bindings
+        try_transform_bindings_deep { bindings; is_rec } transform_bindings
       in
       let rec flatten (inner_acc : expression)
-          (bindings_list : (binding list * bool) list) =
+          (bindings_list : value_definition list) =
         match bindings_list with
         | [] -> inner_acc
-        | [ (new_bindings, new_is_rec) ] ->
-            LetBinding
-              {
-                bindings = new_bindings;
-                is_rec = new_is_rec;
-                inner = inner_acc;
-              }
-        | (new_bindings, _) :: q ->
+        | [ { bindings; is_rec } ] ->
+            LetBinding { bindings; is_rec; inner = inner_acc }
+        | { bindings } :: q ->
             flatten
-              (LetBinding
-                 { bindings = new_bindings; is_rec = false; inner = inner_acc })
+              (LetBinding { bindings; is_rec = false; inner = inner_acc })
               q
       in
       flatten
