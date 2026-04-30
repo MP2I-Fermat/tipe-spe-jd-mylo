@@ -219,50 +219,25 @@ let parse_file name =
 
 
 let whilify_bindings (def : value_definition) : value_definition list =
-  let create_interceptor (name: string) (parameters: pattern list)
-      (return_type: type_expression option) : binding =
-    Function {
-      name;
-      return_type;
-      parameters =
-        List.mapi
-        Caml_light.(fun i x ->
-           match x with
-           | Ident(v) -> Ident(v)
-           | TypeCoercion { inner=Ident(v); typ } ->
-               TypeCoercion { inner=Ident(v); typ }
-           | _ -> Ident("arg"^(string_of_int i))
-        )
-        parameters;
-      body = FunctionApplication {
-        receiver = Variable(name^"_whilified");
-        arguments = List.mapi
-          Caml_light.(fun i x ->
-            match x with
-            | Ident(v) -> Variable(v)
-            | TypeCoercion { inner=Ident(v); typ } -> Variable(v)
-            | _ -> Variable("arg"^(string_of_int i))
-          ) parameters
-      }
-    }
-  in
+  (* Returns the new value definitions, and the renaming applied to modified functions. *)
   let whilify_bindings_after_rectification (def : value_definition)
-      (info: recursive_call_info) : value_definition list =
+      (info: recursive_call_info) : value_definition list * ((label * label) list)=
     if
       not def.is_rec
       || not (info.all_recursive_functions_are_toplevel && is_length_1 info.recursively_defined_functions)
     then
-      [ def ]
+      [ def ], []
     else begin
       match List.hd def.bindings with
       | Function { name; parameters; return_type; body } ->
-         let body_while = fonction_vers_while (name^"_whilified") parameters
+         let new_name = name  ^ "_whilified" in
+         let body_while = fonction_vers_while new_name parameters
                           body info.rectifying_set in
           [
             {
               bindings = [
                 Function {
-                  name = name^"_whilified";
+                  name = new_name;
                   parameters;
                   body = body_while;
                   return_type;
@@ -270,18 +245,46 @@ let whilify_bindings (def : value_definition) : value_definition list =
               ];
               is_rec = false
             };
-            {bindings = [create_interceptor name parameters return_type]; is_rec = false}
-          ]
-      | _ -> [ def ]
+          ], [(name, new_name)]
+      | _ -> [ def ], []
     end
   in
 
   let rectify_then_whilify (def : value_definition) : rectify_result =
     match rectify_bindings def.bindings with
-    | NewBindings (b, Some clot) ->
+    | NewBindings (b, Some info) ->
+      let update_bindings (def : value_definition) (substitutions : (label * label) list)
+        : value_definition list * ((label * label) list) =
+        match def with
+        | {
+            is_rec = false;
+            bindings = [ Function ({ body = FunctionApplication { receiver = Variable callee; arguments } } as f)]
+          } ->
+          (* This is an interceptor created during rectification. Update it to call the rectified-whilified function. *)
+          (
+            [{
+              is_rec = false;
+              bindings = [
+                Function {
+                  f with
+                  body = FunctionApplication {
+                    receiver = Variable (List.assoc_opt callee substitutions |> Option.value ~default:callee);
+                    arguments;
+                  };
+                }
+              ];
+            }],
+            []
+          )
+        | _ -> whilify_bindings_after_rectification def info
+      in
+
       NewBindings (
-        List.map (fun def -> whilify_bindings_after_rectification def clot) b
-          |> List.flatten,
+        List.fold_left (fun (defs, subs) next_def ->
+          let next_defs, next_subs = update_bindings next_def subs in
+          defs @ next_defs, subs @ next_subs
+        ) ([], []) b
+        |> fst,
         None
       )
     | autre -> autre
