@@ -27,10 +27,10 @@ let caml_light_automaton =
     of what is semantically only one rule.
 
     This method collapses all occurrences of variants of a rule into a single
-    node type.
+    type.
 
-    The resulting node type is defined by target. A node is considered to be a
-    variant of target if its node type is prefixed by target, *)
+    The resulting type is defined by target. A is considered to be a variant of
+    target if its type is prefixed by target, *)
 let rec collapse_precedence (target : string)
     (tree : (string, string) syntax_tree) : (string, string) syntax_tree =
   match tree with
@@ -85,14 +85,13 @@ let parse_caml_light_syntax_tree (source : string) =
   |> collapse_precedence "IMPL_PHRASE"
   |> collapse_precedence "IMPLEMENTATION"
 
-type 'a node = 'a
-and program = phrase node list node
+type program = phrase list
 
 and phrase =
-  | Expression of expression node
-  | ValueDefinition of value_definition node
-  | TypeDefinition of type_definition node
-  | ExceptionDefinition of exception_definition node
+  | Expression of expression
+  | ValueDefinition of value_definition
+  | TypeDefinition of type_definition
+  | ExceptionDefinition of exception_definition
 
 and parenthesis_style = Parenthesis | BeginEnd
 and for_direction = Up | Down
@@ -129,7 +128,7 @@ and infix_operation =
   | DoubleAmpersand
   | DoublePipe
 
-and pattern_cases = (pattern node list * expression node) list
+and pattern_cases = (pattern list * expression) list
 and function_literal_style = Fun | Function
 and label = string
 and lowercase_ident = string
@@ -138,117 +137,104 @@ and variable = string
 and type_constructor = string
 
 and constructor =
-  | Named of uppercase_ident node
+  | Named of uppercase_ident
   | EmptyList
   | Unit of parenthesis_style
   | EmptyArray
 
 and function_ = {
-  name : variable node;
-  parameters : pattern node list;
-  body : expression node;
+  name : variable;
+  parameters : pattern list;
+  body : expression;
   return_type : type_expression option;
 }
 
 and binding =
-  | Variable of { lhs : pattern node; value : expression node }
+  | Variable of { lhs : pattern; value : expression }
   | Function of function_
 
 and expression =
-  | Variable of variable node
-  | Constant of constant node
-  | Parenthesised of { inner : expression node; style : parenthesis_style }
-  | TypeCoercion of { inner : expression node; typ : type_expression node }
-  | ListLiteral of expression node list
-  | ArrayLiteral of expression node list
-  | RecordLiteral of (label node * expression node) list
-  | WhileLoop of { condition : expression node; body : expression node }
+  | Variable of variable
+  | Constant of constant
+  | Parenthesised of { inner : expression; style : parenthesis_style }
+  | TypeCoercion of { inner : expression; typ : type_expression }
+  | ListLiteral of expression list
+  | ArrayLiteral of expression list
+  | RecordLiteral of (label * expression) list
+  | WhileLoop of { condition : expression; body : expression }
   | ForLoop of {
       direction : for_direction;
-      variable : lowercase_ident node;
-      start : expression node;
-      finish : expression node;
-      body : expression node;
+      variable : lowercase_ident;
+      start : expression;
+      finish : expression;
+      body : expression;
     }
-  | Dereference of expression node
-  | FieldAccess of { receiver : expression node; target : label node }
-  | ArrayAccess of { receiver : expression node; target : expression node }
+  | Dereference of expression
+  | FieldAccess of { receiver : expression; target : label }
+  | ArrayAccess of { receiver : expression; target : expression }
   | FunctionApplication of {
-      receiver : expression node;
-      arguments : expression node list;
+      receiver : expression;
+      arguments : expression list;
     }
-  | PrefixOperation of {
-      receiver : expression node;
-      operation : prefix_operation;
-    }
+  | PrefixOperation of { receiver : expression; operation : prefix_operation }
   | InfixOperation of {
-      lhs : expression node;
-      rhs : expression node;
+      lhs : expression;
+      rhs : expression;
       operation : infix_operation;
     }
-  | Negation of expression node
-  | Tuple of expression node list
+  | Negation of expression
+  | Tuple of expression list
   | FieldAssignment of {
-      receiver : expression node;
-      target : label node;
-      value : expression node;
+      receiver : expression;
+      target : label;
+      value : expression;
     }
   | ArrayAssignment of {
-      receiver : expression node;
-      target : expression node;
-      value : expression node;
+      receiver : expression;
+      target : expression;
+      value : expression;
     }
-  | ReferenceAssignment of {
-      receiver : expression node;
-      value : expression node;
-    }
+  | ReferenceAssignment of { receiver : expression; value : expression }
   | If of {
-      condition : expression node;
-      body : expression node;
-      else_body : expression node option;
+      condition : expression;
+      body : expression;
+      else_body : expression option;
     }
-  | Sequence of expression node list
-  | Match of { value : expression node; cases : pattern_cases }
-  | Try of { value : expression node; cases : pattern_cases }
+  | Sequence of expression list
+  | Match of { value : expression; cases : pattern_cases }
+  | Try of { value : expression; cases : pattern_cases }
   | FunctionLiteral of { style : function_literal_style; cases : pattern_cases }
-  | LetBinding of {
-      bindings : binding node list;
-      is_rec : bool;
-      inner : expression node;
-    }
-  | StringAccess of { receiver : expression node; target : expression node }
+  | LetBinding of { bindings : binding list; is_rec : bool; inner : expression }
+  | StringAccess of { receiver : expression; target : expression }
   | StringAssignment of {
-      receiver : expression node;
-      target : expression node;
-      value : expression node;
+      receiver : expression;
+      target : expression;
+      value : expression;
     }
 
 and pattern =
-  | Ident of lowercase_ident node
+  | Ident of lowercase_ident
   | Underscore
-  | Parenthesised of pattern node
-  | TypeCoercion of { inner : pattern node; typ : type_expression node }
-  | Constant of constant node
-  | Record of (label node * pattern node) list
-  | List of pattern node list
-  | Construction of { constructor : constructor node; argument : pattern node }
-  | Concatenation of { head : pattern node; tail : pattern node }
-  | Tuple of pattern node list
-  | Or of pattern node list
-  | As of { inner : pattern node; name : lowercase_ident node }
+  | Parenthesised of pattern
+  | TypeCoercion of { inner : pattern; typ : type_expression }
+  | Constant of constant
+  | Record of (label * pattern) list
+  | List of pattern list
+  | Construction of { constructor : constructor; argument : pattern }
+  | Concatenation of { head : pattern; tail : pattern }
+  | Tuple of pattern list
+  | Or of pattern list
+  | As of { inner : pattern; name : lowercase_ident }
 
 and type_expression =
-  | Argument of lowercase_ident node
-  | Parenthesised of type_expression node
+  | Argument of lowercase_ident
+  | Parenthesised of type_expression
   | Construction of {
-      constructor : type_constructor node;
-      arguments : type_expression node list;
+      constructor : type_constructor;
+      arguments : type_expression list;
     }
-  | Tuple of type_expression node list
-  | Function of {
-      argument : type_expression node;
-      result : type_expression node;
-    }
+  | Tuple of type_expression list
+  | Function of { argument : type_expression; result : type_expression }
 
 and char_literal_style = Old | New
 
@@ -257,68 +243,66 @@ and constant =
   | FloatLiteral of float
   | CharacterLiteral of { style : char_literal_style; value : char }
   | StringLiteral of string
-  | Construction of constructor node
+  | Construction of constructor
   | True
   | False
 
-and value_definition = { bindings : binding node list; is_rec : bool }
-and type_definition = typedef node list
+and value_definition = { bindings : binding list; is_rec : bool }
+and type_definition = typedef list
 and type_alias_style = DoubleEq | SingleEq
 
 and field_declaration = {
-  name : lowercase_ident node;
+  name : lowercase_ident;
   is_mutable : bool;
-  typ : type_expression node;
+  typ : type_expression;
 }
 
 and type_constructor_declaration = {
-  name : uppercase_ident node;
-  parameter : type_expression node option;
+  name : uppercase_ident;
+  parameter : type_expression option;
 }
 
 and typedef =
   | Constructors of {
-      name : lowercase_ident node;
-      parameters : lowercase_ident node list;
+      name : lowercase_ident;
+      parameters : lowercase_ident list;
       parenthesised_parameters : bool;
-      constructors : type_constructor_declaration node list;
+      constructors : type_constructor_declaration list;
     }
   | Record of {
-      name : lowercase_ident node;
-      parameters : lowercase_ident node list;
+      name : lowercase_ident;
+      parameters : lowercase_ident list;
       parenthesised_parameters : bool;
-      fields : field_declaration node list;
+      fields : field_declaration list;
     }
   | Alias of {
-      name : lowercase_ident node;
+      name : lowercase_ident;
       style : type_alias_style;
-      parameters : lowercase_ident node list;
+      parameters : lowercase_ident list;
       parenthesised_parameters : bool;
-      aliased : type_expression node;
+      aliased : type_expression;
     }
   | Anonymous of {
-      name : lowercase_ident node;
-      parameters : lowercase_ident node list;
+      name : lowercase_ident;
+      parameters : lowercase_ident list;
       parenthesised_parameters : bool;
     }
 
-and exception_definition = {
-  exceptions : type_constructor_declaration node list;
-}
+and exception_definition = { exceptions : type_constructor_declaration list }
 
 (** Converts a Caml Light syntax_tree to a Caml Light AST. *)
 let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
-  let rec label (tree : (string, string) syntax_tree) : label node =
+  let rec label (tree : (string, string) syntax_tree) : label =
     match tree with
     | Node ("LABEL", [ Leaf { token_type = "lowercase_ident"; value } ]) ->
         value
     | _ -> failwith "Not a label"
-  and variable (tree : (string, string) syntax_tree) : variable node =
+  and variable (tree : (string, string) syntax_tree) : variable =
     match tree with
     | Node ("VARIABLE", [ Leaf { token_type = "lowercase_ident"; value } ]) ->
         value
     | _ -> failwith "Not a variable"
-  and constructor (tree : (string, string) syntax_tree) : constructor node =
+  and constructor (tree : (string, string) syntax_tree) : constructor =
     match tree with
     | Node ("CONSTR", [ Leaf { token_type = "uppercase_ident"; value } ]) ->
         Named value
@@ -348,15 +332,15 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
           [ Leaf { token_type = "begin" }; Leaf { token_type = "end" } ] ) ->
         Unit BeginEnd
     | _ -> failwith "Not a constructor"
-  and type_constructor (tree : (string, string) syntax_tree) :
-      type_constructor node =
+  and type_constructor (tree : (string, string) syntax_tree) : type_constructor
+      =
     match tree with
     | Node ("TYPE_CONSTR", [ Leaf { token_type = "lowercase_ident"; value } ])
       ->
         value
     | _ -> failwith "Not a type constructor"
   and more_type_constructor_arguments (tree : (string, string) syntax_tree) :
-      type_expression node list =
+      type_expression list =
     match tree with
     | Node ("MORE_TYP_CONSTR_ARGS", [ inner ]) -> [ type_expression inner ]
     | Node
@@ -365,13 +349,12 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         type_expression inner :: more_type_constructor_arguments rest
     | _ -> failwith "Not a type expression argument list"
   and tuple_type_expression (tree : (string, string) syntax_tree) :
-      type_expression node list =
+      type_expression list =
     match tree with
     | Node ("TYP_EXPR", [ first; Leaf { token_type = "star" }; rest ]) ->
         type_expression first :: tuple_type_expression rest
     | _ -> [ type_expression tree ]
-  and type_expression (tree : (string, string) syntax_tree) :
-      type_expression node =
+  and type_expression (tree : (string, string) syntax_tree) : type_expression =
     match tree with
     | Node
         ( "TYP_EXPR",
@@ -430,7 +413,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         let result_node = type_expression result in
         Function { argument = argument_node; result = result_node }
     | _ -> failwith "Not a type expression"
-  and constant (tree : (string, string) syntax_tree) : constant node =
+  and constant (tree : (string, string) syntax_tree) : constant =
     match tree with
     | Node ("CONSTANT", [ Leaf { token_type = "integer_literal"; value } ]) ->
         IntegerLiteral (int_of_string value)
@@ -449,14 +432,13 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
     | Node ("CONSTANT", [ Leaf { token_type = "true" } ]) -> True
     | Node ("CONSTANT", [ Leaf { token_type = "false" } ]) -> False
     | _ -> failwith "Not a constant"
-  and field_pattern (tree : (string, string) syntax_tree) :
-      label node * pattern node =
+  and field_pattern (tree : (string, string) syntax_tree) : label * pattern =
     match tree with
     | Node ("FIELD_PATTERN", [ lbl; Leaf { token_type = "eq" }; pttrn ]) ->
         (label lbl, pattern pttrn)
     | _ -> failwith "Not a field pattern"
   and field_pattern_list (tree : (string, string) syntax_tree) :
-      (label node * pattern node) list =
+      (label * pattern) list =
     match tree with
     | Node ("FIELD_PATTERN_LIST", [ inner ]) -> [ field_pattern inner ]
     | Node
@@ -464,24 +446,24 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
           [ inner; Leaf { token_type = "semicolon" }; rest ] ) ->
         field_pattern inner :: field_pattern_list rest
     | _ -> failwith "Not a field pattern lit"
-  and a_pattern_list (tree : (string, string) syntax_tree) : pattern node list =
+  and a_pattern_list (tree : (string, string) syntax_tree) : pattern list =
     match tree with
     | Node ("A_PATTERN_LIST", [ pttrn ]) -> [ pattern pttrn ]
     | Node ("A_PATTERN_LIST", [ pttrn; Leaf { token_type = "semicolon" }; rest ])
       ->
         pattern pttrn :: a_pattern_list rest
     | _ -> failwith "Not an A pattern list"
-  and pattern_tuple (tree : (string, string) syntax_tree) : pattern node list =
+  and pattern_tuple (tree : (string, string) syntax_tree) : pattern list =
     match tree with
     | Node ("PATTERN", [ rest; Leaf { token_type = "comma" }; last ]) ->
         pattern_tuple rest @ [ pattern last ]
     | _ -> [ pattern tree ]
-  and pattern_or (tree : (string, string) syntax_tree) : pattern node list =
+  and pattern_or (tree : (string, string) syntax_tree) : pattern list =
     match tree with
     | Node ("PATTERN", [ rest; Leaf { token_type = "pipe" }; last ]) ->
         pattern_or rest @ [ pattern last ]
     | _ -> [ pattern tree ]
-  and pattern (tree : (string, string) syntax_tree) : pattern node =
+  and pattern (tree : (string, string) syntax_tree) : pattern =
     match tree with
     | Node ("PATTERN", [ Leaf { token_type = "lowercase_ident"; value } ]) ->
         Ident value
@@ -570,7 +552,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         let expr_node = expression expr in
         ([ pttrn_node ], expr_node) :: other_cases_nodes
     | _ -> failwith "Not a simple matching"
-  and b_pattern_list (tree : (string, string) syntax_tree) : pattern node list =
+  and b_pattern_list (tree : (string, string) syntax_tree) : pattern list =
     match tree with
     | Node ("B_PATTERN_LIST", [ inner ]) -> [ pattern inner ]
     | Node ("B_PATTERN_LIST", [ inner; rest ]) ->
@@ -598,7 +580,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         let expr_node = expression expr in
         (pattern_nodes, expr_node) :: rest_node
     | _ -> failwith "Not a multiple matching"
-  and let_binding (tree : (string, string) syntax_tree) : binding node =
+  and let_binding (tree : (string, string) syntax_tree) : binding =
     match tree with
     | Node ("LET_BINDING", [ pttrn; Leaf { token_type = "eq" }; expr ]) ->
         let pttrn_node = pattern pttrn in
@@ -640,15 +622,14 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
             return_type = Some return_type_node;
           }
     | _ -> failwith "Not a let binding"
-  and let_binding_list (tree : (string, string) syntax_tree) : binding node list
-      =
+  and let_binding_list (tree : (string, string) syntax_tree) : binding list =
     match tree with
     | Node ("LET_BINDING_LIST", [ b ]) -> [ let_binding b ]
     | Node ("LET_BINDING_LIST", [ b; Leaf { token_type = "and" }; rest ]) ->
         let_binding b :: let_binding_list rest
     | _ -> failwith "Not a binding list"
   and expression_sequence (tree : (string, string) syntax_tree) :
-      expression node list =
+      expression list =
     match tree with
     | Node
         ( "EXPR",
@@ -664,13 +645,13 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         [ expression e1 ]
     | _ -> [ expression tree ]
   and field_expression (tree : (string, string) syntax_tree) :
-      label node * expression node =
+      label * expression =
     match tree with
     | Node ("FIELD_EXPR", [ name; Leaf { token_type = "eq" }; value ]) ->
         (label name, expression value)
     | _ -> failwith "Not a field expression"
   and field_expression_sequence (tree : (string, string) syntax_tree) :
-      (label node * expression node) list =
+      (label * expression) list =
     match tree with
     | Node ("FIELD_EXPR_LIST", [ expr ]) -> [ field_expression expr ]
     | Node ("FIELD_EXPR_LIST", [ expr; Leaf { token_type = "semicolon" } ]) ->
@@ -680,13 +661,12 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         field_expression expr :: field_expression_sequence rest
     | _ -> failwith "Not a field expression list"
   and adjacent_expressions (tree : (string, string) syntax_tree) :
-      expression node list =
+      expression list =
     match tree with
     | Node ("EXPR", [ (Node ("EXPR", _) as e1); (Node ("EXPR", _) as e2) ]) ->
         adjacent_expressions e1 @ [ expression e2 ]
     | _ -> [ expression tree ]
-  and expression_tuple (tree : (string, string) syntax_tree) :
-      expression node list =
+  and expression_tuple (tree : (string, string) syntax_tree) : expression list =
     match tree with
     | Node
         ( "EXPR",
@@ -697,7 +677,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
           ] ) ->
         expression_tuple e1 @ [ expression e2 ]
     | _ -> [ expression tree ]
-  and expression (tree : (string, string) syntax_tree) : expression node =
+  and expression (tree : (string, string) syntax_tree) : expression =
     match tree with
     | Node ("EXPR", [ (Node ("VARIABLE", _) as var) ]) ->
         let var_node = variable var in
@@ -1124,8 +1104,8 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
 
         FunctionLiteral { style = Function; cases = pattern_case_nodes }
     | _ -> failwith "Not an expression"
-  and value_definition (tree : (string, string) syntax_tree) :
-      value_definition node =
+  and value_definition (tree : (string, string) syntax_tree) : value_definition
+      =
     match tree with
     | Node ("VALUE_DEFINITION", [ Leaf { token_type = "let" }; bindings ]) ->
         let binding_nodes = let_binding_list bindings in
@@ -1138,7 +1118,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         { bindings = binding_nodes; is_rec = true }
     | _ -> failwith "Not a value definition"
   and constructor_declaration (tree : (string, string) syntax_tree) :
-      type_constructor_declaration node =
+      type_constructor_declaration =
     match tree with
     | Node ("CONSTR_DECL", [ Leaf { token_type = "uppercase_ident"; value } ])
       ->
@@ -1154,7 +1134,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         { name = value; parameter = Some argument_node }
     | _ -> failwith "Not a type constructor declaration"
   and type_constructor_declaration_list (tree : (string, string) syntax_tree) :
-      type_constructor_declaration node list =
+      type_constructor_declaration list =
     match tree with
     | Node ("TYPE_CONSTR_DECL_LIST", [ decl ]) ->
         [ constructor_declaration decl ]
@@ -1164,7 +1144,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         constructor_declaration decl :: type_constructor_declaration_list rest
     | _ -> failwith "Not a type constructor declaration list"
   and label_declaration (tree : (string, string) syntax_tree) :
-      field_declaration node =
+      field_declaration =
     match tree with
     | Node
         ( "LABEL_DECL",
@@ -1189,7 +1169,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         { name = value; typ = typ_expr_node; is_mutable = true }
     | _ -> failwith "Not a label declaration"
   and label_declaration_list (tree : (string, string) syntax_tree) :
-      field_declaration node list =
+      field_declaration list =
     match tree with
     | Node ("LABEL_DECL_LIST", [ decl ]) -> [ label_declaration decl ]
     | Node ("LABEL_DECL_LIST", [ decl; Leaf { token_type = "semicolon" }; rest ])
@@ -1197,7 +1177,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         label_declaration decl :: label_declaration_list rest
     | _ -> failwith "Not a label declaration"
   and type_parameter_list (tree : (string, string) syntax_tree) :
-      lowercase_ident node list =
+      lowercase_ident list =
     match tree with
     | Node
         ( "TYPE_PARAM_LIST",
@@ -1217,7 +1197,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         value :: type_parameter_list rest
     | _ -> failwith "Not a type parameter list"
   and type_parameters (tree : (string, string) syntax_tree) :
-      lowercase_ident node list * bool =
+      lowercase_ident list * bool =
     match tree with
     | Node
         ( "TYPE_PARAMS",
@@ -1235,7 +1215,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
           ] ) ->
         (type_parameter_list list, true)
     | _ -> failwith "Not a type parameter list"
-  and typedef (tree : (string, string) syntax_tree) : typedef node =
+  and typedef (tree : (string, string) syntax_tree) : typedef =
     match tree with
     | Node
         ( "TYPEDEF",
@@ -1386,21 +1366,20 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
             aliased = type_expression typ_expr;
           }
     | _ -> failwith "Not a typedef"
-  and typedef_list (tree : (string, string) syntax_tree) : typedef node list =
+  and typedef_list (tree : (string, string) syntax_tree) : typedef list =
     match tree with
     | Node ("TYPEDEF_LIST", [ typdef ]) -> [ typedef typdef ]
     | Node ("TYPEDEF_LIST", [ typdef; Leaf { token_type = "and" }; rest ]) ->
         typedef typdef :: typedef_list rest
     | _ -> failwith "Not a typedef list"
-  and type_definition (tree : (string, string) syntax_tree) :
-      type_definition node =
+  and type_definition (tree : (string, string) syntax_tree) : type_definition =
     match tree with
     | Node ("TYPE_DEFINITION", [ Leaf { token_type = "type" }; typdef_list ]) ->
         typedef_list typdef_list
     | _ -> failwith "Not a type definition"
   and exception_constructor_declaration_list
-      (tree : (string, string) syntax_tree) :
-      type_constructor_declaration node list =
+      (tree : (string, string) syntax_tree) : type_constructor_declaration list
+      =
     match tree with
     | Node ("EXCEPTION_CONSTR_DECL_LIST", [ decl ]) ->
         [ constructor_declaration decl ]
@@ -1411,7 +1390,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
         :: exception_constructor_declaration_list rest
     | _ -> failwith "Not a type constructor declaration list"
   and exception_definition (tree : (string, string) syntax_tree) :
-      exception_definition node =
+      exception_definition =
     match tree with
     | Node ("EXCEPTION_DEFINITION", [ Leaf { token_type = "exception" }; list ])
       ->
@@ -1420,8 +1399,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
     | _ -> failwith "Not an exception definition"
   in
 
-  let implementation_phrase (tree : (string, string) syntax_tree) : phrase node
-      =
+  let implementation_phrase (tree : (string, string) syntax_tree) : phrase =
     match tree with
     | Node ("IMPL_PHRASE", [ (Node ("EXPR", _) as expr) ]) ->
         let expr_node = expression expr in

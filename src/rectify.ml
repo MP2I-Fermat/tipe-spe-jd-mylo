@@ -1,23 +1,23 @@
 open Caml_light
 
 type linear_element =
-  | Variable of variable node
-  | Constant of constant node
+  | Variable of variable
+  | Constant of constant
   | Parenthesised of { inner : linear_form; style : parenthesis_style }
-  | TypeCoercion of { inner : linear_form; typ : type_expression node }
+  | TypeCoercion of { inner : linear_form; typ : type_expression }
   | ListLiteral of linear_form list
   | ArrayLiteral of linear_form list
-  | RecordLiteral of (label node * linear_form) list
+  | RecordLiteral of (label * linear_form) list
   | WhileLoop of { condition : linear_form; body : linear_form }
   | ForLoop of {
       direction : for_direction;
-      variable : lowercase_ident node;
+      variable : lowercase_ident;
       start : linear_form;
       finish : linear_form;
       body : linear_form;
     }
   | Dereference of linear_form
-  | FieldAccess of { receiver : linear_form; target : label node }
+  | FieldAccess of { receiver : linear_form; target : label }
   | ArrayAccess of { receiver : linear_form; target : linear_form }
   | FunctionApplication of {
       receiver : linear_form;
@@ -33,7 +33,7 @@ type linear_element =
   | Tuple of linear_form list
   | FieldAssignment of {
       receiver : linear_form;
-      target : label node;
+      target : label;
       value : linear_form;
     }
   | ArrayAssignment of {
@@ -52,7 +52,7 @@ type linear_element =
   | Try of { value : linear_form; cases : linear_pattern_cases }
   | FunctionLiteral of linear_function_literal
   | LetBinding of {
-      bindings : linear_binding node list;
+      bindings : linear_binding list;
       is_rec : bool;
       inner : linear_form;
     }
@@ -63,7 +63,7 @@ type linear_element =
       value : linear_form;
     }
 
-and linear_pattern_cases = (pattern node list * linear_form) list
+and linear_pattern_cases = (pattern list * linear_form) list
 
 and linear_function_literal = {
   style : function_literal_style;
@@ -72,14 +72,14 @@ and linear_function_literal = {
 }
 
 and linear_function_ = {
-  name : variable node;
-  parameters : pattern node list;
+  name : variable;
+  parameters : pattern list;
   body : linear_form;
   return_type : type_expression option;
 }
 
 and linear_binding =
-  | Variable of { lhs : pattern node; value : linear_form }
+  | Variable of { lhs : pattern; value : linear_form }
   | Function of linear_function_
 
 and linear_form = (variable * linear_element) list

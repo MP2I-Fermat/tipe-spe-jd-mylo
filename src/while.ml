@@ -152,9 +152,9 @@ let fonction_vers_while
     | FunctionLiteral f ->
         modify_res (FunctionLiteral f)
     | LetBinding {
-        bindings : binding node list;
+        bindings : binding list;
         is_rec : bool;
-        inner : expression node;
+        inner : expression;
       } ->
         LetBinding {
           bindings = List.map
