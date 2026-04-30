@@ -1418,9 +1418,6 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
 
   match tree with
   | Node ("IMPLEMENTATION", [ phrase; Leaf { token_type = "double_semicolon" } ])
-    ->
-      let phrase_node = implementation_phrase phrase in
-      [ phrase_node ]
   | Node ("IMPLEMENTATION", [ phrase ]) ->
       let phrase_node = implementation_phrase phrase in
       [ phrase_node ]
