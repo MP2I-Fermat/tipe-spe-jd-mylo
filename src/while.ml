@@ -219,33 +219,37 @@ let parse_file name =
 
 
 let whilify_bindings (def : value_definition) : value_definition list =
-  (* Returns the new value definitions, and the renaming applied to modified functions. *)
+  (* Renvoie les nouvelles value_definition, et le renommage appliqué aux
+   * fonctions modifiées *)
   let whilify_bindings_after_rectification (def : value_definition)
-      (info: recursive_call_info) : value_definition list * ((label * label) list)=
+      (info: recursive_call_info) :
+      value_definition list * ((label * label) list)=
     if
       not def.is_rec
-      || not (info.all_recursive_functions_are_toplevel && is_length_1 info.recursively_defined_functions)
+      || not info.all_recursive_functions_are_toplevel
+      || not (is_length_1 info.recursively_defined_functions)
     then
       [ def ], []
     else begin
       match List.hd def.bindings with
       | Function { name; parameters; return_type; body } ->
-         let new_name = name  ^ "_whilified" in
+         let new_name = name ^ "_whilified" in
          let body_while = fonction_vers_while new_name parameters
-                          body info.rectifying_set in
-          [
-            {
-              bindings = [
-                Function {
-                  name = new_name;
-                  parameters;
-                  body = body_while;
-                  return_type;
-                }
-              ];
-              is_rec = false
-            };
-          ], [(name, new_name)]
+                          body info.rectifying_set
+         in
+         [
+           {
+             bindings = [
+               Function {
+                 name = new_name;
+                 parameters;
+                 body = body_while;
+                 return_type;
+               }
+             ];
+             is_rec = false
+           };
+         ], [(name, new_name)]
       | _ -> [ def ], []
     end
   in
@@ -253,14 +257,25 @@ let whilify_bindings (def : value_definition) : value_definition list =
   let rectify_then_whilify (def : value_definition) : rectify_result =
     match rectify_bindings def.bindings with
     | NewBindings (b, Some info) ->
-      let update_bindings (def : value_definition) (substitutions : (label * label) list)
-        : value_definition list * ((label * label) list) =
+      let update_bindings (def : value_definition)
+          (substitutions : (label * label) list) :
+          value_definition list * ((label * label) list) =
         match def with
         | {
             is_rec = false;
-            bindings = [ Function ({ body = FunctionApplication { receiver = Variable callee; arguments } } as f)]
+            bindings = [
+              Function (
+                {
+                  body = FunctionApplication {
+                    receiver = Variable callee;
+                    arguments
+                  }
+                } as f
+              )
+            ]
           } ->
-          (* This is an interceptor created during rectification. Update it to call the rectified-whilified function. *)
+          (* C’est un intercepteur créé pendant la rectification : on le met à
+           * jour pour appelé la fonction rectifiée-whilifiée *)
           (
             [{
               is_rec = false;
@@ -268,7 +283,10 @@ let whilify_bindings (def : value_definition) : value_definition list =
                 Function {
                   f with
                   body = FunctionApplication {
-                    receiver = Variable (List.assoc_opt callee substitutions |> Option.value ~default:callee);
+                    receiver = Variable (
+                      List.assoc_opt callee substitutions
+                      |> Option.value ~default:callee
+                    );
                     arguments;
                   };
                 }
