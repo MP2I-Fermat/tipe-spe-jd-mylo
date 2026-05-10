@@ -466,7 +466,7 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
                          k_ref := k;
                          Function
                            { name; parameters; body = body_lin; return_type });
-            is_rec = false;
+            is_rec;
             inner = inner_lin;
           }
       in
@@ -1015,6 +1015,73 @@ let rec find_definitions_in_element (name : variable) (e : linear_element) :
                           };
                       ]
                     else [])
+                   @ List.filter_map
+                       (fun parameter ->
+                         let rec create_synthetic_function_from (p : pattern) :
+                             linear_element option =
+                           match p with
+                           | Parenthesised inner ->
+                               create_synthetic_function_from inner
+                           | TypeCoercion { inner; typ } -> (
+                               match get_name inner with
+                               | Some name' when name = name' -> (
+                                   let rec extract_parameters_and_return_type
+                                       (e : type_expression) :
+                                       type_expression list * type_expression =
+                                     match e with
+                                     | Argument _ -> ([], e)
+                                     | Parenthesised _ -> ([], e)
+                                     | Construction _ -> ([], e)
+                                     | Tuple _ -> ([], e)
+                                     | Function { argument; result } ->
+                                         let inner_params, inner_ret =
+                                           extract_parameters_and_return_type
+                                             result
+                                         in
+                                         (argument :: inner_params, inner_ret)
+                                   in
+                                   match
+                                     extract_parameters_and_return_type typ
+                                   with
+                                   | [], _ -> None
+                                   | parameter_types, return_type ->
+                                       Some
+                                         (FunctionLiteral
+                                            {
+                                              style = Fun;
+                                              cases =
+                                                [
+                                                  ( List.mapi
+                                                      (fun i parameter_type ->
+                                                        (Parenthesised
+                                                           (TypeCoercion
+                                                              {
+                                                                inner =
+                                                                  Ident
+                                                                    ("synthetic_arg_"
+                                                                   ^ string_of_int
+                                                                       i);
+                                                                typ =
+                                                                  parameter_type;
+                                                              })
+                                                          : pattern))
+                                                      parameter_types,
+                                                    [
+                                                      ( "SYNTHETIC_BODY",
+                                                        Constant
+                                                          (Construction
+                                                             (Unit Parenthesis))
+                                                      );
+                                                    ] );
+                                                ];
+                                              return_type_for_delinearize =
+                                                Some return_type;
+                                            }))
+                               | _ -> None)
+                           | _ -> None
+                         in
+                         create_synthetic_function_from parameter)
+                       parameters
                    @ find_definitions name body)
         |> List.concat)
 
@@ -1068,34 +1135,89 @@ let rec rectify (l : linear_form) (cloture_rect : variable list)
                   List.map
                     (fun binding ->
                       match binding with
-                      | Function { name; parameters; body; return_type }
-                        when List.mem name cloture_rect ->
-                          Function
-                            {
-                              name;
-                              parameters =
-                                parameters
-                                @ [
-                                    (match return_type with
-                                    | None -> Ident "cont"
-                                    | Some typ ->
-                                        TypeCoercion
-                                          {
-                                            inner = Ident "cont";
-                                            typ =
-                                              Function
-                                                {
-                                                  argument = typ;
-                                                  result = Argument "ret";
-                                                };
-                                          });
-                                  ];
-                              body = rectify body cloture_rect fns;
-                              return_type =
-                                (match return_type with
-                                | None -> None
-                                | Some _ -> Some (Argument "ret"));
-                            }
+                      | Function { name; parameters; body; return_type } ->
+                          let updated_parameters =
+                            List.map
+                              (fun parameter ->
+                                match get_name parameter with
+                                | Some name when List.mem name cloture_rect ->
+                                    let rec update_type_expr
+                                        (t : type_expression) : type_expression
+                                        =
+                                      match (t : type_expression) with
+                                      | Function { argument; result } ->
+                                          Function
+                                            {
+                                              argument;
+                                              result = update_type_expr result;
+                                            }
+                                      | _ ->
+                                          Function
+                                            {
+                                              argument =
+                                                Parenthesised
+                                                  (Function
+                                                     {
+                                                       argument =
+                                                         Parenthesised t;
+                                                       result = Argument "ret";
+                                                     });
+                                              result = Argument "ret";
+                                            }
+                                    in
+                                    let rec update_parameter_type (p : pattern)
+                                        : pattern =
+                                      match (p : pattern) with
+                                      | Parenthesised inner ->
+                                          Parenthesised
+                                            (update_parameter_type inner)
+                                      | TypeCoercion { inner; typ } ->
+                                          TypeCoercion
+                                            {
+                                              inner;
+                                              typ = update_type_expr typ;
+                                            }
+                                      | _ -> p
+                                    in
+                                    update_parameter_type parameter
+                                | _ -> parameter)
+                              parameters
+                          in
+                          if List.mem name cloture_rect then
+                            Function
+                              {
+                                name;
+                                parameters =
+                                  updated_parameters
+                                  @ [
+                                      (match return_type with
+                                      | None -> Ident "cont"
+                                      | Some typ ->
+                                          TypeCoercion
+                                            {
+                                              inner = Ident "cont";
+                                              typ =
+                                                Function
+                                                  {
+                                                    argument = typ;
+                                                    result = Argument "ret";
+                                                  };
+                                            });
+                                    ];
+                                body = rectify body cloture_rect fns;
+                                return_type =
+                                  (match return_type with
+                                  | None -> None
+                                  | Some _ -> Some (Argument "ret"));
+                              }
+                          else
+                            Function
+                              {
+                                name;
+                                parameters = updated_parameters;
+                                body;
+                                return_type;
+                              }
                       | _ -> binding)
                     bindings;
                 inner;
@@ -1218,6 +1340,39 @@ let rec rectify (l : linear_form) (cloture_rect : variable list)
 
 let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
     (new_name : variable -> variable) =
+  let rec rename_elements_in_pattern (p : pattern) : pattern =
+    match (p : pattern) with
+    | Ident name ->
+        if List.mem name cloture_rect then Ident (new_name name) else p
+    | Underscore -> p
+    | Parenthesised inner -> Parenthesised (rename_elements_in_pattern inner)
+    | TypeCoercion { inner; typ } ->
+        TypeCoercion { inner = rename_elements_in_pattern inner; typ }
+    | Constant _ -> p
+    | Record l ->
+        Record
+          (List.map
+             (fun (label, inner) -> (label, rename_elements_in_pattern inner))
+             l)
+    | List l -> List (List.map rename_elements_in_pattern l)
+    | Construction { constructor; argument } ->
+        Construction
+          { constructor; argument = rename_elements_in_pattern argument }
+    | Concatenation { head; tail } ->
+        Concatenation
+          {
+            head = rename_elements_in_pattern head;
+            tail = rename_elements_in_pattern tail;
+          }
+    | Tuple l -> Tuple (List.map rename_elements_in_pattern l)
+    | Or l -> Or (List.map rename_elements_in_pattern l)
+    | As { inner; name } ->
+        As
+          {
+            inner = rename_elements_in_pattern inner;
+            name = (if List.mem name cloture_rect then new_name name else name);
+          }
+  in
   match e with
   | Variable v ->
       if List.mem v cloture_rect then Variable (new_name v) else Variable v
@@ -1324,7 +1479,8 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
           cases =
             List.map
               (fun (patterns, e) ->
-                (patterns, rename_elements e cloture_rect new_name))
+                ( List.map rename_elements_in_pattern patterns,
+                  rename_elements e cloture_rect new_name ))
               cases;
         }
   | Try { value; cases } ->
@@ -1334,7 +1490,8 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
           cases =
             List.map
               (fun (patterns, e) ->
-                (patterns, rename_elements e cloture_rect new_name))
+                ( List.map rename_elements_in_pattern patterns,
+                  rename_elements e cloture_rect new_name ))
               cases;
         }
   | FunctionLiteral { style; cases; return_type_for_delinearize } ->
@@ -1344,7 +1501,8 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
           cases =
             List.map
               (fun (patterns, e) ->
-                (patterns, rename_elements e cloture_rect new_name))
+                ( List.map rename_elements_in_pattern patterns,
+                  rename_elements e cloture_rect new_name ))
               cases;
           return_type_for_delinearize;
         }
@@ -1358,11 +1516,7 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
                 | Variable { lhs; value } ->
                     (Variable
                        {
-                         lhs =
-                           (match get_name lhs with
-                           | Some name when List.mem name cloture_rect ->
-                               Ident (new_name name)
-                           | _ -> lhs);
+                         lhs = rename_elements_in_pattern lhs;
                          value = rename_elements value cloture_rect new_name;
                        }
                       : linear_binding)
@@ -1372,7 +1526,8 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
                         name =
                           (if List.mem name cloture_rect then new_name name
                            else name);
-                        parameters;
+                        parameters =
+                          List.map rename_elements_in_pattern parameters;
                         body = rename_elements body cloture_rect new_name;
                         return_type;
                       })

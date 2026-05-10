@@ -37,3 +37,17 @@ let rec length (l : 'a list) : int =
 let rec f () : unit =
   let rec g () : unit = f () in
   g ()
+
+type 'a tree = Leaf of 'a | Node of 'a tree list
+
+let rec visit_tree (f : 'a -> unit) (t : 'a tree) : unit =
+  let rec iter_list (g : 'b -> unit) (l : 'b list) : unit =
+    match l with
+    | [] -> ()
+    | x :: q ->
+        g x;
+        iter_list g q
+  in
+  match t with
+  | Leaf l -> f l
+  | Node children -> iter_list (fun child -> visit_tree f child) children
