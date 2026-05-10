@@ -387,10 +387,10 @@ EXPR_17 -> EXPR_1 dot_open_bracket EXPR close_bracket left_arrow EXPR_17
 
 EXPR_19 -> EXPR_18 semicolon
 FIELD_EXPR_LIST -> FIELD_EXPR semicolon
-EXPR_20 -> match EXPR with pipe SIMPLE_MATCHING
-EXPR_20 -> try EXPR with pipe SIMPLE_MATCHING
-EXPR_20 -> fun pipe MULTIPLE_MATCHING
-EXPR_20 -> function pipe MULTIPLE_MATCHING
+EXPR_20_DANGLING_MATCHING -> match EXPR with pipe SIMPLE_MATCHING
+EXPR_20_DANGLING_MATCHING -> try EXPR with pipe SIMPLE_MATCHING
+EXPR_20_DANGLING_MATCHING -> fun pipe MULTIPLE_MATCHING
+EXPR_20_DANGLING_MATCHING -> function pipe MULTIPLE_MATCHING
 
 double_ampersand := &&
 double_pipe := \|\|
