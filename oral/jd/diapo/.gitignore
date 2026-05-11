@@ -6,4 +6,5 @@
 *.snm
 *.toc
 *.minted
+_minted*/
 !diapo.pdf
