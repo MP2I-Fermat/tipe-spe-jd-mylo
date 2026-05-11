@@ -1,13 +1,102 @@
 
-\section{Introduction}
+% pas de section
 
-\subsection{test}
 \begin{frame}
     \frametitle{Fonctions récursives et boucles}
 
     \begin{itemize}
-        \item Lorem ipsum~;
+        \item On a souvent besoin d’itérer des instructions sur des données,
+            c’est-à-dire de parcourir et de traiter une certaine liste de
+            données
         \pause
-        \item Dolor sit amet.
+        \item Deux méthodes existent~: boucles et fonctions récursives
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Boucles}
+
+    Avantages~:
+    \pause
+    \begin{itemize}
+        \item Plus facile à compiler ou à interpréter~;
+        \pause
+        \item Parfois plus facile à programmer et à lire.
+    \end{itemize}
+
+    \pause
+    Exemple~:
+    \inputminted{ocaml}{exemples/intro/somme_liste_boucle.ml}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Fonctions récursives}
+
+    \only<1-3>{Avantage~: parfois préférable en terme de lisibilité de code.}
+
+    \only<2-3>{Problème~: peut entraîner des dépassements de pile.}
+
+    \only<3>{Exemple~:}
+    \only<3->{\inputminted{ocaml}{exemples/intro/somme_liste_rec.ml}}
+
+    \only<4-12>{
+        Sur la liste \mintinline{ocaml}{[0; 1; 2; 3]}~:
+        \begin{center}
+        \begin{tikzpicture}
+            \draw (0, 4.3) to (0, 0)
+                         to (3, 0)
+                         to (3, 4.3);
+            \uncover<5-11>{\draw (0, 1) to (3, 1);
+                         \node at (1.5, 0.5) {Appel traitant 0};}
+            \uncover<6-10>{\draw (0, 2) to (3, 2);
+                         \node at (1.5, 1.5) {Appel traitant 1};}
+            \uncover<7-9>{\draw (0, 3) to (3, 3);
+                         \node at (1.5, 2.5) {Appel traitant 2};}
+            \uncover<8>{\draw (0, 4) to (3, 4);
+                         \node at (1.5, 3.5) {Appel traitant 3};}
+            \node at (1.5, 4.3) {\phantom{Appel traitant 4}};
+        \end{tikzpicture}
+        \end{center}
+    }
+    \only<13->{
+        Sur la liste \mintinline{ocaml}{[0; 1; 2; 3; 4]}~:
+        \begin{center}
+        \begin{tikzpicture}
+            \draw (0, 4.3) to (0, 0)
+                         to (3, 0)
+                         to (3, 4.3);
+            \uncover<14->{\draw (0, 1) to (3, 1);
+                         \node at (1.5, 0.5) {Appel traitant 0};}
+            \uncover<15->{\draw (0, 2) to (3, 2);
+                         \node at (1.5, 1.5) {Appel traitant 1};}
+            \uncover<16->{\draw (0, 3) to (3, 3);
+                         \node at (1.5, 2.5) {Appel traitant 2};}
+            \uncover<17->{\draw (0, 4) to (3, 4);
+                         \node at (1.5, 3.5) {Appel traitant 3};}
+            \uncover<18->{\node[red] at (1.5, 4.3) {Appel traitant 4};}
+        \end{tikzpicture}
+        \end{center}
+    }
+
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Passage des fonctions récursives aux boucles}
+
+    \begin{itemize}
+        \pause
+        \item Étape classique de l’optimisation lors de la compilation de
+            langages fonctionnels
+        \pause
+        \item Comment ça marche en pratique~?
+        \pause
+        \begin{itemize}
+            \item Passage du code source à une représentation
+                intermédiaire,
+            \pause
+            \item Traitements sur cette représentation intermédiaire pour
+                passer des fonctions récursives à des boucles.
+        \end{itemize}
     \end{itemize}
 \end{frame}
