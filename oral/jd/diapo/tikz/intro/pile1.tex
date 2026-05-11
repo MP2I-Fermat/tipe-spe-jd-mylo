@@ -2,13 +2,17 @@
     \draw (0, 4.3) to (0, 0)
                  to (3, 0)
                  to (3, 4.3);
-    \uncover<5-11>{\draw (0, 1) to (3, 1);
+    \uncover<5-15>{\draw (0, 1) to (3, 1);
                  \node at (1.5, 0.5) {Appel traitant 0};}
-    \uncover<6-10>{\draw (0, 2) to (3, 2);
+    \uncover<6-13>{\draw (0, 2) to (3, 2);
                  \node at (1.5, 1.5) {Appel traitant 1};}
-    \uncover<7-9>{\draw (0, 3) to (3, 3);
+    \uncover<7-11>{\draw (0, 3) to (3, 3);
                  \node at (1.5, 2.5) {Appel traitant 2};}
-    \uncover<8>{\draw (0, 4) to (3, 4);
+    \uncover<8-9>{\draw (0, 4) to (3, 4);
                  \node at (1.5, 3.5) {Appel traitant 3};}
+    \uncover<9-16>{\node at (4, 3.5) {Résultat~: 3};}
+    \uncover<11-16>{\node at (4, 2.5) {Résultat~: 5};}
+    \uncover<13-16>{\node at (4, 1.5) {Résultat~: 6};}
+    \uncover<15-16>{\node at (4, 0.5) {Résultat~: 6};}
     \node at (1.5, 4.3) {\phantom{Appel traitant 4}};
 \end{tikzpicture}

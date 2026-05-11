@@ -6,8 +6,8 @@
 
     \begin{itemize}
         \item On a souvent besoin d’itérer des instructions sur des données,
-            c’est-à-dire de parcourir et de traiter une certaine liste de
-            données
+            c’est-à-dire de parcourir une certaine séquence de données en les
+            traitant une par une
         \pause
         \item Deux méthodes existent~: boucles et fonctions récursives
     \end{itemize}
@@ -39,13 +39,13 @@
     \only<3>{Exemple~:}
     \only<3->{\inputminted{ocaml}{exemples/intro/somme_liste_rec.ml}}
 
-    \only<4-12>{
+    \only<4-16>{
         Sur la liste \mintinline{ocaml}{[0; 1; 2; 3]}~:
         \begin{center}
             \input{tikz/intro/pile1.tex}
         \end{center}
     }
-    \only<13->{
+    \only<17->{
         Sur la liste \mintinline{ocaml}{[0; 1; 2; 3; 4]}~:
         \begin{center}
             \input{tikz/intro/pile2.tex}
