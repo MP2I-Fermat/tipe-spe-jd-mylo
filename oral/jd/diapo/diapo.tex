@@ -1,0 +1,37 @@
+\documentclass[compress]{beamer}
+
+\newcommand{\initiales}{TODO}
+
+\input{preamble.tex}
+
+%styles
+\newcommand{\couleur}[1]{{\usebeamercolor[fg]{structure}#1}}
+\newcommand{\important}[1]{\couleur{\textbf{#1}}}
+\newcommand{\remarque}[1]{\textit{\textrm{#1}}}
+
+\newcommand{\lin}[1]{\mintinline{latex}{#1}}
+
+\begin{document}
+
+\title{
+    Lorem Ipsum
+    {\large Dolor sit amet}
+}
+
+\author{
+    \large
+    Présentation de \important{Lorem Ipsum}\\[0.2cm]
+    \footnotesize
+    travail réalisé avec \couleur{Dolor sit amet}\\[0.4cm]
+    \vspace*{-1.2cm}
+}
+
+\date[Juillet 2026]{}
+
+\begin{frame}[plain]
+    \titlepage
+    \addtocounter{framenumber}{-1}
+\end{frame}
+
+
+\end{document}
