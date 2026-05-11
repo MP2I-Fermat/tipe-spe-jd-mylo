@@ -1,0 +1,103 @@
+
+\begin{tikzpicture}[node distance=0mm and 5mm]
+  \node (etape1) [draw, rectangle] {
+    \tiny
+    \begin{minipage}{0.17\textwidth}
+      \inputminted[linenos=false, numbersep=0pt, xleftmargin=0pt, frame=none]
+        {ocaml}{exemples/intro/somme_liste_rec_court.ml}
+    \end{minipage}
+  };
+  \node [below=of etape1] {
+    \tiny
+    \begin{minipage}{0.20\textwidth}
+      Fonctions récursives dans un code source au format texte.
+    \end{minipage}
+  };
+  \node (etape2) [draw, rectangle, right=of etape1] {
+    \tiny
+    \begin{minipage}{0.17\textwidth}
+      {\setlength{\fboxsep}{0.8pt}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{let}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{rec}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{somme}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{l}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{=}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{match}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{l}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{with}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{|}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{[}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{]}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{->}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{0}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{|}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{x}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{::}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{q}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{->}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{x}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{+}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{somme}}
+        \fcolorbox{blue}{white}{\mintinline{ocaml}{q}}
+      }
+    \end{minipage}
+  };
+  \node [below=of etape2] {
+    \tiny
+    Lexèmes
+  };
+  \node (etape3) [draw, rectangle, right=of etape2] {
+      \tiny
+      TODO
+      %\begin{minipage}{0.5\textwidth}
+      %  \begin{tikzpicture}%[
+      %      %level 1/.style={sibling distance=5mm},
+      %      %level 2/.style={sibling distance=5mm},
+      %    %]
+      %    \node [draw, rectangle] {\mintinline{ocaml}{let rec}}
+      %      child { node [draw, rectangle] {\mintinline{ocaml}{somme}} }
+      %      child { node [draw, rectangle] {\mintinline{ocaml}{l}} }
+      %      child { node [draw, rectangle] {\mintinline{ocaml}{match}}
+      %        child { node [draw, rectangle] {l} }
+      %          child { node [draw, rectangle] {[]}
+      %          child { node [draw, rectangle] {0}}
+      %        }
+      %        child { node [draw, rectangle] {+}
+      %          child { node [draw, rectangle] {x} }
+      %          child { node [draw, rectangle] {somme}
+      %            child { node [draw, rectangle] {q} }
+      %          }
+      %        }
+      %      };
+      %  \end{tikzpicture}
+      %\end{minipage}
+  };
+  \node [below=of etape3] {
+    \tiny
+    Arbre
+  };
+  \node (etape4) [draw, rectangle, right=of etape3] {
+      \tiny
+      TODO
+  };
+  \node [below=of etape4] {
+    \tiny
+    Arbre de la boucle
+  };
+  \node (etape5) [draw, rectangle, right=of etape4] {
+    \tiny
+    \begin{minipage}{0.24\textwidth}
+      \inputminted[linenos=false, numbersep=0pt, xleftmargin=0pt, frame=none]
+        {ocaml}{exemples/intro/somme_liste_boucle_court.ml}
+    \end{minipage}
+  };
+  \node [below=of etape5] {
+    \tiny
+    Code source de la boucle
+  };
+
+  \draw (etape1) edge[->] node[right] {} (etape2);
+  \draw (etape2) edge[->] node[right] {} (etape3);
+  \draw (etape3) edge[->] node[right] {} (etape4);
+  \draw (etape4) edge[->] node[right] {} (etape5);
+\end{tikzpicture}

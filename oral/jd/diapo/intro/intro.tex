@@ -42,39 +42,13 @@
     \only<4-12>{
         Sur la liste \mintinline{ocaml}{[0; 1; 2; 3]}~:
         \begin{center}
-        \begin{tikzpicture}
-            \draw (0, 4.3) to (0, 0)
-                         to (3, 0)
-                         to (3, 4.3);
-            \uncover<5-11>{\draw (0, 1) to (3, 1);
-                         \node at (1.5, 0.5) {Appel traitant 0};}
-            \uncover<6-10>{\draw (0, 2) to (3, 2);
-                         \node at (1.5, 1.5) {Appel traitant 1};}
-            \uncover<7-9>{\draw (0, 3) to (3, 3);
-                         \node at (1.5, 2.5) {Appel traitant 2};}
-            \uncover<8>{\draw (0, 4) to (3, 4);
-                         \node at (1.5, 3.5) {Appel traitant 3};}
-            \node at (1.5, 4.3) {\phantom{Appel traitant 4}};
-        \end{tikzpicture}
+            \input{tikz/intro/pile1.tex}
         \end{center}
     }
     \only<13->{
         Sur la liste \mintinline{ocaml}{[0; 1; 2; 3; 4]}~:
         \begin{center}
-        \begin{tikzpicture}
-            \draw (0, 4.3) to (0, 0)
-                         to (3, 0)
-                         to (3, 4.3);
-            \uncover<14->{\draw (0, 1) to (3, 1);
-                         \node at (1.5, 0.5) {Appel traitant 0};}
-            \uncover<15->{\draw (0, 2) to (3, 2);
-                         \node at (1.5, 1.5) {Appel traitant 1};}
-            \uncover<16->{\draw (0, 3) to (3, 3);
-                         \node at (1.5, 2.5) {Appel traitant 2};}
-            \uncover<17->{\draw (0, 4) to (3, 4);
-                         \node at (1.5, 3.5) {Appel traitant 3};}
-            \uncover<18->{\node[red] at (1.5, 4.3) {Appel traitant 4};}
-        \end{tikzpicture}
+            \input{tikz/intro/pile2.tex}
         \end{center}
     }
 
@@ -90,13 +64,13 @@
             langages fonctionnels
         \pause
         \item Comment ça marche en pratique~?
-        \pause
-        \begin{itemize}
-            \item Passage du code source à une représentation
-                intermédiaire,
-            \pause
-            \item Traitements sur cette représentation intermédiaire pour
-                passer des fonctions récursives à des boucles.
-        \end{itemize}
     \end{itemize}
+\end{frame}
+
+
+% TODO : schéma pour le plan
+\begin{frame}
+    \frametitle{Passage des fonctions récursives aux boucles}
+
+    \input{tikz/plan.tex}
 \end{frame}
