@@ -11,7 +11,9 @@
   peut entraîner des dépassement de pile (donner un exemple ?)
 * Un compilateur va vouloir transformer les fonctions récursives en boucles
 
-## Représentation intermédiaire
+Schéma + annonce de plan
+
+## Arbre de syntaxe abstrait
 
 * On doit partir d’un texte (la fonction source) et le transformer en un autre
   texte (la boucle)
