@@ -26,7 +26,7 @@
 
     \pause
     Exemple~:
-    \inputminted{ocaml}{exemples/intro/somme_liste_boucle.ml}
+    \inputminted{ocaml}{exemples/0intro/somme_liste_boucle.ml}
 \end{frame}
 
 \begin{frame}
@@ -37,18 +37,18 @@
     \only<2-3>{Problème~: peut entraîner des dépassements de pile.}
 
     \only<3>{Exemple~:}
-    \only<3->{\inputminted{ocaml}{exemples/intro/somme_liste_rec.ml}}
+    \only<3->{\inputminted{ocaml}{exemples/0intro/somme_liste_rec.ml}}
 
     \only<4-16>{
         Sur la liste \mintinline{ocaml}{[0; 1; 2; 3]}~:
         \begin{center}
-            \input{tikz/intro/pile1.tex}
+            \input{tikz/0intro/pile1.tex}
         \end{center}
     }
     \only<17->{
         Sur la liste \mintinline{ocaml}{[0; 1; 2; 3; 4]}~:
         \begin{center}
-            \input{tikz/intro/pile2.tex}
+            \input{tikz/0intro/pile2.tex}
         \end{center}
     }
 
@@ -68,7 +68,6 @@
 \end{frame}
 
 
-% TODO : schéma pour le plan
 \begin{frame}
     \frametitle{Passage des fonctions récursives aux boucles}
 

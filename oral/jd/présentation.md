@@ -13,8 +13,6 @@
 
 Schéma + annonce de plan
 
-## Arbre de syntaxe abstrait
-
 * On doit partir d’un texte (la fonction source) et le transformer en un autre
   texte (la boucle)
 * Traiter directement un texte est assez compliqué&nbsp;: on aimerait bien
@@ -22,6 +20,8 @@ Schéma + annonce de plan
   très facile d’effectuer des traitements et des modifications
 * Pour construire cet arbre, on va procéder en deux étapes&nbsp;: l’analyse
   lexicale et l’analyse syntaxique
+
+## Arbre de syntaxe abstrait
 
 ### Analyse lexicale (Mylo)
 
