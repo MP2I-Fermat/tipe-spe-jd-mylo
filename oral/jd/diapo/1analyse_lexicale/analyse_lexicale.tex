@@ -1,2 +1,33 @@
 
 \section{Analyse lexicale}
+
+%\subsection{Introduction}
+
+\begin{frame}
+    \frametitle{Analyse lexicale}
+
+    But~: construire, à partir du code source, une liste de lexèmes plus faciles
+    à traiter que du texte brut.
+
+    \pause
+
+    \begin{definition}[lexème]
+      Un lexème est un couple \mintinline{text}{(type, valeur)}. Le type
+      doit figurer dans une liste que l'on a prédéfini, et la valeur
+      doit correspondre au type tel qu'on l'a prédéfini.
+    \end{definition}
+
+    \pause
+
+    Exemples~: \mintinline{text}{(int, 12)},
+    \mintinline{text}{(string, "Hello, world")}, \mintinline{text}{(equals, =)}.
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Analyse lexicale}
+
+  Exemple~:
+  \input{tikz/1analyse_lexicale/exemple.tex}
+\end{frame}
+

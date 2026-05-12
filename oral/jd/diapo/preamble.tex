@@ -96,7 +96,7 @@
 % Plan qui s'affiche au début de chaque section %|
 \AtBeginSection[]{                              %|
     \begin{frame}[plain]                        %|
-        \frametitle{Plan\\[0.1cm]}              %|
+        \frametitle{Plan}                       %|
         \tableofcontents[                       %|
             currentsection,                     %|
             hideothersubsections,               %|
@@ -122,3 +122,5 @@
 % commandes hors du template
 
 \newcommand{\pointeur}[0]{\raisebox{-5pt}{$\uparrow$}}
+%\renewcommand{\defname}{Définition}
+\newtheorem{definition}{Définition}
