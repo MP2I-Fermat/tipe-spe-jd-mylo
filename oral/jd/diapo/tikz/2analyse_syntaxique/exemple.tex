@@ -23,23 +23,23 @@
           ]
           \node [draw, rectangle] {\mintinline{ocaml}{ValueDefinition}}
             child { node [draw, rectangle] {\mintinline{ocaml}{is_rec: false}} }
-            child
+            child[missing]
             child { node [draw, rectangle] {\mintinline{ocaml}{bindings}}
-              child
+              child[missing]
               child { node [draw, rectangle] {\mintinline{ocaml}{Function}}
                 child { node [draw, rectangle] {\mintinline{ocaml}{name: f}} }
                 child { node [draw, rectangle] {\mintinline{ocaml}{parameters: [x]}}}
                 child { node [draw, rectangle] {\mintinline{ocaml}{body}}
-                  child
+                  child[missing]
                   child { node [draw, rectangle] {\mintinline{ocaml}{Variable}}
-                    child
+                    child[missing]
                     child { node [draw, rectangle] {\mintinline{ocaml}{x}}}
-                    child
+                    child[missing]
                   }
-                  child
+                  child[missing]
                 }
               }
-              child
+              child[missing]
             };
         \end{tikzpicture}
       \end{center}
