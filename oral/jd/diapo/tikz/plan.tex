@@ -113,54 +113,58 @@
   \affichelexemes {
       \node (lexer) [above=of lexerarrow, yshift=10mm] {
           \small
-          \ifstrempty{#1}{
-              \begin{minipage}{0.1\textwidth}
-                  \begin{center}
-                        Analyse lexicale
-                  \end{center}
-              \end{minipage}
-          }{
-              \ifnum#1=1
-                \fcolorbox{red}{white}{
+          \hyperref[seclexer] {
+              \ifstrempty{#1}{
                   \begin{minipage}{0.1\textwidth}
                       \begin{center}
-                          Analyse lexicale
-                      \end{center}
-                  \end{minipage}}
-              \else
-                  \begin{minipage}{0.1\textwidth}
-                      \begin{center}
-                          {Analyse lexicale}
+                            Analyse lexicale
                       \end{center}
                   \end{minipage}
-              \fi
+              }{
+                  \ifnum#1=1
+                    \fcolorbox{red}{white}{
+                      \begin{minipage}{0.1\textwidth}
+                          \begin{center}
+                              Analyse lexicale
+                          \end{center}
+                      \end{minipage}}
+                  \else
+                      \begin{minipage}{0.1\textwidth}
+                          \begin{center}
+                              {Analyse lexicale}
+                          \end{center}
+                      \end{minipage}
+                  \fi
+              }
           }
       };
       \draw (lexer) edge[->] node {} (lexerarrow);
 
       \node (parser) [above=of parserarrow, yshift=20mm] {
           \small
-          \ifstrempty{#1}{
-              \begin{minipage}{0.15\textwidth}
-                  \begin{center}
-                        Analyse syntaxique
-                  \end{center}
-              \end{minipage}
-          }{
-              \ifnum#1=2
-                \fcolorbox{red}{white}{
+          \hyperref[secparser] {
+              \ifstrempty{#1}{
                   \begin{minipage}{0.15\textwidth}
                       \begin{center}
-                          Analyse syntaxique
-                      \end{center}
-                  \end{minipage}}
-              \else
-                  \begin{minipage}{0.15\textwidth}
-                      \begin{center}
-                          {Analyse syntaxique}
+                            Analyse syntaxique
                       \end{center}
                   \end{minipage}
-              \fi
+              }{
+                  \ifnum#1=2
+                    \fcolorbox{red}{white}{
+                      \begin{minipage}{0.15\textwidth}
+                          \begin{center}
+                              Analyse syntaxique
+                          \end{center}
+                      \end{minipage}}
+                  \else
+                      \begin{minipage}{0.15\textwidth}
+                          \begin{center}
+                              {Analyse syntaxique}
+                          \end{center}
+                      \end{minipage}
+                  \fi
+              }
           }
       };
       \draw (parser) edge[->] node {} (parserarrow);
