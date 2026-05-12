@@ -1,0 +1,51 @@
+
+\begin{center}
+\begin{tikzpicture}[node distance=0mm and 10mm]
+  \node (tokens) [draw, rectangle, right=of source] {
+    \begin{minipage}{0.25\textwidth}
+      (\mintinline{text}{let}, \mintinline{ocaml}{let}), \\
+      (\mintinline{text}{identifier}, \mintinline{ocaml}{f}), \\
+      (\mintinline{text}{identifier}, \mintinline{ocaml}{x}), \\
+      (\mintinline{text}{equals}, \mintinline{ocaml}{=}), \\
+      (\mintinline{text}{identifier}, \mintinline{ocaml}{x})
+    \end{minipage}
+  };
+
+  \uncover<2->{
+    \node (tree) [draw, rectangle, right=of tokens] {
+      \begin{minipage}{0.6\textwidth}
+      \begin{center}
+        \begin{tikzpicture}[
+            font=\tiny,
+            level distance=7mm,
+            %level 1/.style={sibling distance=25mm},
+            %level 2/.style={sibling distance=15mm},
+          ]
+          \node [draw, rectangle] {\mintinline{ocaml}{ValueDefinition}}
+            child { node [draw, rectangle] {\mintinline{ocaml}{is_rec: false}} }
+            child
+            child { node [draw, rectangle] {\mintinline{ocaml}{bindings}}
+              child
+              child { node [draw, rectangle] {\mintinline{ocaml}{Function}}
+                child { node [draw, rectangle] {\mintinline{ocaml}{name: f}} }
+                child { node [draw, rectangle] {\mintinline{ocaml}{parameters: [x]}}}
+                child { node [draw, rectangle] {\mintinline{ocaml}{body}}
+                  child
+                  child { node [draw, rectangle] {\mintinline{ocaml}{Variable}}
+                    child
+                    child { node [draw, rectangle] {\mintinline{ocaml}{x}}}
+                    child
+                  }
+                  child
+                }
+              }
+              child
+            };
+        \end{tikzpicture}
+      \end{center}
+      \end{minipage}
+    };
+    \draw (tokens) edge[->] node {} (tree);
+  }
+\end{tikzpicture}
+\end{center}
