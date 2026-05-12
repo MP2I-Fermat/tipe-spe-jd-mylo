@@ -30,6 +30,8 @@
 \usepackage{calc}  % pour pouvoir écrire \textwidth-1cm
 \usepackage{xspace}  % espaces après les commandes texte
 
+\usepackage{hyperref}
+
 \input{couleurs.tex}
 
 %% PARAMÈTRES BEAMER
@@ -46,14 +48,14 @@
 \setbeamertemplate{headline}{
   % la premiere ligne
   \begin{beamercolorbox}[ht=0.42cm, vmode]{section in head/foot}
-    \insertshorttitle – {\initiales} – {\insertshortdate}
+    \insertshorttitle -- {\initiales} -- {\insertshortdate}
     \vspace*{0.08cm}
   \end{beamercolorbox}
   % la deuxième ligne
   \begin{beamercolorbox}[ht=0.4cm, vmode]{subsection in head/foot}
     % titre de la section si elle n’est pas 0
     \ifnum\value{section}=0{}
-    \else{ \hspace{0.8cm} \thesection - \insertsectionhead }
+    \else{ \hspace{0.8cm} {\thesection} -- {\insertsectionhead} }
     \fi
     % séparateur + titre de la sous-section si elle n’est pas 0
     \ifnum\value{subsection}=0{}
