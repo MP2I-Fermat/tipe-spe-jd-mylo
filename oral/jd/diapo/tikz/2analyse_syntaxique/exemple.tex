@@ -11,37 +11,27 @@
     \end{minipage}
   };
 
-  \uncover<2->{
+  \uncover<3->{
     \node (tree) [draw, rectangle, right=of tokens] {
       \begin{minipage}{0.6\textwidth}
+      \small
       \begin{center}
-        \begin{tikzpicture}[
-            font=\tiny,
-            level distance=7mm,
-            %level 1/.style={sibling distance=25mm},
-            %level 2/.style={sibling distance=15mm},
-          ]
-          \node [draw, rectangle] {\mintinline{ocaml}{ValueDefinition}}
-            child { node [draw, rectangle] {\mintinline{ocaml}{is_rec: false}} }
-            child[missing]
-            child { node [draw, rectangle] {\mintinline{ocaml}{bindings}}
-              child[missing]
-              child { node [draw, rectangle] {\mintinline{ocaml}{Function}}
-                child { node [draw, rectangle] {\mintinline{ocaml}{name: f}} }
-                child { node [draw, rectangle] {\mintinline{ocaml}{parameters: [x]}}}
-                child { node [draw, rectangle] {\mintinline{ocaml}{body}}
-                  child[missing]
-                  child { node [draw, rectangle] {\mintinline{ocaml}{Variable}}
-                    child[missing]
-                    child { node [draw, rectangle] {\mintinline{ocaml}{x}}}
-                    child[missing]
-                  }
-                  child[missing]
-                }
-              }
-              child[missing]
-            };
-        \end{tikzpicture}
+        \begin{forest}
+            [\mintinline{ocaml}{ValueDefinition}
+                [\mintinline{ocaml}{is_rec: false}]
+                [\mintinline{ocaml}{bindings}
+                    [\mintinline{ocaml}{Function}, calign=child, calign child=2
+                        [\mintinline{ocaml}{name: f}]
+                        [\mintinline{ocaml}{parameters: [x]}]
+                        [\mintinline{ocaml}{body}
+                            [\mintinline{ocaml}{Variable}
+                                [\mintinline{ocaml}{x}]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        \end{forest}
       \end{center}
       \end{minipage}
     };

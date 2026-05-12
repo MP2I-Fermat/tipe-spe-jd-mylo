@@ -34,7 +34,18 @@
 
     \only<1-3>{Avantage~: parfois préférable en terme de lisibilité de code.}
 
+    %\only<1>{\phantom{Problème~: peut entraîner des dépassements de pile.}}
     \only<2-3>{Problème~: peut entraîner des dépassements de pile.}
+
+    %\only<1-3>{\phantom{Exemple~:}}
+    %\only<1-3>{%
+    %    \inputminted[
+    %        rulecolor=white,
+    %        tabsize=2,
+    %        colored=false,
+    %        fgcolor=white
+    %    ] {ocaml}{exemples/0intro/somme_liste_rec.ml}%
+    %}
 
     \only<3>{Exemple~:}
     \only<3->{\inputminted{ocaml}{exemples/0intro/somme_liste_rec.ml}}
