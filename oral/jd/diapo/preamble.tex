@@ -30,7 +30,6 @@
 \usepackage{calc}  % pour pouvoir écrire \textwidth-1cm
 \usepackage{xspace}  % espaces après les commandes texte
 
-
 \input{couleurs.tex}
 
 %% PARAMÈTRES BEAMER
@@ -92,15 +91,14 @@
 % TOC
 \setbeamertemplate{section in toc}[sections numbered]
 
+
+\input{tikz/plan.tex}  % définit une commande \plan
 % -----------------------------------------------|
 % Plan qui s'affiche au début de chaque section %|
 \AtBeginSection[]{                              %|
-    \begin{frame}[plain]                        %|
+    \begin{frame}  % [plain]                    %|
         \frametitle{Plan}                       %|
-        \tableofcontents[                       %|
-            currentsection,                     %|
-            hideothersubsections,               %|
-            subsubsectionstyle=hide]            %|
+        \plan[\thesection]                      %|
         \addtocounter{framenumber}{-1}          %|
     \end{frame}                                 %|
 }                                               %|
@@ -122,5 +120,4 @@
 % commandes hors du template
 
 \newcommand{\pointeur}[0]{\raisebox{-5pt}{$\uparrow$}}
-%\renewcommand{\defname}{Définition}
 \newtheorem{definition}{Définition}

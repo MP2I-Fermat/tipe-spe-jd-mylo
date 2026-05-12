@@ -1,6 +1,28 @@
 
+\newenvironment{gereraffichage}[1]{
+    \ifstrempty{#1}{
+        \newcommand{\affichearbres}[1]{\uncover<2->{##1}}
+        \newcommand{\affichelexemes}[1]{\uncover<3->{##1}}
+        \newcommand{\pasencorearbres}[1]{\only<1>{##1}}
+        \newcommand{\pasencorelexemes}[1]{\only<2>{##1}}
+    }{
+        \newcommand{\affichearbres}[1]{\uncover<1->{##1}}
+        \newcommand{\affichelexemes}[1]{\uncover<1->{##1}}
+        \newcommand{\pasencorearbres}[1]{\only<0>{##1}}
+        \newcommand{\pasencorelexemes}[1]{\only<0>{##1}}
+    }
+}
+
+% si l’argument est vide (défaut), dévoile peu à peu les éléments de la figure
+% (pour l’introduction).
+% sinon, affiche la figure complète, en entourant l’étape correspondant à la
+% section actuelle
+\newcommand{\plan}[1][] {
+
+\begin{gereraffichage}{#1}
 \begin{adjustwidth}{-1.5 em}{-1.5em}
 \begin{tikzpicture}[node distance=0mm and 5mm]
+
   \node (etape1) [draw, rectangle] {
     \tiny
     \begin{minipage}{0.17\textwidth}
@@ -14,81 +36,59 @@
       Fonctions récursives dans un code source au format texte.
     \end{minipage}
   };
-  \node (etape2) [draw, rectangle, right=of etape1] {
-    \tiny
-    \begin{minipage}{0.17\textwidth}
-      {\setlength{\fboxsep}{0.8pt}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{let}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{rec}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{somme}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{l}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{=}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{match}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{l}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{with}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{|}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{[}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{]}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{->}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{0}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{|}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{x}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{::}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{q}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{->}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{x}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{+}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{somme}}
-        \fcolorbox{blue}{white}{\mintinline{ocaml}{q}}
-      }
-    \end{minipage}
-  };
-  \node [below=of etape2] {
-    \tiny
-    Lexèmes
-  };
-  \node (etape3) [draw, rectangle, right=of etape2] {
-      \tiny
-      \begin{minipage}{0.1\textwidth}
-          Arbre de la fonction récursive
-      \end{minipage}
-      %\begin{minipage}{0.5\textwidth}
-      %  \begin{tikzpicture}%[
-      %      %level 1/.style={sibling distance=5mm},
-      %      %level 2/.style={sibling distance=5mm},
-      %    %]
-      %    \node [draw, rectangle] {\mintinline{ocaml}{let rec}}
-      %      child { node [draw, rectangle] {\mintinline{ocaml}{somme}} }
-      %      child { node [draw, rectangle] {\mintinline{ocaml}{l}} }
-      %      child { node [draw, rectangle] {\mintinline{ocaml}{match}}
-      %        child { node [draw, rectangle] {l} }
-      %          child { node [draw, rectangle] {[]}
-      %          child { node [draw, rectangle] {0}}
-      %        }
-      %        child { node [draw, rectangle] {+}
-      %          child { node [draw, rectangle] {x} }
-      %          child { node [draw, rectangle] {somme}
-      %            child { node [draw, rectangle] {q} }
-      %          }
-      %        }
-      %      };
-      %  \end{tikzpicture}
-      %\end{minipage}
-  };
-  %\node [below=of etape3] {
-  %  \tiny
-  %  Arbre
-  %};
-  \node (etape4) [draw, rectangle, right=of etape3] {
-      \tiny
-      \begin{minipage}{0.1\textwidth}
-          Arbre de la boucle
-      \end{minipage}
-  };
-  %\node [below=of etape4] {
-  %  \tiny
-  %  Arbre de la boucle
-  %};
+
+  \affichelexemes {
+      \node (etape2) [draw, rectangle, right=of etape1] {
+        \tiny
+        \begin{minipage}{0.17\textwidth}
+          {\setlength{\fboxsep}{0.8pt}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{let}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{rec}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{somme}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{l}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{=}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{match}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{l}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{with}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{|}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{[}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{]}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{->}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{0}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{|}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{x}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{::}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{q}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{->}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{x}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{+}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{somme}}
+            \fcolorbox{blue}{white}{\mintinline{ocaml}{q}}
+          }
+        \end{minipage}
+      };
+      \node [below=of etape2] {
+        \tiny
+        Lexèmes
+      };
+  }
+
+  \affichearbres {
+      \node (etape3) [draw, rectangle, right=of etape2] {
+          \tiny
+          \begin{minipage}{0.1\textwidth}
+              Arbre de la fonction récursive
+          \end{minipage}
+      };
+
+      \node (etape4) [draw, rectangle, right=of etape3] {
+          \tiny
+          \begin{minipage}{0.1\textwidth}
+              Arbre de la boucle
+          \end{minipage}
+      };
+  }
+
   \node (etape5) [draw, rectangle, right=of etape4] {
     \tiny
     \begin{minipage}{0.24\textwidth}
@@ -101,39 +101,118 @@
     Code source de la boucle
   };
 
-  \draw (etape1) edge[->] node(lexerarrow)[right, xshift=-1.5mm] {} (etape2);
-  \draw (etape2) edge[->] node(parserarrow)[right, xshift=-1.5mm] {} (etape3);
-  \draw (etape3) edge[->] node(looparrow)[right, xshift=-1.5mm] {} (etape4);
-  \draw (etape4) edge[->] node[right] {} (etape5);
+  \affichelexemes {
+      \draw (etape1) edge[->] node(lexerarrow)[right, xshift=-1.5mm] {} (etape2);
+      \draw (etape2) edge[->] node(parserarrow)[right, xshift=-1.5mm] {} (etape3);
+  }
+  \affichearbres {
+      \draw (etape3) edge[->] node(looparrow)[right, xshift=-1.5mm] {} (etape4);
+      \draw (etape4) edge[->] node(reconsarrow)[right, xshift=-1.5mm] {} (etape5);
+  }
 
-  \node (lexer) [above=of lexerarrow, yshift=10.6mm] {
-      \small
-      \begin{minipage}{0.1\textwidth}
-          \begin{center}
-              Analyse lexicale
-          \end{center}
-      \end{minipage}
-  };
-  \draw (lexer) edge[->] node {} (lexerarrow);
+  \affichelexemes {
+      \node (lexer) [above=of lexerarrow, yshift=10mm] {
+          \small
+          \ifstrempty{#1}{
+              \begin{minipage}{0.1\textwidth}
+                  \begin{center}
+                        Analyse lexicale
+                  \end{center}
+              \end{minipage}
+          }{
+              \ifnum#1=1
+                \fcolorbox{red}{white}{
+                  \begin{minipage}{0.1\textwidth}
+                      \begin{center}
+                          Analyse lexicale
+                      \end{center}
+                  \end{minipage}}
+              \else
+                  \begin{minipage}{0.1\textwidth}
+                      \begin{center}
+                          {Analyse lexicale}
+                      \end{center}
+                  \end{minipage}
+              \fi
+          }
+      };
+      \draw (lexer) edge[->] node {} (lexerarrow);
 
-  \node (parser) [above=of parserarrow, yshift=10mm] {
-      \small
-      \begin{minipage}{0.2\textwidth}
-          \begin{center}
-              Analyse syntaxique
-          \end{center}
-      \end{minipage}
-  };
-  \draw (parser) edge[->] node {} (parserarrow);
+      \node (parser) [above=of parserarrow, yshift=20mm] {
+          \small
+          \ifstrempty{#1}{
+              \begin{minipage}{0.15\textwidth}
+                  \begin{center}
+                        Analyse syntaxique
+                  \end{center}
+              \end{minipage}
+          }{
+              \ifnum#1=2
+                \fcolorbox{red}{white}{
+                  \begin{minipage}{0.15\textwidth}
+                      \begin{center}
+                          Analyse syntaxique
+                      \end{center}
+                  \end{minipage}}
+              \else
+                  \begin{minipage}{0.15\textwidth}
+                      \begin{center}
+                          {Analyse syntaxique}
+                      \end{center}
+                  \end{minipage}
+              \fi
+          }
+      };
+      \draw (parser) edge[->] node {} (parserarrow);
+  }
 
-  \node (loop) [below=of looparrow, yshift=-10mm] {
-      \small
-      \begin{minipage}{0.2\textwidth}
-          \begin{center}
-              Transformation en boucles
-          \end{center}
-      \end{minipage}
-  };
-  \draw (loop) edge[->] node {} (looparrow);
+  \affichearbres {
+      \node (loop) [above=of looparrow, yshift=10mm] {
+          \small
+          \ifstrempty{#1}{
+              \begin{minipage}{0.2\textwidth}
+                  \begin{center}
+                        Transformation en boucles
+                  \end{center}
+              \end{minipage}
+          }{
+              \ifnum#1=3
+                \fcolorbox{red}{white}{
+                  \begin{minipage}{0.2\textwidth}
+                      \begin{center}
+                          Transformation en boucles
+                      \end{center}
+                  \end{minipage}}
+              \else
+                  \begin{minipage}{0.2\textwidth}
+                      \begin{center}
+                          {Transformation en boucles}
+                      \end{center}
+                  \end{minipage}
+              \fi
+          }
+      };
+      \draw (loop) edge[->] node {} (looparrow);
+
+      \node (reconstruction) [above=of reconsarrow, yshift=20.6mm] {
+          \small
+          \begin{minipage}{0.2\textwidth}
+              \begin{center}
+                  Reconstruction du code source
+              \end{center}
+          \end{minipage}
+      };
+      \draw (reconstruction) edge[->] node {} (reconsarrow);
+  }
+
+  \pasencorearbres{ \draw (etape1) edge[->] (etape5); }
+  \pasencorelexemes{
+      \draw (etape1) edge[->] (etape3);
+      \draw (etape4) edge[->] (etape5);
+   }
+
 \end{tikzpicture}
 \end{adjustwidth}
+\end{gereraffichage}
+
+}
