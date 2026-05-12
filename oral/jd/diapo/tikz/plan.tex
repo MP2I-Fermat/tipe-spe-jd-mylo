@@ -1,4 +1,5 @@
 
+\begin{adjustwidth}{-1.5 em}{-1.5em}
 \begin{tikzpicture}[node distance=0mm and 5mm]
   \node (etape1) [draw, rectangle] {
     \tiny
@@ -48,7 +49,9 @@
   };
   \node (etape3) [draw, rectangle, right=of etape2] {
       \tiny
-      TODO
+      \begin{minipage}{0.1\textwidth}
+          Arbre de la fonction récursive
+      \end{minipage}
       %\begin{minipage}{0.5\textwidth}
       %  \begin{tikzpicture}%[
       %      %level 1/.style={sibling distance=5mm},
@@ -72,18 +75,20 @@
       %  \end{tikzpicture}
       %\end{minipage}
   };
-  \node [below=of etape3] {
-    \tiny
-    Arbre
-  };
+  %\node [below=of etape3] {
+  %  \tiny
+  %  Arbre
+  %};
   \node (etape4) [draw, rectangle, right=of etape3] {
       \tiny
-      TODO
+      \begin{minipage}{0.1\textwidth}
+          Arbre de la boucle
+      \end{minipage}
   };
-  \node [below=of etape4] {
-    \tiny
-    Arbre de la boucle
-  };
+  %\node [below=of etape4] {
+  %  \tiny
+  %  Arbre de la boucle
+  %};
   \node (etape5) [draw, rectangle, right=of etape4] {
     \tiny
     \begin{minipage}{0.24\textwidth}
@@ -96,8 +101,39 @@
     Code source de la boucle
   };
 
-  \draw (etape1) edge[->] node[right] {} (etape2);
-  \draw (etape2) edge[->] node[right] {} (etape3);
-  \draw (etape3) edge[->] node[right] {} (etape4);
+  \draw (etape1) edge[->] node(lexerarrow)[right, xshift=-1.5mm] {} (etape2);
+  \draw (etape2) edge[->] node(parserarrow)[right, xshift=-1.5mm] {} (etape3);
+  \draw (etape3) edge[->] node(looparrow)[right, xshift=-1.5mm] {} (etape4);
   \draw (etape4) edge[->] node[right] {} (etape5);
+
+  \node (lexer) [above=of lexerarrow, yshift=10.6mm] {
+      \small
+      \begin{minipage}{0.1\textwidth}
+          \begin{center}
+              Analyse lexicale
+          \end{center}
+      \end{minipage}
+  };
+  \draw (lexer) edge[->] node {} (lexerarrow);
+
+  \node (parser) [above=of parserarrow, yshift=10mm] {
+      \small
+      \begin{minipage}{0.2\textwidth}
+          \begin{center}
+              Analyse syntaxique
+          \end{center}
+      \end{minipage}
+  };
+  \draw (parser) edge[->] node {} (parserarrow);
+
+  \node (loop) [below=of looparrow, yshift=-10mm] {
+      \small
+      \begin{minipage}{0.2\textwidth}
+          \begin{center}
+              Transformation en boucles
+          \end{center}
+      \end{minipage}
+  };
+  \draw (loop) edge[->] node {} (looparrow);
 \end{tikzpicture}
+\end{adjustwidth}
