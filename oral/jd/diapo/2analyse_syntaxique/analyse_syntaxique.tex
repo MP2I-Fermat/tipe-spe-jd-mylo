@@ -14,3 +14,59 @@
 
   \input{tikz/2analyse_syntaxique/exemple.tex}
 \end{frame}
+
+\subsection{Grammaires}
+
+\begin{frame}
+    \frametitle{Grammaires}
+
+    Pour décrire les <<~règles de branchement~>> dans nos arbres, on introduit
+    la notion de grammaire.
+
+    \pause
+
+    \begin{definition}[grammaire]
+        Une grammaire est un ensemble de règles (dites <<~règles de
+        dérivation~>>) de la forme \boxed{\text{Symbole} \to \dots}. Les
+        symboles pouvant être mis à gauche des flèches sont appelés
+        \textbf{symboles non terminaux}. À droite des flèches apparaissent une
+        liste de \textbf{symboles terminaux et non terminaux} (les symboles
+        terminaux étant des types de lexèmes).
+    \end{definition}
+
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{Exemple}
+
+    \[
+        \begin{aligned}
+            \underline{\text{PHRASE}} & \to \text{EXPR = EXPR} \\
+            \text{EXPR}               & \to \text{integer\_literal}  \\
+            \text{EXPR}               & \to \text{(EXPR plus EXPR)}  \\
+            \text{EXPR}               & \to \text{(EXPR times EXPR)}
+        \end{aligned}
+    \]
+
+
+    \uncover<2-> {Exemple de texte~:}
+
+    % bonne chance pour relire ça…
+    \onslide <2-> \[
+        \onslide <6-> \underbrace{ \onslide <4->
+            \overbrace{ \onslide <2->
+            (3 + \onslide <3-> \underbrace{ \onslide <2->
+            (1 + 2)
+            \onslide <3-> }_\text{EXPR} \onslide <2->
+            ) \onslide <4-> }^\text{EXPR} \onslide <2->
+            = \onslide <5-> \overbrace{ \onslide <2->
+            (3 \times 2)
+            \onslide <5-> }^\text{EXPR}
+        \onslide <6-> }_\text{PHRASE} \onslide <2->
+    \]
+\end{frame}
+
+\subsection{Automates}
+
+\begin{frame}
+\end{frame}
