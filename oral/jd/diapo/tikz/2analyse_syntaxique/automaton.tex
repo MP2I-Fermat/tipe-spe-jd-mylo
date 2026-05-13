@@ -28,6 +28,10 @@
         \end{aligned}$
     };
 
+    \node (q3bis) [state, below=of q3] {
+        $ \underline{P} \to \text{V égal E \pointeur} $
+    };
+
     \node (q4) [state, right=of q3] {
         $ E \to \text{ent} \pointeur $
     };
@@ -71,20 +75,21 @@
     };
 
     \path[->, every node/.style={font=\footnotesize}]
-        (q0)  edge             node [swap]                    {id}    (q1)
-              edge             node                           {V}     (q2)
-        (q2)  edge             node                           {égal}  (q3)
-        (q3)  edge             node                           {ent}   (q4)
-              edge             node                           {parg}  (q5)
-        (q5)  edge [loop right] node [yshift=4mm, xshift=-1mm]           {parg}  ()
-              edge             node                           {ent}   (q4)
-              edge             node                           {E}     (q6)
-        (q6)  edge             node [yshift=2.5mm]            {plus}  (q7)
-              edge             node [yshift=-2.5mm]           {fois}  (q8)
-              edge             node                           {O}     (q9)
-        (q9)  edge             node [auto=right, yshift=-1mm] {parg}  (q5)
-              edge [bend left] node                           {ent}   (q4)
-              edge             node [yshift=-2.1mm]           {E}     (q10)
-        (q10) edge             node                           {pard}  (q11);
+        (q0)  edge              node [swap]                    {id}    (q1)
+              edge              node                           {V}     (q2)
+        (q2)  edge              node                           {égal}  (q3)
+        (q3)  edge              node                           {ent}   (q4)
+              edge              node                           {parg}  (q5)
+              edge              node                           {E}     (q3bis)
+        (q5)  edge [loop right] node [yshift=4mm, xshift=-1mm] {parg}  ()
+              edge              node                           {ent}   (q4)
+              edge              node                           {E}     (q6)
+        (q6)  edge              node [yshift=2.5mm]            {plus}  (q7)
+              edge              node [yshift=-2.5mm]           {fois}  (q8)
+              edge              node                           {O}     (q9)
+        (q9)  edge              node [auto=right, yshift=-1mm] {parg}  (q5)
+              edge [bend left]  node                           {ent}   (q4)
+              edge              node [yshift=-2.1mm]           {E}     (q10)
+        (q10) edge              node                           {pard}  (q11);
 
 \end{tikzpicture}
