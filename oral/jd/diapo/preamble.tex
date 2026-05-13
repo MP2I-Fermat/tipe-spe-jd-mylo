@@ -24,14 +24,18 @@
 \usetikzlibrary{positioning}  % pour écrire \node[below rigth = 3pt and 5pt]
 \usetikzlibrary{decorations.pathreplacing}  % pour les accolades
 \usetikzlibrary{patterns}  % pour les hachures
+\usetikzlibrary{automata}  % pour les automates
 
 \usepackage{caption}  % les personaliser (les centrer par ex)
 \usepackage{changepage}  % pour élargir la page avec adjustwidth
 \usepackage{calc}  % pour pouvoir écrire \textwidth-1cm
 \usepackage{xspace}  % espaces après les commandes texte
 
+%% pas dans le template
 \usepackage{hyperref}
 \usepackage[linguistics]{forest}
+\usepackage{adjustbox}
+%%%%%%%%%%%%%%%%%%%%%%%
 
 \input{couleurs.tex}
 
@@ -131,5 +135,5 @@
 
 % commandes hors du template
 
-\newcommand{\pointeur}[0]{\raisebox{-5pt}{$\uparrow$}}
+\newcommand{\pointeur}[0]{\raisebox{-3pt}{$\uparrow$}}
 \newtheorem{definition}{Définition}

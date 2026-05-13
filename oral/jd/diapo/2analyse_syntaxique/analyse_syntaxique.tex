@@ -11,7 +11,10 @@
 
   \pause
 
-  Exemple~:
+  Exemple~: \uncover<3->{\tiny{Note~: faut-il montrer un arbre de syntaxe construit
+    par LR(0) plutôt qu’un AST~?}}
+
+  \normalsize
 
   \input{tikz/2analyse_syntaxique/exemple.tex}
 \end{frame}
@@ -40,17 +43,9 @@
 \begin{frame}[fragile]
     \frametitle{Exemple}
 
-    \[
-        \begin{aligned}
-            \underline{\text{PHRASE}} & \to \text{EXPR = EXPR} \\
-            \text{EXPR}               & \to \text{integer\_literal}  \\
-            \text{EXPR}               & \to \text{(EXPR plus EXPR)}  \\
-            \text{EXPR}               & \to \text{(EXPR times EXPR)}
-        \end{aligned}
-    \]
+    \input{tikz/2analyse_syntaxique/grammaire_longue.tex}
 
-
-    \uncover<2-> {Exemple de texte~:}
+    \uncover<2-> {Exemple de <<~code source~>>~:}
 
     % bonne chance pour relire ça…
     \onslide <2-> \[
@@ -65,9 +60,40 @@
             \onslide <5-> }^\text{EXPR}
         \onslide <6-> }_\text{PHRASE} \onslide <2->
     \]
+
+    \uncover <7-> {Problème~: comment passer d’une grammaire et d’un code source
+    à un arbre de syntaxe~?}
 \end{frame}
 
-\subsection{Automates}
+\subsection{Algorithme LR(0)}
 
 \begin{frame}
+    \frametitle{Automates}
+
+    \pause
+    L’algorithme LR(0) repose sur l’utilisation \textbf{d’automates}.
+
+    \pause
+    \begin{definition}[automate]
+        Un \textbf{automate LR(0)} est composé d’états et de transitions.
+
+        Les \textbf{états LR(0)} sont constitués de règles de grammaires
+        comportant une position.
+
+        Les \textbf{transitions} entre les états peuvent être des symboles
+        terminaux (types de lexèmes) ou des symboles non terminaux.
+    \end{definition}
+
+    \pause
+    L’automate LR(0) correspondant à une grammaire peut être construit à partir
+    de cette grammaire.
+\end{frame}
+
+\begin{frame}
+    \frametitle{Automates}
+
+    \maxsizebox{\textwidth}{0.8\textheight}{
+        \input{tikz/2analyse_syntaxique/automaton.tex}
+    }
+
 \end{frame}

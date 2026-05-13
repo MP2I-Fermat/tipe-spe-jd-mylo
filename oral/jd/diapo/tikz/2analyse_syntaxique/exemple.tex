@@ -1,7 +1,11 @@
 
 \begin{center}
-\begin{tikzpicture}[node distance=0mm and 10mm]
-  \node (tokens) [draw, rectangle, right=of source] {
+\begin{tikzpicture}[node distance=10mm and 10mm]
+  \node (source) [draw, rectangle] {
+      \mintinline{ocaml}{let f x = x}
+  };
+
+  \node (tokens) [draw, rectangle, below=of source] {
     \begin{minipage}{0.25\textwidth}
       (\mintinline{text}{let}, \mintinline{ocaml}{let}), \\
       (\mintinline{text}{identifier}, \mintinline{ocaml}{f}), \\
@@ -10,6 +14,8 @@
       (\mintinline{text}{identifier}, \mintinline{ocaml}{x})
     \end{minipage}
   };
+
+  \draw (source) edge[->] node {} (tokens);
 
   \uncover<3->{
     \node (tree) [draw, rectangle, right=of tokens] {
