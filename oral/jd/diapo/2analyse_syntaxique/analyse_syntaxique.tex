@@ -92,67 +92,82 @@
 \end{frame}
 
 \begin{frame}
-    \only<1-3>{\frametitle{Automates}}
-    \only<4->{\frametitle{Algorithme LR(0) sur un exemple}}
-
-    \only<4>{ \addtocounter{framenumber}{1} }
+    \frametitle{Automates}
 
     \only<1>{\input{tikz/2analyse_syntaxique/grammaire_longue.tex}}
     \only<2>{\input{tikz/2analyse_syntaxique/grammaire_courte.tex}}
-
-    \only<3->{
-        \only<3> {
-            % a little bit of hacking here
-            \phantom{Exemple~: $x = (3 \times (1 + 2))$
-            \quad\quad
-            $\pointeur$}
-        }
-        \only<4-> {
-            Exemple~: $x = (3 \times (1 + 2))$ \only<4-5>{\phantom{$\pointeur$}}
-            \quad\quad
-            \only<6>{ $\pointeur x = (3 \times (1 + 2))$}%
-            \only<7>{ $x \pointeur = (3 \times (1 + 2))$}%
-            \only<8>{ $\pointeur V = (3 \times (1 + 2))$}%
-            \only<9>{ $V \pointeur = (3 \times (1 + 2))$}%
-            \only<10>{ $V = \pointeur (3 \times (1 + 2))$}%
-            \only<11>{ $V = ( \pointeur 3 \times (1 + 2))$}%
-            \only<12>{ $V = ( 3 \pointeur \times (1 + 2))$}%
-            \only<13>{ $V = ( \pointeur E \times (1 + 2))$}%
-            \only<14>{ $V = ( E \pointeur \times (1 + 2))$}%
-            \only<15>{ $V = ( E \times \pointeur (1 + 2))$}%
-            \only<16>{ $V = ( E \pointeur O (1 + 2))$}%
-            \only<17>{ $V = ( E O \pointeur (1 + 2))$}%
-            \only<18>{ $V = ( E O ( \pointeur 1 + 2))$}%
-            \only<19>{ $V = ( E O ( 1 \pointeur + 2))$}%
-            \only<20>{ $V = ( E O ( \pointeur E + 2))$}%
-            \only<21>{ $V = ( E O ( E \pointeur + 2))$}%
-            \only<22>{ $V = ( E O ( E + \pointeur 2))$}%
-            \only<23>{ $V = ( E O ( E \pointeur O 2))$}%
-            \only<24>{ $V = ( E O ( E O \pointeur 2))$}%
-            \only<25>{ $V = ( E O ( E O 2 \pointeur))$}%
-            \only<26>{ $V = ( E O ( E O \pointeur E))$}%
-            \only<27>{ $V = ( E O ( E O E \pointeur))$}%
-            \only<28>{ $V = ( E O ( E O E ) \pointeur)$}%
-            \only<29>{ $V = ( E O \pointeur E)$}%
-            \only<30>{ $V = ( E O E \pointeur)$}%
-            \only<31>{ $V = ( E O E ) \pointeur$}%
-            \only<32>{ $V = \pointeur E$}%
-            \only<33>{ $V = E \pointeur$}%
-            \only<34>{ $\pointeur \underline{P}$}
-        }
-
-        \vspace{1em}
-        \begin{minipage}{0.7\textwidth}
-            \maxsizebox{\textwidth}{0.8\textheight}{
-                \input{tikz/2analyse_syntaxique/automaton.tex}
-            }
-        \end{minipage}%
-        \begin{minipage}{0.3\textwidth}
-            \only<3-4> {\input{tikz/2analyse_syntaxique/grammaire_courte.tex}}
-            \only<5-> {
-                TODO pile d’arbres
-            }
-        \end{minipage}
-    }
 \end{frame}
-\addtocounter{framenumber}{-1}
+
+%\iffalse
+\begin{frame}
+    \frametitle{Algorithme LR(0) sur un exemple}
+    %\foreach \x in {1, ..., 32}
+    %    {\only<\x>{Diapo numéro \x/32}}
+    \only<1> {
+        % a little bit of hacking here
+        \phantom{Exemple~: $x = (3 \times (1 + 2))$
+        \quad\quad
+        $\pointeur$}
+    }
+    \only<2-> {
+        Exemple~: $x = (3 \times (1 + 2))$ \only<2-3>{\phantom{$\pointeur$}}
+        \quad\quad
+        \only<4>{ $\pointeur x = (3 \times (1 + 2))$}%
+        \only<5>{ $x \pointeur = (3 \times (1 + 2))$}%
+        \only<6>{ $\pointeur V = (3 \times (1 + 2))$}%
+        \only<7>{ $V \pointeur = (3 \times (1 + 2))$}%
+        \only<8>{ $V = \pointeur (3 \times (1 + 2))$}%
+        \only<9>{ $V = ( \pointeur 3 \times (1 + 2))$}%
+        \only<10>{ $V = ( 3 \pointeur \times (1 + 2))$}%
+        \only<11>{ $V = ( \pointeur E \times (1 + 2))$}%
+        \only<12>{ $V = ( E \pointeur \times (1 + 2))$}%
+        \only<13>{ $V = ( E \times \pointeur (1 + 2))$}%
+        \only<14>{ $V = ( E \pointeur O (1 + 2))$}%
+        \only<15>{ $V = ( E O \pointeur (1 + 2))$}%
+        \only<16>{ $V = ( E O ( \pointeur 1 + 2))$}%
+        \only<17>{ $V = ( E O ( 1 \pointeur + 2))$}%
+        \only<18>{ $V = ( E O ( \pointeur E + 2))$}%
+        \only<19>{ $V = ( E O ( E \pointeur + 2))$}%
+        \only<20>{ $V = ( E O ( E + \pointeur 2))$}%
+        \only<21>{ $V = ( E O ( E \pointeur O 2))$}%
+        \only<22>{ $V = ( E O ( E O \pointeur 2))$}%
+        \only<23>{ $V = ( E O ( E O 2 \pointeur))$}%
+        \only<24>{ $V = ( E O ( E O \pointeur E))$}%
+        \only<25>{ $V = ( E O ( E O E \pointeur))$}%
+        \only<26>{ $V = ( E O ( E O E ) \pointeur)$}%
+        \only<27>{ $V = ( E O \pointeur E)$}%
+        \only<28>{ $V = ( E O E \pointeur)$}%
+        \only<29>{ $V = ( E O E ) \pointeur$}%
+        \only<30>{ $V = \pointeur E$}%
+        \only<31>{ $V = E \pointeur$}%
+        \only<32>{ $\pointeur \underline{P}$}
+    }
+
+    \vspace{1em}
+    \begin{adjustwidth}{-1.5 em}{-1.5em}
+    \begin{minipage}{0.7\textwidth}
+        \maxsizebox{\textwidth}{0.8\textheight}{
+            \input{tikz/2analyse_syntaxique/automaton.tex}
+        }
+    \end{minipage}%
+    \begin{minipage}{0.4\textwidth}
+        \only<1-2> {\input{tikz/2analyse_syntaxique/grammaire_courte.tex}}
+        \only<3-> {
+            \maxsizebox{\textwidth}{0.8\textheight}{
+                \input{tikz/2analyse_syntaxique/automaton_pile_arbres.tex}
+            }
+        }
+    \end{minipage}
+    \end{adjustwidth}
+\end{frame}
+%\fi
+
+\begin{frame}
+    \frametitle{Algorithme LR(0) sur un exemple}
+
+    \[x = (3 \times (1 + 2))\]
+
+    \begin{center}
+        \input{tikz/2analyse_syntaxique/arbre_final.tex}
+    \end{center}
+\end{frame}
