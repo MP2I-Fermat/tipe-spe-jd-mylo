@@ -1,4 +1,4 @@
 #!/usr/bin/sh
 
-rm *.aux *.log *.nav *.out *.snm *.toc *.minted *.vrb
+rm -f *.aux *.log *.nav *.out *.snm *.toc *.minted *.vrb *.fdb_latexmk *.fls *.dvi
 

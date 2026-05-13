@@ -16,7 +16,7 @@
     };
 
     \uncover<6-34>{
-        \node[draw, rectangle, red, thick] at (q0) {
+        \node (boxq0) [draw, rectangle, red, thick] at (q0) {
             \phantom{$\begin{aligned}
                 \underline{P} & \to \pointeur \text{V égal E} \\
                 V             & \to \pointeur \text{id}
@@ -29,9 +29,10 @@
     };
 
     \uncover<7>{
-        \node[draw, rectangle, red, thick, inner ysep=10pt] at (q1) {
+        \node (boxq1) [draw, rectangle, red, thick, inner ysep=10pt] at (q1) {
             \phantom{$ V \to \text{id} \pointeur $}
         };
+        \draw (boxq0) edge[->, red, thick, bend left] node {} (boxq1);
     }
 
     \node (q2) [state, below=of q0] {
@@ -39,9 +40,10 @@
     };
 
     \uncover<9-33>{
-        \node[draw, rectangle, red, thick, inner ysep=10pt] at (q2) {
+        \node (boxq2) [draw, rectangle, red, thick, inner ysep=10pt] at (q2) {
             \phantom{ $ \underline{P} \to \text{V \pointeur égal E} $ }
         };
+        \draw (boxq0) edge[->, red, thick, bend right] node {} (boxq2);
     }
 
     \node (q3) [state, below=of q2] {
@@ -53,13 +55,14 @@
     };
 
     \uncover<10-33>{
-        \node[draw, rectangle, red, thick] at (q3) {
+        \node (boxq3) [draw, rectangle, red, thick] at (q3) {
             \phantom{ $\begin{aligned}
                 \underline{P} & \to \text{V égal \pointeur E} \\
                 E             & \to \pointeur \text{ent} \\
                 E             & \to \pointeur \text{parg E O E pard}
             \end{aligned}$ }
         };
+        \draw (boxq2) edge[->, red, thick, bend right] node {} (boxq3);
     }
 
     \node (q3bis) [state, below=of q3] {
@@ -67,9 +70,11 @@
     };
 
     \uncover<33>{
-        \node[draw, rectangle, red, thick, inner ysep=10pt] at (q3bis) {
+        \node (boxq3bis) [draw, rectangle, red, thick, inner ysep=10pt]
+              at (q3bis) {
             \phantom{$ \underline{P} \to \text{V égal E \pointeur} $}
         };
+        \draw (boxq3) edge[->, red, thick, bend right] node {} (boxq3bis);
     }
 
     \node (q4) [state, right=of q3] {
@@ -77,9 +82,12 @@
     };
 
     \uncover<12, 19, 25>{
-        \node[draw, rectangle, red, thick, inner ysep=10pt] at (q4) {
+        \node (boxq4) [draw, rectangle, red, thick, inner ysep=10pt] at (q4) {
             \phantom{ $ E \to \text{ent} \pointeur $ }
         };
+        \only<12>{\draw (boxq5) edge[->, red, thick, bend left] node {} (boxq4);}
+        \only<19>{\draw (box2q5) edge[->, red, thick, bend left] node {} (boxq4);}
+        \only<25>{\draw (box2q9) edge[->, red, thick, bend left=35] node {} (boxq4);}
     }
 
     \node (q5) [state, above right=of q3] {
@@ -91,7 +99,7 @@
     };
 
     \uncover<11-31>{
-        \node[draw, rectangle, red, thick] at (q5) {
+        \node (boxq5) [draw, rectangle, red, thick] at (q5) {
             \phantom{
             $\begin{aligned}
                 E & \to \text{parg \pointeur E O E pard} \\
@@ -100,10 +108,11 @@
             \end{aligned}$
             }
         };
+        \draw (boxq3) edge[->, red, thick, bend right=10] node {} (boxq5);
     }
 
     \uncover<18-28>{
-        \node[draw, rectangle, red, thick, inner sep=6pt] at (q5) {
+        \node (box2q5) [draw, rectangle, red, thick, inner sep=6pt] at (q5) {
             \phantom{
             $\begin{aligned}
                 E & \to \text{parg \pointeur E O E pard} \\
@@ -123,7 +132,7 @@
     };
 
     \uncover<14-31>{
-        \node[draw, rectangle, red, thick] at (q6) {
+        \node (boxq6) [draw, rectangle, red, thick] at (q6) {
             \phantom{
             $\begin{aligned}
                 E & \to \text{parg E \pointeur O E pard} \\
@@ -132,10 +141,11 @@
             \end{aligned}$
             }
         };
+        \draw (boxq5) edge[->, red, thick, bend right] node {} (boxq6);
     }
 
     \uncover<21-28>{
-        \node[draw, rectangle, red, thick, inner sep=6pt] at (q6) {
+        \node (box2q6) [draw, rectangle, red, thick, inner sep=6pt] at (q6) {
             \phantom{
             $\begin{aligned}
                 E & \to \text{parg E \pointeur O E pard} \\
@@ -144,25 +154,27 @@
             \end{aligned}$
             }
         };
+        \draw (box2q5) edge[->, red, thick, bend left] node {} (box2q6);
     }
-
 
     \node (q7) [state, above left=of q6, xshift=15mm] {
         $ O \to \text{plus} \pointeur $
     };
+    \uncover<22>{
+        \node (boxq7) [draw, rectangle, red, thick, inner ysep=10pt] at (q7) {
+            \phantom{$ O \to \text{plus} \pointeur $}
+        };
+        \draw (box2q6) edge[->, red, thick, bend right] node {} (boxq7);
+    }
+
     \node (q8) [state, above right=of q6, xshift=-15mm] {
         $ O \to \text{fois} \pointeur $
     };
-
-    \uncover<22>{
-        \node[draw, rectangle, red, thick, inner ysep=10pt] at (q7) {
-            \phantom{$ O \to \text{plus} \pointeur $}
-        };
-    }
     \uncover<15>{
-        \node[draw, rectangle, red, thick, inner ysep=10pt] at (q8) {
+        \node (boxq8) [draw, rectangle, red, thick, inner ysep=10pt] at (q8) {
             \phantom{$ O \to \text{fois} \pointeur $}
         };
+        \draw (node cs:name=boxq6, anchor=40) edge[->, red, thick, bend right] node {} (boxq8);
     }
 
     \node (q9) [state, right=of q6] {
@@ -174,7 +186,7 @@
     };
 
     \uncover<17-31>{
-        \node[draw, rectangle, red, thick] at (q9) {
+        \node (boxq9) [draw, rectangle, red, thick] at (q9) {
             \phantom{
             $\begin{aligned}
                 E & \to \text{parg E O \pointeur E pard} \\
@@ -183,9 +195,15 @@
             \end{aligned}$
             }
         };
+        \draw (node cs:name=boxq6, anchor=-10)
+            edge[->, red, thick, bend right] node {}
+            (node cs:name=boxq9, anchor=-170);
+        \uncover<18-28>{
+            \draw (boxq9) edge[->, red, thick, bend left] node {} (box2q5);
+        }
     }
     \uncover<24-28>{
-        \node[draw, rectangle, red, thick, inner sep=6pt] at (q9) {
+        \node (box2q9) [draw, rectangle, red, thick, inner sep=6pt] at (q9) {
             \phantom{
             $\begin{aligned}
                 E & \to \text{parg E O \pointeur E pard} \\
@@ -194,24 +212,34 @@
             \end{aligned}$
             }
         };
+        \draw (node cs:name=box2q6, anchor=40)
+            edge[->, red, thick, bend left] node {}
+            (node cs:name=box2q9, anchor=140);
     }
 
     \node (q10) [state, below right=of q9, xshift=-25mm] {
         $ E \to \text{parg E O E \pointeur pard} $
     };
+    \uncover<27-28, 30-31>{
+        \node (boxq10) [draw, rectangle, red, thick, inner ysep=10pt] at (q10) {
+            \phantom{$ E \to \text{parg E O E \pointeur pard} $}
+        };
+        \uncover<27-28>{
+            \draw (box2q9) edge[->, red, thick, bend right] node {} (boxq10);
+        }
+        \uncover<30-31>{
+            \draw (boxq9) edge[->, red, thick, bend right] node {} (boxq10);
+        }
+    }
+
     \node (q11) [state, below=of q10] {
         $ E \to \text{parg E O E pard \pointeur} $
     };
-
-    \uncover<27-28, 30-31>{
-        \node[draw, rectangle, red, thick, inner ysep=10pt] at (q10) {
-            \phantom{$ E \to \text{parg E O E \pointeur pard} $}
-        };
-    }
     \uncover<28, 31>{
-        \node[draw, rectangle, red, thick, inner ysep=10pt] at (q11) {
+        \node (boxq11) [draw, rectangle, red, thick, inner ysep=10pt] at (q11) {
             \phantom{$ E \to \text{parg E O E pard \pointeur} $}
         };
+        \draw (boxq10) edge[->, red, thick, bend right] node {} (boxq11);
     }
 
 
@@ -219,7 +247,7 @@
         (q0)  edge              node [swap]                    {id}    (q1)
               edge              node                           {V}     (q2)
         (q2)  edge              node                           {égal}  (q3)
-        (q3)  edge              node                           {ent}   (q4)
+        (q3)  edge              node [auto=right]              {ent}   (q4)
               edge              node                           {parg}  (q5)
               edge              node                           {E}     (q3bis)
         (q5)  edge [loop right] node [yshift=4mm, xshift=-1mm] {parg}  ()

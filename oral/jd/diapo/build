@@ -1,3 +1,3 @@
 #!/usr/bin/sh
 
-latexmk -pdf diapo.tex && xdg-open diapo.pdf
+latexmk -pdf -pdflatex="pdflatex --shell-escape %O %S" diapo.tex && xdg-open diapo.pdf
