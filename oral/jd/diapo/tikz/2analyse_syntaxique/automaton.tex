@@ -1,5 +1,3 @@
-% TODO mettre des flèches entre les rectangles rouges pour bien indiquer
-% le sens de l’empilement
 \begin{tikzpicture}[
         every node/.style={rectangle, font=\footnotesize, inner sep=3pt},
         every state/.style={rectangle, font=\footnotesize, inner sep=1pt},
@@ -15,7 +13,7 @@
         \end{aligned}$
     };
 
-    \uncover<6-34>{
+    \uncover<4-32>{
         \node (boxq0) [draw, rectangle, red, thick] at (q0) {
             \phantom{$\begin{aligned}
                 \underline{P} & \to \pointeur \text{V égal E} \\
@@ -28,7 +26,7 @@
         $ V \to \text{id} \pointeur $
     };
 
-    \uncover<7>{
+    \uncover<5>{
         \node (boxq1) [draw, rectangle, red, thick, inner ysep=10pt] at (q1) {
             \phantom{$ V \to \text{id} \pointeur $}
         };
@@ -39,7 +37,7 @@
         $ \underline{P} \to \text{V \pointeur égal E} $
     };
 
-    \uncover<9-33>{
+    \uncover<7-31>{
         \node (boxq2) [draw, rectangle, red, thick, inner ysep=10pt] at (q2) {
             \phantom{ $ \underline{P} \to \text{V \pointeur égal E} $ }
         };
@@ -54,7 +52,7 @@
         \end{aligned}$
     };
 
-    \uncover<10-33>{
+    \uncover<8-31>{
         \node (boxq3) [draw, rectangle, red, thick] at (q3) {
             \phantom{ $\begin{aligned}
                 \underline{P} & \to \text{V égal \pointeur E} \\
@@ -69,7 +67,7 @@
         $ \underline{P} \to \text{V égal E \pointeur} $
     };
 
-    \uncover<33>{
+    \uncover<31>{
         \node (boxq3bis) [draw, rectangle, red, thick, inner ysep=10pt]
               at (q3bis) {
             \phantom{$ \underline{P} \to \text{V égal E \pointeur} $}
@@ -81,13 +79,13 @@
         $ E \to \text{ent} \pointeur $
     };
 
-    \uncover<12, 19, 25>{
+    \uncover<10, 17, 23>{
         \node (boxq4) [draw, rectangle, red, thick, inner ysep=10pt] at (q4) {
             \phantom{ $ E \to \text{ent} \pointeur $ }
         };
-        \only<12>{\draw (boxq5) edge[->, red, thick, bend left] node {} (boxq4);}
-        \only<19>{\draw (box2q5) edge[->, red, thick, bend left] node {} (boxq4);}
-        \only<25>{\draw (box2q9) edge[->, red, thick, bend left=35] node {} (boxq4);}
+        \only<10>{\draw (boxq5) edge[->, red, thick, bend left] node {} (boxq4);}
+        \only<17>{\draw (box2q5) edge[->, red, thick, bend left] node {} (boxq4);}
+        \only<23>{\draw (box2q9) edge[->, red, thick, bend left=35] node {} (boxq4);}
     }
 
     \node (q5) [state, above right=of q3] {
@@ -98,7 +96,7 @@
         \end{aligned}$
     };
 
-    \uncover<11-31>{
+    \uncover<9-29>{
         \node (boxq5) [draw, rectangle, red, thick] at (q5) {
             \phantom{
             $\begin{aligned}
@@ -111,7 +109,7 @@
         \draw (boxq3) edge[->, red, thick, bend right=10] node {} (boxq5);
     }
 
-    \uncover<18-28>{
+    \uncover<16-26>{
         \node (box2q5) [draw, rectangle, red, thick, inner sep=6pt] at (q5) {
             \phantom{
             $\begin{aligned}
@@ -131,7 +129,7 @@
         \end{aligned}$
     };
 
-    \uncover<14-31>{
+    \uncover<12-29>{
         \node (boxq6) [draw, rectangle, red, thick] at (q6) {
             \phantom{
             $\begin{aligned}
@@ -144,7 +142,7 @@
         \draw (boxq5) edge[->, red, thick, bend right] node {} (boxq6);
     }
 
-    \uncover<21-28>{
+    \uncover<19-26>{
         \node (box2q6) [draw, rectangle, red, thick, inner sep=6pt] at (q6) {
             \phantom{
             $\begin{aligned}
@@ -160,7 +158,7 @@
     \node (q7) [state, above left=of q6, xshift=15mm] {
         $ O \to \text{plus} \pointeur $
     };
-    \uncover<22>{
+    \uncover<20>{
         \node (boxq7) [draw, rectangle, red, thick, inner ysep=10pt] at (q7) {
             \phantom{$ O \to \text{plus} \pointeur $}
         };
@@ -170,7 +168,7 @@
     \node (q8) [state, above right=of q6, xshift=-15mm] {
         $ O \to \text{fois} \pointeur $
     };
-    \uncover<15>{
+    \uncover<13>{
         \node (boxq8) [draw, rectangle, red, thick, inner ysep=10pt] at (q8) {
             \phantom{$ O \to \text{fois} \pointeur $}
         };
@@ -185,7 +183,7 @@
         \end{aligned}$
     };
 
-    \uncover<17-31>{
+    \uncover<15-29>{
         \node (boxq9) [draw, rectangle, red, thick] at (q9) {
             \phantom{
             $\begin{aligned}
@@ -198,11 +196,11 @@
         \draw (node cs:name=boxq6, anchor=-10)
             edge[->, red, thick, bend right] node {}
             (node cs:name=boxq9, anchor=-170);
-        \uncover<18-28>{
+        \uncover<16-26>{
             \draw (boxq9) edge[->, red, thick, bend left] node {} (box2q5);
         }
     }
-    \uncover<24-28>{
+    \uncover<22-26>{
         \node (box2q9) [draw, rectangle, red, thick, inner sep=6pt] at (q9) {
             \phantom{
             $\begin{aligned}
@@ -220,14 +218,14 @@
     \node (q10) [state, below right=of q9, xshift=-25mm] {
         $ E \to \text{parg E O E \pointeur pard} $
     };
-    \uncover<27-28, 30-31>{
+    \uncover<25-26, 28-29>{
         \node (boxq10) [draw, rectangle, red, thick, inner ysep=10pt] at (q10) {
             \phantom{$ E \to \text{parg E O E \pointeur pard} $}
         };
-        \uncover<27-28>{
+        \uncover<25-26>{
             \draw (box2q9) edge[->, red, thick, bend right] node {} (boxq10);
         }
-        \uncover<30-31>{
+        \uncover<28-29>{
             \draw (boxq9) edge[->, red, thick, bend right] node {} (boxq10);
         }
     }
@@ -235,7 +233,7 @@
     \node (q11) [state, below=of q10] {
         $ E \to \text{parg E O E pard \pointeur} $
     };
-    \uncover<28, 31>{
+    \uncover<26, 29>{
         \node (boxq11) [draw, rectangle, red, thick, inner ysep=10pt] at (q11) {
             \phantom{$ E \to \text{parg E O E pard \pointeur} $}
         };

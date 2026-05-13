@@ -1,0 +1,204 @@
+\begin{tikzpicture}
+    \draw (0, 13.5) to (0, 0)
+                    to (10, 0)
+                    to (10, 13.5);
+    \uncover<5>{
+        \draw (0, 1.5) to (10, 1.5);
+        \node at (5, 0.75) {\mintinline{text}{x}};
+    }
+
+    \uncover<6-31>{
+        \draw (0, 1.5) to (10, 1.5);
+        \node at (5, 0.75) {
+            \small
+            \begin{forest}
+                l sep-=50mm
+                [V
+                    [\mintinline{text}{x}]
+                ]
+            \end{forest}
+        };
+    }
+
+    \uncover<8-31>{
+        \draw (0, 2.5) to (10, 2.5);
+        \node at (5, 2) {\mintinline{text}{=}};
+    }
+
+    \uncover<9-29>{
+        \draw (0, 3.5) to (10, 3.5);
+        \node at (5, 3) {\mintinline{text}{(}};
+    }
+
+    \uncover<10>{
+        \draw (0, 5) to (10, 5);
+        \node at (5, 4.25) {\mintinline{text}{3}};
+    }
+
+    \uncover<11-29>{
+        \draw (0, 5) to (10, 5);
+        \node at (5, 4.25) {
+            \small
+            \begin{forest}
+                l sep-=50mm
+                [E
+                    [\mintinline{text}{3}]
+                ]
+            \end{forest}
+        };
+    }
+
+    \uncover<13>{
+        \draw (0, 6.5) to (10, 6.5);
+        \node at (5, 5.75) {\mintinline{text}{×}};
+    }
+
+    \uncover<14-29>{
+        \draw (0, 6.5) to (10, 6.5);
+        \node at (5, 5.75) {
+            \small
+            \begin{forest}
+                l sep-=50mm
+                [O
+                    [\mintinline{text}{×}]
+                ]
+            \end{forest}
+        };
+    }
+
+    \uncover<16-26>{
+        \draw (0, 7.5) to (10, 7.5);
+        \node at (5, 7) {\mintinline{text}{(}};
+    }
+
+    \uncover<17>{
+        \draw (0, 9) to (10, 9);
+        \node at (5, 8.25) {\mintinline{text}{1}};
+    }
+
+    \uncover<18-26>{
+        \draw (0, 9) to (10, 9);
+        \node at (5, 8.25) {
+            \small
+            \begin{forest}
+                l sep-=50mm
+                [E
+                    [\mintinline{text}{1}]
+                ]
+            \end{forest}
+        };
+    }
+
+    \uncover<20>{
+        \draw (0, 10.5) to (10, 10.5);
+        \node at (5, 9.75) {\mintinline{text}{+}};
+    }
+
+    \uncover<21-26>{
+        \draw (0, 10.5) to (10, 10.5);
+        \node at (5, 9.75) {
+            \small
+            \begin{forest}
+                l sep-=50mm
+                [O
+                    [\mintinline{text}{+}]
+                ]
+            \end{forest}
+        };
+    }
+
+    \uncover<23>{
+        \draw (0, 12) to (10, 12);
+        \node at (5, 11.25) {\mintinline{text}{2}};
+    }
+
+    \uncover<24-26>{
+        \draw (0, 12) to (10, 12);
+        \node at (5, 11.25) {
+            \small
+            \begin{forest}
+                l sep-=50mm
+                [E
+                    [\mintinline{text}{2}]
+                ]
+            \end{forest}
+        };
+    }
+
+    \uncover<26>{
+        \draw (0, 13) to (10, 13);
+        \node at (5, 12.5) {\mintinline{text}{)}};
+    }
+
+    \uncover<27-29> {
+        % précédent : 6.5 (hauteur 3)
+        \draw (0, 9.5) to (10, 9.5);
+        \node at (5, 8) {
+            \small
+            \begin{forest}
+                l sep-=50mm
+                [E
+                    [\mintinline{text}{(}]
+                    [E
+                        [\mintinline{text}{1}]
+                    ]
+                    [O
+                        [\mintinline{text}{+}]
+                    ]
+                    [E
+                        [\mintinline{text}{2}]
+                    ]
+                    [\mintinline{text}{)}]
+                ]
+            \end{forest}
+        };
+    }
+
+    \uncover<29> {
+        \draw (0, 10.5) to (10, 10.5);
+        \node at (5, 10) {\mintinline{text}{)}};
+    }
+
+    \uncover<30-31> {
+        % précédent : 3.5 (hauteur 4)
+        \draw (0, 7.5) to (10, 7.5);
+        \node at (5, 5.5) {
+            \small
+            \begin{forest}
+                l sep-=50mm
+                [E
+                    [\mintinline{text}{(}]
+                    [E
+                        [\mintinline{text}{3}]
+                    ]
+                    [O
+                        [\mintinline{text}{×}]
+                    ]
+                    [E
+                        [\mintinline{text}{(}]
+                        [E
+                            [\mintinline{text}{1}]
+                        ]
+                        [O
+                            [\mintinline{text}{+}]
+                        ]
+                        [E
+                            [\mintinline{text}{2}]
+                        ]
+                        [\mintinline{text}{)}]
+                    ]
+                    [\mintinline{text}{)}]
+                ]
+            \end{forest}
+        };
+    }
+
+    \uncover<32> {
+        \draw (0, 5) to (10, 5);
+        \node at (5, 2.5) {
+            \small
+            \input{tikz/2analyse_syntaxique/arbre_final.tex}
+        };
+    }
+
+\end{tikzpicture}
