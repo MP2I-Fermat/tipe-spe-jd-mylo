@@ -1,0 +1,53 @@
+
+\label{secloops}
+\section{Mise sous forme de boucles}
+
+\begin{frame}
+    \frametitle{Mise sous forme de boucles}
+
+    \maxsizebox{\textwidth}{0.8\textheight}{
+        \input{tikz/3boucles/exemple.tex}
+    }
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{Remplacement des appels récursifs}
+    \setminted{escapeinside=##}
+
+    \only<1-2>{
+        \begin{center}
+            \inputminted{ocaml}{exemples/3boucles/somme_liste_tailrec_court_avec_tikz.ml}
+
+            \input{tikz/3boucles/transformations0.tex}
+        \end{center}
+    }
+
+    \only<3-6>{
+        \begin{center}
+            \inputminted{ocaml}{exemples/3boucles/somme_liste_transformation.ml}
+
+            \input{tikz/3boucles/transformations1.tex}
+        \end{center}
+    }
+
+    \only<7> {
+        \begin{center}
+            \inputminted{ocaml}{exemples/3boucles/somme_liste_transformation2.ml}
+
+            \input{tikz/3boucles/transformations2.tex}
+        \end{center}
+    }
+
+    \only<8> {
+        \maxsizebox{\textwidth}{0.45\textheight}{
+            \begin{minipage}{\textwidth}
+                \inputminted{ocaml}{exemples/3boucles/somme_liste_boucle_court.ml}
+            \end{minipage}
+        }
+    }
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Mise sous forme de boucles}
+\end{frame}

@@ -1,0 +1,19 @@
+\begin{tikzpicture}[remember picture, overlay]
+  \draw[red, thick, rounded corners]
+    ([yshift=9pt, xshift=-1mm]pic cs:startcall)
+    rectangle
+    node [xshift=13.9mm] (call) {}
+    ([yshift=-4pt, xshift=1mm]pic cs:stopcall);
+
+  \draw[blue, thick, rounded corners]
+    ([yshift=9pt, xshift=-1mm]pic cs:startreturn)
+    rectangle
+    node [xshift=1.75mm] (return) {}
+    ([yshift=-4pt, xshift=1mm]pic cs:stopreturn);
+
+  \draw[green, thick, rounded corners]
+    ([yshift=9pt, xshift=-1mm]pic cs:startarg)
+    rectangle
+    ([yshift=-4pt, xshift=1mm]pic cs:stoparg);
+
+\end{tikzpicture}

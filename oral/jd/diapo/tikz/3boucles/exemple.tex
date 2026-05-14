@@ -1,0 +1,52 @@
+
+\begin{tikzpicture}[node distance=10mm and 10mm]
+  \node (source) [draw, rectangle] {
+    \tiny
+    \begin{minipage}{0.24\textwidth}
+      \inputminted[linenos=false, numbersep=0pt, xleftmargin=0pt, frame=none]
+        {ocaml}{exemples/3boucles/somme_liste_tailrec_court.ml}
+    \end{minipage}
+  };
+
+  \node (tree) [draw, rectangle, right=of source] {
+    \begin{minipage}{0.26\textwidth}
+        \begin{center}
+        \begin{tikzpicture}[node distance=5mm and 5mm]
+            \node (root) [draw, circle, fill=green] {};
+            \node (left) [draw, circle, below left=of root, fill=green] {};
+            \node (right) [draw, circle, below right=of root, fill=green] {};
+            \draw (root) edge node {} (left);
+            \draw (root) edge node {} (right);
+        \end{tikzpicture}
+        \end{center}
+    \end{minipage}
+  };
+  \draw (source) edge[->] node {} (tree);
+
+  \uncover<2-> {
+    \node (newtree) [draw, rectangle, right=of tree] {
+        \begin{minipage}{0.26\textwidth}
+            \begin{center}
+            \begin{tikzpicture}[node distance=5mm and 5mm]
+                \node (root) [draw, circle, fill=blue] {};
+                \node (left) [draw, circle, below left=of root, fill=blue] {};
+                \node (right) [draw, circle, below right=of root, fill=blue] {};
+                \draw (root) edge node {} (left);
+                \draw (root) edge node {} (right);
+            \end{tikzpicture}
+            \end{center}
+        \end{minipage}
+    };
+    \draw (tree) edge[->] node {} (newtree);
+
+    \node (output) [draw, rectangle, right=of newtree] {
+        \tiny
+        \begin{minipage}{0.24\textwidth}
+          \inputminted[linenos=false, numbersep=0pt, xleftmargin=0pt, frame=none]
+            {ocaml}{exemples/3boucles/somme_liste_boucle_court.ml}
+        \end{minipage}
+    };
+    \draw (newtree) edge[->] node {} (output);
+  }
+
+\end{tikzpicture}

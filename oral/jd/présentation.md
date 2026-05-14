@@ -57,18 +57,15 @@ modifier.
 On veut donc transformer les fonctions récursives en boucles. On va d’abord les
 transformer en fonctions récursives terminales.
 
-### Mise sous forme récursive terminale (Mylo)
-
-* Récursivité terminale&nbsp;: la dernière instruction = l’appel récursif
-* Linéarisation du programme puis CPS
-
 ### Mise sous forme de boucle
 
-* Une fois la fonction mise sous forme récursive terminale, on place chaque
-  argument dans un `ref`
+* On place chaque argument dans un `ref`
 * À chaque appel récursif, on change la valeur des `ref` puis on refait un tour
   de boucle
 * Lorsqu’une valeur est renvoyée, on met la condition de la boucle à `false`
+
+* Montrer les problèmes que ça pose
+* Solution&nbsp;: récursivité terminale
 
 ## Conclusion&nbsp;: résultats
 

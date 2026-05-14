@@ -113,27 +113,32 @@
   \affichelexemes {
       \node (lexer) [above=of lexerarrow, yshift=10mm] {
           \small
-          \hyperref[seclexer] {
-              \ifstrempty{#1}{
-                  \begin{minipage}{0.1\textwidth}
-                      \begin{center}
+          \hyperref[seclexer] {%
+              \ifstrempty{#1}{%
+                  \fcolorbox{white}{white}{
+                    \begin{minipage}{0.1\textwidth}
+                        \begin{center}
                             Analyse lexicale
-                      \end{center}
-                  \end{minipage}
-              }{
-                  \ifnum#1=1
+                        \end{center}
+                    \end{minipage}
+                  }
+              }{%
+                  \ifnum#1=1%
                     \fcolorbox{red}{white}{
                       \begin{minipage}{0.1\textwidth}
                           \begin{center}
                               Analyse lexicale
                           \end{center}
-                      \end{minipage}}
-                  \else
+                      \end{minipage}
+                    }
+                  \else%
+                    \fcolorbox{white}{white}{
                       \begin{minipage}{0.1\textwidth}
                           \begin{center}
                               {Analyse lexicale}
                           \end{center}
                       \end{minipage}
+                    }
                   \fi
               }
           }
@@ -142,27 +147,33 @@
 
       \node (parser) [above=of parserarrow, yshift=20mm] {
           \small
-          \hyperref[secparser] {
-              \ifstrempty{#1}{
+          \hyperref[secparser] {%
+              \ifstrempty{#1}{%
+                % fcolorbox for alignment
+                \fcolorbox{white}{white}{
                   \begin{minipage}{0.15\textwidth}
                       \begin{center}
                             Analyse syntaxique
                       \end{center}
                   \end{minipage}
-              }{
-                  \ifnum#1=2
+                }
+              }{%
+                  \ifnum#1=2%
                     \fcolorbox{red}{white}{
                       \begin{minipage}{0.15\textwidth}
                           \begin{center}
                               Analyse syntaxique
                           \end{center}
-                      \end{minipage}}
-                  \else
+                      \end{minipage}
+                    }
+                  \else%
+                    \fcolorbox{white}{white}{
                       \begin{minipage}{0.15\textwidth}
                           \begin{center}
-                              {Analyse syntaxique}
+                              Analyse syntaxique
                           \end{center}
                       \end{minipage}
+                    }
                   \fi
               }
           }
@@ -173,27 +184,34 @@
   \affichearbres {
       \node (loop) [above=of looparrow, yshift=10mm] {
           \small
-          \ifstrempty{#1}{
-              \begin{minipage}{0.2\textwidth}
-                  \begin{center}
-                        Transformation en boucles
-                  \end{center}
-              \end{minipage}
-          }{
-              \ifnum#1=3
-                \fcolorbox{red}{white}{
-                  \begin{minipage}{0.2\textwidth}
-                      \begin{center}
-                          Transformation en boucles
-                      \end{center}
-                  \end{minipage}}
-              \else
-                  \begin{minipage}{0.2\textwidth}
-                      \begin{center}
-                          {Transformation en boucles}
-                      \end{center}
-                  \end{minipage}
-              \fi
+          \hyperref[secloops] {
+              \ifstrempty{#1}{%
+                  \fcolorbox{white}{white}{
+                    \begin{minipage}{0.2\textwidth}
+                        \begin{center}
+                            Transformation en boucles
+                        \end{center}
+                    \end{minipage}
+                  }
+              }{%
+                  \ifnum#1=3%
+                    \fcolorbox{red}{white}{
+                      \begin{minipage}{0.2\textwidth}
+                          \begin{center}
+                              Transformation en boucles
+                          \end{center}
+                      \end{minipage}
+                    }
+                  \else%
+                    \fcolorbox{white}{white}{
+                      \begin{minipage}{0.2\textwidth}
+                          \begin{center}
+                              {Transformation en boucles}
+                          \end{center}
+                      \end{minipage}
+                    }
+                  \fi
+              }
           }
       };
       \draw (loop) edge[->] node {} (looparrow);
