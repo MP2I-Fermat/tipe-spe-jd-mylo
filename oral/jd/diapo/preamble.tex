@@ -138,3 +138,18 @@
 
 \newcommand{\pointeur}[0]{\raisebox{-3pt}{$\uparrow$}}
 \newtheorem{definition}{Définition}
+
+%% Utilitaire TikZ pour faire une roue dentée
+%% par Stefan Kottwitz sur https://latex.org/forum/viewtopic.php?t=21696
+% #1 number of teeths
+% #2 radius intern
+% #3 radius extern
+% #4 angle from start to end of the first arc
+% #5 angle to decale the second arc from the first 
+
+\newcommand{\gear}[5]{%
+\foreach \i in {1,...,#1} {%
+  [rotate=(\i-1)*360/#1]  (0:#2)  arc (0:#4:#2) {[rounded corners=1.5pt]
+             -- (#4+#5:#3)  arc (#4+#5:360/#1-#5:#3)} --  (360/#1:#2)
+}}
+
