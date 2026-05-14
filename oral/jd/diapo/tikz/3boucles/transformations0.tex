@@ -1,0 +1,13 @@
+\begin{tikzpicture}[remember picture, overlay]
+  \draw<2>
+    (pic cs:fleche)
+    node[yshift=1mm, xshift=15mm] (fleche) {}
+    (pic cs:fleche);
+
+  \node<2> [right=20mm of fleche] (arguments) {
+      \begin{minipage}{0.5\textwidth}
+          \inputminted{ocaml}{exemples/3boucles/args_refs.ml}
+      \end{minipage}
+  };
+  \draw<2> (arguments) edge[->] (fleche);
+\end{tikzpicture}
