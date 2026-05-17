@@ -513,7 +513,7 @@ let parse (a : ('token_type, 'non_terminal) lr1_automaton)
               let racine_opt = Stack.pop_opt pile_arbres in
               match racine_opt with
               | None -> raise (SyntaxError (
-                  "État invalide : absence de racine apres lecture du texte",
+                  "État invalide : absence de racine après lecture du texte",
                   pos_nt
                 ))
               | Some (racine, _) ->
