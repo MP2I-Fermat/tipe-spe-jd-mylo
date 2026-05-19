@@ -30,12 +30,16 @@
     \pause
 
     \begin{definition}[grammaire]
-        Une grammaire est un ensemble de règles (dites <<~règles de
-        dérivation~>>) de la forme \boxed{\text{Symbole} \to \dots}. Les
-        symboles pouvant être mis à gauche des flèches sont appelés
-        \textbf{symboles non terminaux}. À droite des flèches apparaissent une
-        liste de \textbf{symboles terminaux et non terminaux} (les symboles
-        terminaux étant des types de lexèmes).
+      \begin{itemize}
+        \item Ensemble de règles (dites <<~règles de dérivation~>>) de la forme
+          \boxed{\text{Symbole} \to \dots}~;
+        \pause
+        \item Les symboles à gauche sont appelés \textbf{symboles non
+          terminaux}~;
+        \pause
+        \item À droite de la flèche~: liste de \textbf{symboles terminaux et non
+          terminaux}.
+      \end{itemize}
     \end{definition}
 
 \end{frame}
@@ -49,21 +53,21 @@
     \uncover<2-> {Exemple de <<~code source~>>~:}
     % bonne chance pour relire ça…
     \onslide <2-> \[
-        \onslide <6-> \underbrace{
-            \onslide <3-> \overbrace{ \onslide <2->
+        \onslide <3-> \underbrace{
+            \overbrace{ \onslide <2->
                 x
             \onslide <3-> }^\text{\tiny VAR. \normalsize} \onslide <2->
             =
-            \onslide <5-> \overbrace{ \onslide <2->
-                (3 \times \onslide <4-> \overbrace{ \onslide <2->
+            \onslide <3-> \overbrace{ \onslide <2->
+                (3 \times \onslide <3-> \overbrace{ \onslide <2->
                     (1 + 2)
-                \onslide <4-> }^\text{\tiny EXPR \normalsize} \onslide <2->
+                \onslide <3-> }^\text{\tiny EXPR \normalsize} \onslide <2->
                 )
-            \onslide <5-> }^\text{\tiny EXPR \normalsize} \onslide <6->
+            \onslide <3-> }^\text{\tiny EXPR \normalsize}
         }_\text{\tiny PHRASE \normalsize} \onslide <2->
     \]
 
-    \uncover <7-> {Problème~: comment passer d’une grammaire et d’un code source
+    \uncover <4-> {Problème~: comment passer d’une grammaire et d’un code source
     à un arbre de syntaxe~?}
 \end{frame}
 
@@ -89,6 +93,12 @@
     \pause
     L’automate LR(0) correspondant à une grammaire peut être construit à partir
     de cette grammaire.
+\end{frame}
+
+\begin{frame}
+    \frametitle{Automates}
+
+    TODO états
 \end{frame}
 
 \begin{frame}
@@ -153,7 +163,7 @@
     \begin{minipage}{0.4\textwidth}
         \only<1-2> {\input{tikz/2analyse_syntaxique/grammaire_courte.tex}}
         \only<3-> {
-            \maxsizebox{\textwidth}{0.8\textheight}{
+            \maxsizebox{\textwidth}{0.7\textheight}{
                 \input{tikz/2analyse_syntaxique/automaton_pile_arbres.tex}
             }
         }

@@ -1,10 +1,10 @@
 let somme l =
-  let c = ref true in
+  let continuer = ref true in
   let res = ref 0 in
   let l' = ref l in
-  while !c do
+  while !continuer do
     match !l' with
-    | [] -> c := false
+    | [] -> continuer := false
     | x::q ->
       begin
         res := !res + x;
