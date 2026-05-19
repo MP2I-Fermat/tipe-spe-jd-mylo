@@ -1,6 +1,8 @@
-let somme_liste (l: int array) =
+let somme_liste (l: int list) =
   let resultat = ref 0 in
-  for i = 0 to Array.length l do
-    resultat := !resultat + l.(i)
+  let l' = ref l in
+  while !l' <> [] do
+    resultat := !resultat + List.hd !l';
+    l' := List.tl !l'
   done;
   !resultat
