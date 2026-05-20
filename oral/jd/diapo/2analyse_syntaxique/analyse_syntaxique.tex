@@ -74,9 +74,18 @@
 \subsection{Algorithme LR(0)}
 
 \begin{frame}
+    \frametitle{Algorithme LR(0)}
+
+    \begin{itemize}
+        \item \textit{\textbf{L}eft to right}~;
+        \item \textit{\textbf{R}ightmost derivation}~;
+        \item \textit{\textbf{0} lookahead symbols}.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
     \frametitle{Automates}
 
-    \pause
     L’algorithme LR(0) repose sur l’utilisation \textbf{d’automates}.
 
     \pause
@@ -98,11 +107,25 @@
 \begin{frame}
     \frametitle{Automates}
 
-    TODO états
+    \only<1>{\input{tikz/2analyse_syntaxique/state.tex}}
+    \only<2>{\input{tikz/2analyse_syntaxique/state_transition.tex}}
+    \only<3>{\input{tikz/2analyse_syntaxique/state_reduction.tex}}
 \end{frame}
 
 \begin{frame}
-    \frametitle{Automates}
+    \frametitle{Algorithme LR(0)}
+
+    \begin{itemize}
+        \pause
+        \item Construire l’automate LR(0) à partir de la grammaire~;
+        \pause
+        \item Lire le texte en suivant les transitions de l’automate et en
+            construisant des arbres petit à petit.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Algorithme LR(0) sur un exemple}
 
     \only<1>{\input{tikz/2analyse_syntaxique/grammaire_longue.tex}}
     \only<2>{\input{tikz/2analyse_syntaxique/grammaire_courte.tex}}
@@ -181,3 +204,11 @@
         \input{tikz/2analyse_syntaxique/arbre_final.tex}
     \end{center}
 \end{frame}
+
+%\begin{frame}
+%    \frametitle{LR(1)}
+%
+%    En pratique, LR(0) a des limitations~: on utilise l’algorithme LR(1), qui
+%    s’autorise à regarder le caractère suivant pour décider ce qu’il doit faire
+%    s’il a le choix entre suivre une transition et réduire.
+%\end{frame}
