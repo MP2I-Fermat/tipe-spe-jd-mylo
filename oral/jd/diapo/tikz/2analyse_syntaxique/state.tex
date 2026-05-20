@@ -1,0 +1,19 @@
+\begin{center}
+\begin{tikzpicture}[
+        every node/.style={rectangle, font=\footnotesize, inner sep=3pt},
+        every state/.style={rectangle, font=\footnotesize, inner sep=1pt},
+        every loop/.style={min distance=1mm, looseness=2},
+        auto,
+        node distance=7mm and 7mm
+    ]
+
+    \node (q5) [state] {
+        $\begin{aligned}
+            \text{EXPR} & \to \text{parenthèse\_g \pointeur EXPR OPÉRATEUR EXPR parenthèse\_d} \\
+            \text{EXPR} & \to \text{\pointeur littéral\_d’entier} \\
+            \text{EXPR} & \to \text{\pointeur parenthèse\_g EXPR OPÉRATEUR EXPR parenthèse\_d}
+        \end{aligned}$
+    };
+
+\end{tikzpicture}
+\end{center}
