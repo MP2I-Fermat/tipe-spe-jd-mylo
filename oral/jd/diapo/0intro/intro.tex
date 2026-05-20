@@ -16,30 +16,37 @@
 \begin{frame}
     \frametitle{Boucles}
 
+    Exemple~:
+    \inputminted{ocaml}{exemples/0intro/somme_liste_boucle.ml}
+    \pause
+
     Avantages~:
     \pause
     \begin{itemize}
         \item Plus facile à compiler ou à interpréter~;
         \item Moins de problèmes mémoires.
     \end{itemize}
-
-    \pause
-    Exemple~:
-    \inputminted{ocaml}{exemples/0intro/somme_liste_boucle.ml}
 \end{frame}
 
 \begin{frame}
     \frametitle{Fonctions récursives}
+
+    Exemple~:
+    \inputminted{ocaml}{exemples/0intro/somme_liste_rec.ml}
+
+    \pause
 
     \begin{itemize}
         \item Avantage~: parfois préférable en terme de lisibilité de code.
         \pause
         \item Problème~: peut entraîner des dépassements de pile.
     \end{itemize}
+\end{frame}
 
-    \pause
-    Exemple~:
-    \inputminted{ocaml}{exemples/0intro/somme_liste_rec.ml}
+\begin{frame}
+    \frametitle{Fonctions récursives~: problème}
+
+    \inputminted{text}{exemples/0intro/erreur}
 \end{frame}
 
 %\begin{frame}
