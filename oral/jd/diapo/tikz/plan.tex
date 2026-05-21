@@ -233,7 +233,10 @@
       \draw (etape4) edge[->] (etape5);
    }
 
-   \node [below=of etape5, yshift=-10mm, xshift=5mm] (annexes) {\tiny\hyperref[secannexes]{Annexes}};
+   \affichelexemes{
+       \node [below=of etape5, yshift=-10mm, xshift=5mm] (annexes)
+           {\tiny\hyperref[secannexes]{Annexes}};
+    }
 
 \end{tikzpicture}
 \end{adjustwidth}
