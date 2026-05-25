@@ -3,20 +3,140 @@
 \section{Annexes}
 
 \begin{frame}
-    \frametitle{Choses à mettre dans les annexes}
+    \frametitle{Annexes}
+    \tableofcontents[
+        currentsection,
+        sections=\value{section},
+        subsubsectionstyle=hide
+    ]
+\end{frame}
+\addtocounter{framenumber}{-1}
 
+\subsection{Construction de l’automate LR(0)}
+\begin{frame}
+    \frametitle{Construction de l’automate LR(0)}
+
+    \begin{minipage}{0.3\textwidth}
+    \input{tikz/2analyse_syntaxique/grammaire_courte.tex}
+    \end{minipage}%
+    \begin{minipage}{0.7\textwidth}
+        \begin{center}
+        \maxsizebox{\textwidth}{0.8\textheight}{
+            \input{tikz/5annexes/LR0_automaton_construction.tex}
+        }
+        \end{center}
+    \end{minipage}
+\end{frame}
+\addtocounter{framenumber}{-1}
+
+\begin{frame}
+    \frametitle{Construction de l’automate LR(0)}
+
+    \begin{center}
+    \maxsizebox{\textwidth}{0.8\textheight}{
+        \input{tikz/5annexes/LR0_automaton.tex}
+    }
+    \end{center}
+\end{frame}
+\addtocounter{framenumber}{-1}
+
+\subsection{Limitations de LR(0)~: exemples de conflits}
+
+\begin{frame}
+    \frametitle{Limitations de LR(0)~: exemples de conflits}
+
+    \input{tikz/5annexes/if_then_else_grammar.tex}
+    \pause
+    \input{tikz/5annexes/LR0_automaton_conflict.tex}
+\end{frame}
+\addtocounter{framenumber}{-1}
+
+\begin{frame}
+    \frametitle{Limitations de LR(0)~: exemples de conflits}
+
+    \begin{center}
+        \input{tikz/5annexes/read_reduce_conflict.tex}
+    \end{center}
+
+    Que faire~?
+    \pause
     \begin{itemize}
-        % \item Pourquoi <<~rightmost derivation~>>~;
-        \item Détail de la construction de l’automate LR(0)~;
-        \item Exemple de limitation de LR(0) (conflits lire/réduire et réduire/réduire, par exemple la grammaire if/then/else)
-        \item Exemple d’exécution LR(1) avec exemple d’automate.
+        \item Réduire $\underline{I} \to \text{\textit{si bool E}}$~?
+        \pause
+        \item Essayer de lire $sinon$~?
+    \end{itemize}
+
+    \pause
+    C’est un conflit lire/réduire.
+\end{frame}
+\addtocounter{framenumber}{-1}
+
+\begin{frame}
+    \frametitle{Limitations de LR(0)~: différence avec LR(1)}
+
+    \begin{center}
+        \input{tikz/5annexes/read_reduce_LR1.tex}
+    \end{center}
+
+    \pause
+    On regarde le caractère suivant~:
+    \pause
+    \begin{itemize}
+        \item Si c’est la fin du fichier (\lozenge), réduire
+            $\underline{I} \to \text{\textit{si bool E}}$~;
+        \pause
+        \item Si c’est $sinon$, lire.
     \end{itemize}
 \end{frame}
+\addtocounter{framenumber}{-1}
 
-%\begin{frame}
-%    \frametitle{\textit{Rightmost derivation}}
-%
-%    \input{tikz/5annexes/rightmost_derivation.tex}
-%\end{frame}
+\begin{frame}
+    \frametitle{Limitations de LR(0)~: conflits réduire/réduire}
 
+    \begin{center}
+        \input{tikz/5annexes/reduce_reduce_conflict.tex}
+    \end{center}
+
+    Deux choix~:
+    \pause
+    \begin{itemize}
+        \item Réduire $A \to \dots$~;
+        \pause
+        \item Réduire $B \to \dots$.
+    \end{itemize}
+
+    \pause
+    C’est un conflit réduire/réduire.
+\end{frame}
+\addtocounter{framenumber}{-1}
+
+\begin{frame}
+    \frametitle{Limitations de LR(0)~: conflits réduire/réduire}
+
+    \begin{center}
+        \input{tikz/5annexes/reduce_reduce_LR1.tex}
+    \end{center}
+
+    On regarde le caractère suivant~:
+    \pause
+    \begin{itemize}
+        \item Si c’est $a$, $b$ ou la fin du fichier (\lozenge), réduire
+            $A \to \dots$~;
+        \pause
+        \item Si c’est $c$ ou $d$, réduire $B \to \dots$.
+    \end{itemize}
+\end{frame}
+\addtocounter{framenumber}{-1}
+
+\subsection{Automate LR(1)}
+
+\begin{frame}
+    \frametitle{Automate LR(1)}
+
+    \input{tikz/5annexes/if_then_else_grammar.tex}
+    \pause
+    \maxsizebox{\textwidth}{0.8\textheight}{
+        \input{tikz/5annexes/LR1_automaton_conflict.tex}
+    }
+\end{frame}
 \addtocounter{framenumber}{-1}
