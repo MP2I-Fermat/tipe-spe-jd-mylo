@@ -12,29 +12,29 @@
         }%
         \only<1->{%
             $\begin{aligned}
-                \underline{P} & \to \pointeur \text{V égal E} \\
-                V             & \to \pointeur \text{id}
+                \underline{P}  & \to \pointeur \text{V égal E} \\
+                \uncover<2->{V & \to \pointeur \text{id}}
             \end{aligned}$%
         }%
     };
 
-    \uncover<3->{
+    \uncover<4->{
         \node (q1) [state, above right=of q0] {
             $ V \to \text{id} \pointeur $
         };
     }
 
-    \uncover<4->{
+    \uncover<5->{
         \node (q2) [state, below right=of q0] {
             $ \underline{P} \to \text{V \pointeur égal E} $
         };
     }
 
-    \uncover<6->{
+    \uncover<7->{
         \node (q3) [state, right=of q2] {
             $\begin{aligned}
                 \underline{P} & \to \text{V égal \pointeur E} \\
-                \uncover<7->{%
+                \uncover<8->{%
                 E             & \to \pointeur \text{ent} \\
                 E             & \to \pointeur \text{parg E O E pard}
                 }%
@@ -42,13 +42,13 @@
         };
     }
 
-    \uncover<2->{
+    \uncover<3->{
         \path[->, every node/.style={font=\footnotesize}]
             (q0)  edge              node                           {id}    (q1);
         \path[->, every node/.style={font=\footnotesize}]
             (q0)  edge              node                           {V}     (q2);
     }
-    \uncover<5->{
+    \uncover<6->{
         \path[->, every node/.style={font=\footnotesize}]
             (q2)  edge              node                           {égal}  (q3);
     }
