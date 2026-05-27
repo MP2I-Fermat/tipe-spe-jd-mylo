@@ -1,4 +1,5 @@
 \begin{center}
+\maxsizebox{\textwidth}{0.8\textheight}{%
 \begin{tikzpicture}[
         every node/.style={rectangle, font=\footnotesize, inner sep=3pt},
         every state/.style={rectangle, font=\footnotesize, inner sep=1pt},
@@ -9,21 +10,22 @@
 
     \node (q0) [state, initial, initial text={}] {
         $\begin{aligned}
-            \underline{P} & \to \pointeur \text{V égal E} \\
-            V             & \to \pointeur \text{id}
+            \underline{PHRASE} & \to \pointeur \text{VARIABLE égal EXPR} \\
+            VARIABLE           & \to \pointeur \text{identifiant}
         \end{aligned}$
     };
 
     \node (q1) [state, above right=of q0] {
-        $ V \to \text{id} \pointeur $
+        $ VARIABLE \to \text{identifiant} \pointeur $
     };
 
     \node (q2) [state, below right=of q0] {
-        $ \underline{P} \to \text{V \pointeur égal E} $
+        $ \underline{PHRASE} \to \text{VARIABLE \pointeur égal EXPR} $
     };
 
     \path[->, every node/.style={font=\footnotesize}]
-        (q0)  edge              node [swap]                    {id}    (q1)
-              edge              node                           {V}     (q2);
+        (q0)  edge              node [swap]        {identifiant} (q1)
+              edge              node               {VARIABLE}    (q2);
 \end{tikzpicture}
+}  % maxsizebox
 \end{center}

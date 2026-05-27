@@ -64,7 +64,7 @@
                 \onslide <3-> }^\text{\tiny EXPR \normalsize} \onslide <2->
                 )
             \onslide <3-> }^\text{\tiny EXPR \normalsize}
-        }_\text{\tiny PHRASE \normalsize} \onslide <2->
+        }_\underline{\text{\tiny PHRASE\normalsize}} \onslide <2->
     \]
 
     \uncover <4-> {Problème~: comment passer d’une grammaire et d’un code source
@@ -201,8 +201,11 @@
     \[x = (3 \times (1 + 2))\]
 
     \begin{center}
-        \input{tikz/2analyse_syntaxique/arbre_final.tex}
+        \input{tikz/2analyse_syntaxique/arbre_final.tex}%
     \end{center}
+
+    \pause
+    En pratique, LR(0) a quelques limitations et on utilise sa variante LR(1).
 \end{frame}
 
 %\begin{frame}
