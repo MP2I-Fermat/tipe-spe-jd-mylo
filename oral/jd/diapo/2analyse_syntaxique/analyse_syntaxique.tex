@@ -47,24 +47,25 @@
 \begin{frame}[fragile]
     \frametitle{Exemple}
     \footnotesize
-    \input{tikz/2analyse_syntaxique/grammaire_longue.tex}
+    \only<1, 3->{\input{tikz/2analyse_syntaxique/grammaire_longue.tex}}
+    \only<2>{\input{tikz/2analyse_syntaxique/grammaire_longue_axiome.tex}}
     \normalsize
 
-    \uncover<2-> {Exemple de <<~code source~>>~:}
+    \uncover<3-> {Exemple de <<~code source~>>~:}
     % bonne chance pour relire ça…
-    \onslide <2-> \[
-        \onslide <3-> \underbrace{
-            \overbrace{ \onslide <2->
+    \onslide <3-> \[
+        \onslide <4-> \underbrace{
+            \overbrace{ \onslide <3->
                 x
-            \onslide <3-> }^\text{\tiny VAR. \normalsize} \onslide <2->
+            \onslide <4-> }^\text{\tiny VAR. \normalsize} \onslide <3->
             =
-            \onslide <3-> \overbrace{ \onslide <2->
-                (3 \times \onslide <3-> \overbrace{ \onslide <2->
+            \onslide <4-> \overbrace{ \onslide <3->
+                (3 \times \onslide <4-> \overbrace{ \onslide <3->
                     (1 + 2)
-                \onslide <3-> }^\text{\tiny EXPR \normalsize} \onslide <2->
+                \onslide <4-> }^\text{\tiny EXPR \normalsize} \onslide <3->
                 )
-            \onslide <3-> }^\text{\tiny EXPR \normalsize}
-        }_\underline{\text{\tiny PHRASE\normalsize}} \onslide <2->
+            \onslide <4-> }^\text{\tiny EXPR \normalsize}
+        }_\underline{\text{\tiny PHRASE\normalsize}} \onslide <3->
     \]
 
     \uncover <4-> {Problème~: comment passer d’une grammaire et d’un code source
@@ -86,6 +87,7 @@
 \begin{frame}
     \frametitle{Automates}
 
+    \pause
     L’algorithme LR(0) repose sur l’utilisation \textbf{d’automates}.
 
     \pause
