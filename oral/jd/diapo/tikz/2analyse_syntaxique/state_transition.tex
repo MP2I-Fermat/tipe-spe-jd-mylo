@@ -10,17 +10,17 @@
 
     \node (q0) [state, initial, initial text={}] {
         $\begin{aligned}
-            \underline{PHRASE} & \to \pointeur \text{VARIABLE égal EXPR} \\
-            VARIABLE           & \to \pointeur \text{identifiant}
+            \underline{\text{PHRASE}} & \to \pointeur \text{VARIABLE égal EXPR} \\
+            \text{VARIABLE}           & \to \pointeur \text{identifiant}
         \end{aligned}$
     };
 
     \node (q1) [state, above right=of q0] {
-        $ VARIABLE \to \text{identifiant} \pointeur $
+        $ \text{VARIABLE} \to \text{identifiant} \pointeur $
     };
 
     \node (q2) [state, below right=of q0] {
-        $ \underline{PHRASE} \to \text{VARIABLE \pointeur égal EXPR} $
+        $ \underline{\text{PHRASE}} \to \text{VARIABLE \pointeur égal EXPR} $
     };
 
     \path[->, every node/.style={font=\footnotesize}]
