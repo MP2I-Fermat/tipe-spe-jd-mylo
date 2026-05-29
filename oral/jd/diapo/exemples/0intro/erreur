@@ -1,4 +1,0 @@
-[utilisateur@arch ~]$ ocaml boucle.ml
-1249999975000000
-[utilisateur@arch ~]$ ocaml fonction_recursive.ml
-Stack overflow during evaluation (looping recursion?).
