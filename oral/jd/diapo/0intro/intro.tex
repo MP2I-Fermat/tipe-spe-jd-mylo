@@ -2,18 +2,6 @@
 % pas de section
 
 \begin{frame}
-    \frametitle{Fonctions récursives et boucles}
-
-    \begin{itemize}
-        \item On a souvent besoin d’itérer des instructions sur des données,
-            c’est-à-dire de parcourir une certaine séquence de données en les
-            traitant une par une
-        \pause
-        \item Deux méthodes existent~: boucles et fonctions récursives
-    \end{itemize}
-\end{frame}
-
-\begin{frame}
     \frametitle{Boucles}
 
     Exemple~:
@@ -46,28 +34,11 @@
 \begin{frame}
     \frametitle{Fonctions récursives~: problème}
 
-    \inputminted{text}{exemples/0intro/erreur}
+    \mintinline{bash}{[raphael@arch ~]$ ocaml boucle.ml} \\
+    \mintinline{text}{1249999975000000} \\ % 50 millions premiers entiers
+    \mintinline{bash}{[raphael@arch ~]$ ocaml fonction_recursive.ml} \\
+    \color{red}\mintinline{text}{Stack overflow during evaluation (looping recursion?).}
 \end{frame}
-
-%\begin{frame}
-%    \frametitle{Fonctions récursives}
-%
-%    \inputminted{ocaml}{exemples/0intro/somme_liste_rec.ml}
-%
-%    \only<1-13>{
-%        Sur la liste \mintinline{ocaml}{[0; 1; 2; 3]}~:
-%        \begin{center}
-%            \input{tikz/0intro/pile1.tex}
-%        \end{center}
-%    }
-%    \only<14->{
-%        Sur la liste \mintinline{ocaml}{[0; 1; 2; 3; 4]}~:
-%        \begin{center}
-%            \input{tikz/0intro/pile2.tex}
-%        \end{center}
-%    }
-%
-%\end{frame}
 
 
 \begin{frame}

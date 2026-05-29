@@ -1,4 +1,4 @@
-let somme_liste (l: int list) =
+let somme_liste (l: int list) : int =
   let resultat = ref 0 in
   let l' = ref l in
   while !l' <> [] do
