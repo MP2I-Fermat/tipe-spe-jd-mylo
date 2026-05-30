@@ -54,34 +54,36 @@
 \setbeamertemplate{navigation symbols}{}
 \setbeamertemplate{footline}[frame number]
 \setbeamertemplate{headline}{
-  % la premiere ligne
-  \begin{beamercolorbox}[ht=0.42cm, vmode]{section in head/foot}
-    \insertshorttitle -- {\initiales} -- {\insertshortdate}
-    \vspace*{0.08cm}
-  \end{beamercolorbox}
-  % la deuxième ligne
-  \begin{beamercolorbox}[ht=0.4cm, vmode]{subsection in head/foot}
-    % titre de la section si elle n’est pas 0
-    \ifnum\value{section}=0{}
-    \else{ \hspace{0.8cm} {\thesection} -- {\insertsectionhead} }
-    \fi
-    % séparateur + titre de la sous-section si elle n’est pas 0
-    \ifnum\value{subsection}=0{}
-    \else{
-        \hspace*{0.1cm} \couleur{$\bullet$} \hspace*{0.1cm}
-        \thesection.\thesubsection \, \insertsubsectionhead
-    }
-    \fi
-    \vspace*{0.12cm}
-  \end{beamercolorbox}
-  % \vspace*{-0.03cm} % pour pas qu'il n’y ait d'espace avec la ligne de
-                      % frametitle
+    % la premiere ligne
+    \begin{beamercolorbox}[ht=0.42cm, vmode]{section in head/foot}
+        \hspace{0.4cm} \insertshorttitle~--~\initiales~--~\insertshortdate
+        \strut
+        \vspace*{0.04cm}
+    \end{beamercolorbox}
+    % la deuxième ligne
+    \begin{beamercolorbox}[ht=0.4cm, vmode]{subsection in head/foot}
+        % titre de la section si elle est pas 0
+        \ifnum\value{section}=0{}
+        \else{\hspace{0.8cm} \thesection~--~\insertsectionhead}
+        \fi
+        % séparateur + titre de la sous-section si elle est pas 0
+        \ifnum\value{subsection}=0{}
+        \else{
+            \couleur{$\bullet$} \hspace*{0.1cm}
+            \thesection.\thesubsection \, \insertsubsectionhead
+        }
+        \fi
+        \strut
+        \vspace*{0.05cm}
+    \end{beamercolorbox}
+    %\vspace*{-0.03cm} % pour pas qu'il n’yy ait d'espace avec la ligne de
+                       % frametitle
 }
 
 \setbeamertemplate{frametitle}{
     \vspace*{-0.04cm}
-    \begin{beamercolorbox}[ht=0.8cm, wd=\paperwidth, vmode]{frametitle}
-      \hspace{0.3cm} \insertframetitle \vspace*{0.1cm} \\[-0.5cm]
+    \begin{beamercolorbox}[ht=0.8cm,wd=\paperwidth, vmode]{frametitle}
+        \hspace{0.3cm} \insertframetitle \strut \vspace*{0.05cm}
     \end{beamercolorbox}
 }
 
