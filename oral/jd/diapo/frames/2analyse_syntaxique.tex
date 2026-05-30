@@ -27,30 +27,30 @@
 \begin{frame}[fragile]
     \frametitle{Exemple}
     % TODO refaire avec animations
-    \footnotesize
-    \only<1, 3->{\input{tikz/2analyse_syntaxique/grammaire_longue.tex}}
-    \only<2>{\input{tikz/2analyse_syntaxique/grammaire_longue_axiome.tex}}
-    \normalsize
 
-    \uncover<3-> {Exemple de <<~code source~>>~:}
     % bonne chance pour relire ça…
-    \onslide <3-> \[
-        \onslide <4-> \underbrace{
-            \overbrace{ \onslide <3->
-                x
-            \onslide <4-> }^\text{\tiny VAR. \normalsize} \onslide <3->
-            =
-            \onslide <4-> \overbrace{ \onslide <3->
-                (3 \times \onslide <4-> \overbrace{ \onslide <3->
-                    (1 + 2)
-                \onslide <4-> }^\text{\tiny EXPR \normalsize} \onslide <3->
-                )
-            \onslide <4-> }^\text{\tiny EXPR \normalsize}
-        }_\underline{\text{\tiny PHRASE\normalsize}} \onslide <3->
+    \[
+        \onslide <2-> \underbrace{
+            \onslide <3-> \overbrace{ \onslide <1->
+                \texttt{x}
+            \onslide <3-> }^\text{\tiny VAR. \normalsize} \onslide <1->
+            \texttt{=}
+            \onslide <4-> \overbrace{ \onslide <1->
+                \texttt{(3 ×} \onslide <4-> \overbrace{ \onslide <1->
+                    \texttt{(1 + 2)}
+                \onslide <4-> }^\text{\tiny EXPR \normalsize} \onslide <1->
+                \texttt{)}
+            \onslide <4-> }^\text{\tiny EXPR \normalsize} \onslide<2->
+        }_\underline{\text{\tiny PHRASE\normalsize}} \onslide <1->
     \]
 
-    \uncover <4-> {Problème~: comment passer d’une grammaire et d’un code source
-    à un arbre de syntaxe~?}
+    \footnotesize
+    \input{tikz/2analyse_syntaxique/grammaire_longue_animation.tex}
+    \normalsize
+
+    \pause
+    Problème~: comment passer d’une grammaire et d’un code source à un arbre de
+    syntaxe~?
 \end{frame}
 
 \subsection{Algorithme LR(0)}
