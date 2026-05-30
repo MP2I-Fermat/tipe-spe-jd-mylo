@@ -41,4 +41,50 @@
 \input{frames/4resultats.tex}
 \input{frames/5annexes.tex}
 
+%\iffalse
+\iftrue
+
+\subsection{Code}
+
+\begin{frame}
+    \frametitle{Code}
+    \tableofcontents[
+        currentsubsection,
+        sections=\value{section},
+        subsubsectionstyle=show
+    ]
+\end{frame}
+\addtocounter{framenumber}{-1}
+
+\addtocontents{toc}{\catcode95=11}
+\catcode95=11
+
+\subsubsection{caml_light.grammar}
+\texttt{caml_light.grammar}
+\tiny \inputminted[breaklines=true]{text}{../../../caml_light.grammar}
+\pagebreak
+
+\foreach \name in {
+    automaton.ml,
+    caml_light.ml,
+    grammar_grammar.ml,
+    lexer.ml,
+    parser.ml,
+    rectify_helper.ml,
+    rectify.ml,
+    regex_grammar.ml,
+    regex.ml,
+    utils.ml,
+    while_cli.ml,
+    while.ml}{
+    \subsubsection{\name}
+    \texttt{\name}
+    \tiny \inputminted[]{ocaml}{../../../src/\name}
+    \pagebreak
+  }
+
+\catcode95=8
+\addtocontents{toc}{\catcode95=8}
+\fi
+
 \end{document}
