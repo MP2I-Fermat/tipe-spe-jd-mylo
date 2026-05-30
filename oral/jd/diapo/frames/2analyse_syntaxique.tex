@@ -25,8 +25,7 @@
 \end{frame}
 
 \begin{frame}[fragile]
-    \frametitle{Exemple}
-    % TODO refaire avec animations
+    \frametitle{Grammaires}
 
     % bonne chance pour relire ça…
     \[
@@ -44,13 +43,26 @@
         }_\underline{\text{\tiny PHRASE\normalsize}} \onslide <1->
     \]
 
-    \footnotesize
-    \input{tikz/2analyse_syntaxique/grammaire_longue_animation.tex}
-    \normalsize
+    \only<1-5>{
+        \footnotesize
+        \input{tikz/2analyse_syntaxique/grammaire_longue_animation.tex}
+        \normalsize
+    }%
+    \uncover<6->{
+        \begin{minipage}{0.5\textwidth}
+            \footnotesize
+            \input{tikz/2analyse_syntaxique/grammaire_courte.tex}
+            \normalsize
+        \end{minipage}%
+        \begin{minipage}{0.5\textwidth}
+            \maxsizebox{\textwidth}{0.039\textheight}{
+                \uncover<7->{ \input{tikz/2analyse_syntaxique/arbre_final.tex} }
+            }
+        \end{minipage}
+    }
 
-    \pause
-    Problème~: comment passer d’une grammaire et d’un code source à un arbre de
-    syntaxe~?
+    \uncover<7->{Problème~: comment passer d’une grammaire et d’un code source
+    à un arbre de syntaxe~?}
 \end{frame}
 
 \subsection{Algorithme LR(0)}
@@ -118,7 +130,7 @@
 %    \end{itemize}
 %\end{frame}
 
-%\iffalse
+\iffalse
 \begin{frame}
     \frametitle{Algorithme LR(0) sur un exemple}
     %\foreach \x in {1, ..., 32}
@@ -180,7 +192,7 @@
     \end{minipage}
     \end{adjustwidth}
 \end{frame}
-%\fi
+\fi
 
 \begin{frame}
     \frametitle{Algorithme LR(0) sur un exemple}
