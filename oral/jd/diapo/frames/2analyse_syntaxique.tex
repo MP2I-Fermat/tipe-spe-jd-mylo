@@ -32,15 +32,15 @@
         \onslide <2-> \underbrace{
             \onslide <3-> \overbrace{ \onslide <1->
                 \texttt{x}
-            \onslide <3-> }^\text{\tiny VAR. \normalsize} \onslide <1->
+            \onslide <3-> }^{\ntcolour{\tiny VAR. \normalsize}} \onslide <1->
             \texttt{=}
             \onslide <4-> \overbrace{ \onslide <1->
                 \texttt{(3 ×} \onslide <4-> \overbrace{ \onslide <1->
                     \texttt{(1 + 2)}
-                \onslide <4-> }^\text{\tiny EXPR \normalsize} \onslide <1->
+                \onslide <4-> }^{\ntcolour{\tiny EXPR \normalsize}} \onslide <1->
                 \texttt{)}
-            \onslide <4-> }^\text{\tiny EXPR \normalsize} \onslide<2->
-        }_\underline{\text{\tiny PHRASE\normalsize}} \onslide <1->
+            \onslide <4-> }^{\ntcolour{\tiny EXPR \normalsize}} \onslide<2->
+        }_{\axiomcolour{\tiny PHRASE\normalsize}} \onslide <1->
     \]
 
     \only<1-5>{
@@ -137,35 +137,35 @@
     \only<2-> {
         Exemple~: $x = (3 \times (1 + 2))$ \only<2-3>{\phantom{$\pointeur$}}
         \quad\quad
-        \only<4>{ $\pointeur x = (3 \times (1 + 2))$}%
-        \only<5>{ $x \pointeur = (3 \times (1 + 2))$}%
-        \only<6>{ $\pointeur V = (3 \times (1 + 2))$}%
-        \only<7>{ $V \pointeur = (3 \times (1 + 2))$}%
-        \only<8>{ $V = \pointeur (3 \times (1 + 2))$}%
-        \only<9>{ $V = ( \pointeur 3 \times (1 + 2))$}%
-        \only<10>{ $V = ( 3 \pointeur \times (1 + 2))$}%
-        \only<11>{ $V = ( \pointeur E \times (1 + 2))$}%
-        \only<12>{ $V = ( E \pointeur \times (1 + 2))$}%
-        \only<13>{ $V = ( E \times \pointeur (1 + 2))$}%
-        \only<14>{ $V = ( E \pointeur O (1 + 2))$}%
-        \only<15>{ $V = ( E O \pointeur (1 + 2))$}%
-        \only<16>{ $V = ( E O ( \pointeur 1 + 2))$}%
-        \only<17>{ $V = ( E O ( 1 \pointeur + 2))$}%
-        \only<18>{ $V = ( E O ( \pointeur E + 2))$}%
-        \only<19>{ $V = ( E O ( E \pointeur + 2))$}%
-        \only<20>{ $V = ( E O ( E + \pointeur 2))$}%
-        \only<21>{ $V = ( E O ( E \pointeur O 2))$}%
-        \only<22>{ $V = ( E O ( E O \pointeur 2))$}%
-        \only<23>{ $V = ( E O ( E O 2 \pointeur))$}%
-        \only<24>{ $V = ( E O ( E O \pointeur E))$}%
-        \only<25>{ $V = ( E O ( E O E \pointeur))$}%
-        \only<26>{ $V = ( E O ( E O E ) \pointeur)$}%
-        \only<27>{ $V = ( E O \pointeur E)$}%
-        \only<28>{ $V = ( E O E \pointeur)$}%
-        \only<29>{ $V = ( E O E ) \pointeur$}%
-        \only<30>{ $V = \pointeur E$}%
-        \only<31>{ $V = E \pointeur$}%
-        \only<32>{ $\pointeur \underline{P}$}
+        \only<4>{\pointeur\token{x}\token{=}\token{(}\token{3}\token{×}\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<5>{\token{x}\pointeur\token{=}\token{(}\token{3}\token{×}\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<6>{\pointeur\nonterminal{V}\token{=}\token{(}\token{3}\token{×}\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<7>{\nonterminal{V}\pointeur\token{=}\token{(}\token{3}\token{×}\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<8>{\nonterminal{V}\token{=}\pointeur\token{(}\token{3}\token{×}\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<9>{\nonterminal{V}\token{=}\token{(}\pointeur\token{3}\token{×}\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<10>{\nonterminal{V}\token{=}\token{(}\token{3}\pointeur\token{×}\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<11>{\nonterminal{V}\token{=}\token{(}\pointeur\nonterminal{E}\token{×}\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<12>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\pointeur\token{×}\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<13>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\token{×}\pointeur\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<14>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\pointeur\nonterminal{O}\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<15>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\pointeur\token{(}\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<16>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\token{(}\pointeur\token{1}\token{+}\token{2}\token{)}\token{)}}%
+        \only<17>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\token{(}\token{1}\pointeur\token{+}\token{2}\token{)}\token{)}}%
+        \only<18>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\token{(}\pointeur\nonterminal{E}\token{+}\token{2}\token{)}\token{)}}%
+        \only<19>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\token{(}\nonterminal{E}\pointeur\token{+}\token{2}\token{)}\token{)}}%
+        \only<20>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\token{(}\nonterminal{E}\token{+}\pointeur\token{2}\token{)}\token{)}}%
+        \only<21>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\token{(}\nonterminal{E}\pointeur\nonterminal{O}\token{2}\token{)}\token{)}}%
+        \only<22>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\token{(}\nonterminal{E}\nonterminal{O}\pointeur\token{2}\token{)}\token{)}}%
+        \only<23>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\token{(}\nonterminal{E}\nonterminal{O}\token{2}\pointeur\token{)}\token{)}}%
+        \only<24>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\token{(}\nonterminal{E}\nonterminal{O}\pointeur\nonterminal{E}\token{)}\token{)}}%
+        \only<25>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\token{(}\nonterminal{E}\nonterminal{O}\nonterminal{E}\pointeur\token{)}\token{)}}%
+        \only<26>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\token{(}\nonterminal{E}\nonterminal{O}\nonterminal{E}\token{)}\pointeur\token{)}}%
+        \only<27>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\pointeur\nonterminal{E}\token{)}}%
+        \only<28>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\nonterminal{E}\pointeur\token{)}}%
+        \only<29>{\nonterminal{V}\token{=}\token{(}\nonterminal{E}\nonterminal{O}\nonterminal{E}\token{)}\pointeur}%
+        \only<30>{\nonterminal{V}\token{=}\pointeur\nonterminal{E}}%
+        \only<31>{\nonterminal{V}\token{=}\nonterminal{E}\pointeur}%
+        \only<32>{\pointeur\nonterminal{\underline{P}}}%
     }
 
     \vspace{1em}
@@ -195,15 +195,15 @@
         \underbrace{
             \overbrace{
                 \texttt{x}
-            }^\text{\tiny V \normalsize}
+            }^{\ntcolour{\tiny V \normalsize}}
             \texttt{=}
             \overbrace{
                 \texttt{(3 ×} \overbrace{
                     \texttt{(1 + 2)}
-                }^\text{\tiny E \normalsize}
+                }^{\ntcolour{\tiny E \normalsize}}
                 \texttt{)}
-            }^\text{\tiny E \normalsize}
-        }_\underline{\text{\tiny P\normalsize}}
+            }^{\ntcolour{\tiny E \normalsize}}
+        }_{\axiomcolour{\tiny P\normalsize}}
     \]
     \end{minipage}%
     \begin{minipage}{0.5\textwidth}

@@ -8,61 +8,61 @@
 
     \node (q1) [state, initial, initial text={}] {
         $\begin{aligned}
-            \underline{I} & \to \pointeur \text{si bool E} ~\wr \{\lozenge\} \\
-            \underline{I} & \to \pointeur \text{si bool E sinon E} ~\wr \{\lozenge\}
+            \axiomcolour{I} & \to \pointeur \text{si bool \ntcolour{E}} ~\wr \{\lozenge\} \\
+            \axiomcolour{I} & \to \pointeur \text{si bool \ntcolour{E} sinon \ntcolour{E}} ~\wr \{\lozenge\}
         \end{aligned}$
     };
 
     \node (q2) [state, below=of q1] {
         $\begin{aligned}
-            \underline{I} & \to \text{si \pointeur bool E} ~\wr \{\lozenge\} \\
-            \underline{I} & \to \text{si \pointeur bool E sinon E} ~\wr \{\lozenge\}
+            \axiomcolour{I} & \to \text{si \pointeur bool \ntcolour{E}} ~\wr \{\lozenge\} \\
+            \axiomcolour{I} & \to \text{si \pointeur bool \ntcolour{E} sinon \ntcolour{E}} ~\wr \{\lozenge\}
         \end{aligned}$
     };
 
     \node (q3) [state, below=of q2] {
         $\begin{aligned}
-            \underline{I} & \to \text{si bool \pointeur E} ~\wr \{\lozenge\} \\
-            \underline{I} & \to \text{si bool \pointeur E sinon E} ~\wr \{\lozenge\} \\
-            \text{E}      & \to \pointeur \text{instr} ~\wr \{\lozenge, sinon\}
+            \axiomcolour{I} & \to \text{si bool \pointeur \ntcolour{E}} ~\wr \{\lozenge\} \\
+            \axiomcolour{I} & \to \text{si bool \pointeur \ntcolour{E} sinon \ntcolour{E}} ~\wr \{\lozenge\} \\
+            \ntcolour{E}      & \to \pointeur \text{instr} ~\wr \{\lozenge, sinon\}
         \end{aligned}$
     };
 
     \node (q4) [state, right=of q3, xshift=40mm] {
         $\begin{aligned}
-            \underline{I} & \to \text{si bool E \pointeur} ~\wr \{\lozenge\} \\
-            \underline{I} & \to \text{si bool E \pointeur sinon E} ~\wr \{\lozenge\}
+            \axiomcolour{I} & \to \text{si bool \ntcolour{E} \pointeur} ~\wr \{\lozenge\} \\
+            \axiomcolour{I} & \to \text{si bool \ntcolour{E} \pointeur sinon \ntcolour{E}} ~\wr \{\lozenge\}
         \end{aligned}$
     };
 
     \node (q5) [state, right=of q2, xshift=40mm] {
         $\begin{aligned}
-            \underline{I} & \to \text{si bool E sinon \pointeur E} ~\wr \{\lozenge\} \\
-            \text{E}      & \to \pointeur \text{instr} ~\wr \{\lozenge\}
+            \axiomcolour{I} & \to \text{si bool \ntcolour{E} sinon \pointeur \ntcolour{E}} ~\wr \{\lozenge\} \\
+            \ntcolour{E}      & \to \pointeur \text{instr} ~\wr \{\lozenge\}
         \end{aligned}$
     };
 
     \node (q6) [state, above=of q5, yshift=0.5mm] {
         $\begin{aligned}
-            \underline{I} & \to \text{si bool E sinon E \pointeur} ~\wr \{\lozenge\}
+            \axiomcolour{I} & \to \text{si bool \ntcolour{E} sinon \ntcolour{E} \pointeur} ~\wr \{\lozenge\}
         \end{aligned}$
     };
 
     \node (q7) [state, right=of q2] {
-        $\text{E} \to \text{instr} \pointeur ~\wr \{\lozenge, sinon\}$
+        $\ntcolour{E} \to \text{instr} \pointeur ~\wr \{\lozenge, sinon\}$
     };
 
     \node (q8) [state, left=of q6, xshift=-3mm] {
-        $\text{E} \to \text{instr} \pointeur ~\wr \{\lozenge\}$
+        $\ntcolour{E} \to \text{instr} \pointeur ~\wr \{\lozenge\}$
     };
 
     \path[->, every node/.style={font=\footnotesize}]
-        (q1)  edge              node                           {si}    (q2)
-        (q2)  edge              node                           {bool}  (q3)
-        (q3)  edge              node                           {E}     (q4)
-        (q4)  edge              node                           {sinon} (q5)
-        (q5)  edge              node                           {E}     (q6)
-        (q3)  edge              node [auto=right]              {instr} (q7)
-        (q5)  edge              node [yshift=1mm]              {instr} (q8);
+        (q1)  edge              node              {si}    (q2)
+        (q2)  edge              node              {bool}  (q3)
+        (q3)  edge              node              {\ntcolour{E}}     (q4)
+        (q4)  edge              node              {sinon} (q5)
+        (q5)  edge              node              {\ntcolour{E}}     (q6)
+        (q3)  edge              node [auto=right] {instr} (q7)
+        (q5)  edge              node [yshift=1mm] {instr} (q8);
 
 \end{tikzpicture}

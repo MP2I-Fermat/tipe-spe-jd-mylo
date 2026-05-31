@@ -2,44 +2,44 @@
 \begin{center}
 \begin{tikzpicture}[node distance=10mm and 10mm]
   \node (source) [draw, rectangle] {
-      \mintinline{ocaml}{let f x = x}
+      \mintinline{ocaml}{let plus_un x = x+1}
   };
 
   \node (tokens) [draw, rectangle, below=of source] {
     \begin{minipage}{0.25\textwidth}
-      (\mintinline{text}{let}, \mintinline{ocaml}{let}), \\
-      (\mintinline{text}{identifier}, \mintinline{ocaml}{f}), \\
-      (\mintinline{text}{identifier}, \mintinline{ocaml}{x}), \\
-      (\mintinline{text}{equals}, \mintinline{ocaml}{=}), \\
-      (\mintinline{text}{identifier}, \mintinline{ocaml}{x})
+        \ocamltoken{let} \ocamltoken{plus_un} \ocamltoken{x} \ocamltoken{=}
+        \ocamltoken{x} \ocamltoken{+} \ocamltoken{1}
     \end{minipage}
   };
 
   \draw (source) edge[->] node {} (tokens);
 
-  \uncover<3->{
-    \node (tree) [draw, rectangle, right=of tokens] {
-      \begin{minipage}{0.6\textwidth}
-      \small
-      \begin{center}
-        \begin{forest}
-            [\mintinline{ocaml}{ValueDefinition}
-                [\mintinline{ocaml}{is_rec: false}]
-                  [\mintinline{ocaml}{Function}, calign=child, calign child=2
-                      [\mintinline{ocaml}{name: f}]
-                      [\mintinline{ocaml}{parameters: [x]}]
-                      [\mintinline{ocaml}{body}
-                          [\mintinline{ocaml}{Variable}
-                              [\mintinline{ocaml}{x}]
-                          ]
-                      ]
-                  ]
-            ]
-        \end{forest}
-      \end{center}
-      \end{minipage}
-    };
-    \draw (tokens) edge[->] node {} (tree);
-  }
+  \node (tree) [draw, rectangle, right=of tokens, visible on=<3->] {
+    \begin{minipage}{0.6\textwidth}
+    \maxsizebox{\textwidth}{\textheight}{
+      \begin{forest}
+          [\mintinline{ocaml}{ValueDefinition}
+              [\mintinline{ocaml}{is_rec: false}]
+                [\mintinline{ocaml}{Function}, calign=child, calign child=2
+                    [\mintinline{ocaml}{name: plus_un}]
+                    [\mintinline{ocaml}{parameters: [x]}]
+                    [\mintinline{ocaml}{body}
+                        [\mintinline{ocaml}{InfixOperation}, calign=child, calign child=2
+                            [\mintinline{ocaml}{Variable}
+                                [\mintinline{ocaml}{x}]
+                            ]
+                            [\mintinline{ocaml}{Plus}]
+                            [\mintinline{ocaml}{IntegerLiteral}
+                                [\mintinline{ocaml}{1}]
+                            ]
+                        ]
+                    ]
+                ]
+          ]
+      \end{forest}
+    }
+    \end{minipage}
+  };
+  \draw (tokens) edge[->, visible on=<3->] node {} (tree);
 \end{tikzpicture}
 \end{center}

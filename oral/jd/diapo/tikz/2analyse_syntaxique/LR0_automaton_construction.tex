@@ -7,36 +7,31 @@
     ]
 
     \node (q0) [state, initial, initial text={}] {
-        \only<0>{%
-            $\underline{P} \to \pointeur \text{V égal E}$%
-        }%
-        \only<1->{%
-            $\begin{aligned}
-                \underline{P}  & \to \pointeur \text{V égal E} \\
-                \uncover<2->{V & \to \pointeur \text{id}}
-            \end{aligned}$%
-        }%
+        $\begin{aligned}
+            \axiomcolour{P}  & \to \pointeur \ntcolour{V}~\text{égal}~\ntcolour{E} \\
+            \uncover<2->{\ntcolour{V} & \to \pointeur \text{id}}
+        \end{aligned}$
     };
 
     \uncover<4->{
         \node (q1) [state, above right=of q0] {
-            $ V \to \text{id} \pointeur $
+            $ \ntcolour{V} \to \text{id} \pointeur $
         };
     }
 
     \uncover<5->{
         \node (q2) [state, below right=of q0] {
-            $ \underline{P} \to \text{V \pointeur égal E} $
+            $ \axiomcolour{P} \to \ntcolour{V} \pointeur \text{égal}~\ntcolour{E} $
         };
     }
 
     \uncover<7->{
         \node (q3) [state, right=of q2] {
             $\begin{aligned}
-                \underline{P} & \to \text{V égal \pointeur E} \\
+                \axiomcolour{P} & \to \ntcolour{V}~\text{égal} \pointeur \ntcolour{E} \\
                 \uncover<8->{%
-                E             & \to \pointeur \text{ent} \\
-                E             & \to \pointeur \text{parg E O E pard}
+                \ntcolour{E}    & \to \pointeur \text{ent} \\
+                \ntcolour{E}    & \to \pointeur \text{parg}~\ntcolour{E O E}~\text{pard}
                 }%
             \end{aligned}$
         };
@@ -44,13 +39,13 @@
 
     \uncover<3->{
         \path[->, every node/.style={font=\footnotesize}]
-            (q0)  edge              node                           {id}    (q1);
+            (q0) edge node {id}           (q1);
         \path[->, every node/.style={font=\footnotesize}]
-            (q0)  edge              node                           {V}     (q2);
+            (q0) edge node {\ntcolour{V}} (q2);
     }
     \uncover<6->{
         \path[->, every node/.style={font=\footnotesize}]
-            (q2)  edge              node                           {égal}  (q3);
+            (q2) edge node {égal}         (q3);
     }
 
 \end{tikzpicture}

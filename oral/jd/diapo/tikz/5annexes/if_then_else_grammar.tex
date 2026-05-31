@@ -1,7 +1,7 @@
 \[
     \begin{aligned}
-        \underline{\text{IF\_EXPR}} & \to \text{si bool EXPR} \\
-        \underline{\text{IF\_EXPR}} & \to \text{si bool EXPR sinon EXPR} \\
-        \text{EXPR}                & \to \text{instruction}
+        \axiomcolour{IF\_EXPR} & \to \text{si bool}~\ntcolour{EXPR} \\
+        \axiomcolour{IF\_EXPR} & \to \text{si bool}~\ntcolour{EXPR}~\text{sinon}~\ntcolour{EXPR} \\
+        \ntcolour{EXPR}        & \to \text{instruction}
     \end{aligned}
 \]

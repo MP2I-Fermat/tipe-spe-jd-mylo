@@ -159,3 +159,12 @@
              -- (#4+#5:#3)  arc (#4+#5:360/#1-#5:#3)} --  (360/#1:#2)
 }}
 
+\colorlet{token}{vertFonce}
+\colorlet{nonterminal}{violette}
+
+\newcommand{\token}[1]{\fcolorbox{token}{white}{\texttt{#1}}}
+\newcommand{\ocamltoken}[1]{\fcolorbox{token}{white}{\mintinline{ocaml}{#1}}}
+\newcommand{\nonterminal}[1]{\fcolorbox{nonterminal}{white}{\texttt{#1}}}
+
+\newcommand{\ntcolour}[1]{\textcolor{nonterminal}{\text{#1}}}
+\newcommand{\axiomcolour}[1]{\textcolor{nonterminal}{\underline{\text{#1}}}}
