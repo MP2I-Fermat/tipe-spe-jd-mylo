@@ -8,66 +8,61 @@
 
     \node (q1) [state, initial, initial text={}] {
         $\begin{aligned}
-            \underline{I} & \to \pointeur \text{si bool E} \\
-            \underline{I} & \to \pointeur \text{si bool E sinon E}
+            \axiomcolour{I} & \to \pointeur \text{si bool}~\ntcolour{E} \\
+            \axiomcolour{I} & \to \pointeur \text{si bool}~\ntcolour{E}~\text{sinon}~\ntcolour{E}
         \end{aligned}$
     };
 
     \node (q2) [state, below=of q1] {
         $\begin{aligned}
-            \underline{I} & \to \text{si \pointeur bool E} \\
-            \underline{I} & \to \text{si \pointeur bool E sinon E}
+            \axiomcolour{I} & \to \text{si \pointeur bool}~\ntcolour{E} \\
+            \axiomcolour{I} & \to \text{si \pointeur bool}~\ntcolour{E}~\text{sinon}~\ntcolour{E}
         \end{aligned}$
     };
 
     \node (q3) [state, below=of q2] {
         $\begin{aligned}
-            \underline{I} & \to \text{si bool \pointeur E} \\
-            \underline{I} & \to \text{si bool \pointeur E sinon E} \\
-            \text{E}      & \to \pointeur \text{instr}
+            \axiomcolour{I} & \to \text{si bool} \pointeur \ntcolour{E} \\
+            \axiomcolour{I} & \to \text{si bool} \pointeur \ntcolour{E}~\text{sinon}~\ntcolour{E} \\
+            \ntcolour{E}    & \to \pointeur \text{instr}
         \end{aligned}$
     };
 
-    \node (q4) [state, right=of q3, xshift=30mm] {
+    \node (q4) [state, right=of q3, xshift=30.5mm] {
         $\begin{aligned}
-            \underline{I} & \to \text{si bool E \pointeur} \\
-            \underline{I} & \to \text{si bool E \pointeur sinon E}
+            \axiomcolour{I} & \to \text{si bool}~\ntcolour{E} \pointeur \\
+            \axiomcolour{I} & \to \text{si bool}~\ntcolour{E} \pointeur \text{sinon}~\ntcolour{E}
         \end{aligned}$
     };
 
     \uncover<3-> {
-        \node (boxq4) [draw, rectangle, red, thick] at (q4) {
-            \phantom{$\begin{aligned}
-                \underline{I} & \to \text{si bool E \pointeur} \\
-                \underline{I} & \to \text{si bool E \pointeur sinon E}
-            \end{aligned}$}
-        };
+        \node (boxq4) [draw, inner sep=1mm, red, thick, fit=(q4)] {};
     }
 
     \node (q5) [state, right=of q2, xshift=30mm] {
         $\begin{aligned}
-            \underline{I} & \to \text{si bool E sinon \pointeur E} \\
-            \text{E}      & \to \pointeur \text{instr}
+            \axiomcolour{I} & \to \text{si bool}~\ntcolour{E}~\text{sinon} \pointeur \ntcolour{E} \\
+            \ntcolour{E}    & \to \pointeur \text{instr}
         \end{aligned}$
     };
 
     \node (q6) [state, above=of q5] {
         $\begin{aligned}
-            \underline{I} & \to \text{si bool E sinon E \pointeur}
+            \axiomcolour{I} & \to \text{si bool}~\ntcolour{E}~\text{sinon}~\ntcolour{E} \pointeur
         \end{aligned}$
     };
 
     \node (q7) [state, right=of q2, xshift=4mm] {
-        $\text{E} \to \text{instr} \pointeur$
+        $\ntcolour{E} \to \text{instr} \pointeur$
     };
 
     \path[->, every node/.style={font=\footnotesize}]
-        (q1)  edge              node                           {si}    (q2)
-        (q2)  edge              node                           {bool}  (q3)
-        (q3)  edge              node                           {E}     (q4)
-        (q4)  edge              node                           {sinon} (q5)
-        (q5)  edge              node                           {E}     (q6)
-        (q3)  edge              node [auto=right]              {instr} (q7)
-        (q5)  edge              node [auto=right]              {instr} (q7);
+        (q1)  edge node              {si}           (q2)
+        (q2)  edge node              {bool}         (q3)
+        (q3)  edge node              {\ntcolour{E}} (q4)
+        (q4)  edge node              {sinon}        (q5)
+        (q5)  edge node              {\ntcolour{E}} (q6)
+        (q3)  edge node [auto=right] {instr}        (q7)
+        (q5)  edge node [auto=right] {instr}        (q7);
 
 \end{tikzpicture}

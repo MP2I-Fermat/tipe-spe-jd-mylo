@@ -12,19 +12,6 @@
 \end{frame}
 \addtocounter{framenumber}{-1}
 
-%\subsection{Construction de l’automate LR(0)}
-
-%\begin{frame}
-%    \frametitle{Construction de l’automate LR(0)}
-%
-%    \begin{center}
-%    \maxsizebox{\textwidth}{0.8\textheight}{
-%        \input{tikz/5annexes/LR0_automaton.tex}
-%    }
-%    \end{center}
-%\end{frame}
-%\addtocounter{framenumber}{-1}
-
 \subsection{Limitations de LR(0)~: exemples de conflits}
 
 \begin{frame}
@@ -46,7 +33,7 @@
     Que faire~?
     \pause
     \begin{itemize}
-        \item Réduire $\underline{I} \to \text{\textit{si bool E}}$~?
+        \item Réduire $\axiomcolour{I} \to \text{\textit{si bool \ntcolour{E}}}$~?
         \pause
         \item Essayer de lire $sinon$~?
     \end{itemize}
@@ -68,7 +55,7 @@
     \pause
     \begin{itemize}
         \item Si c’est la fin du fichier (\lozenge), réduire
-            $\underline{I} \to \text{\textit{si bool E}}$~;
+            $\axiomcolour{I} \to \text{\textit{si bool \ntcolour{E}}}$~;
         \pause
         \item Si c’est $sinon$, lire.
     \end{itemize}
@@ -85,9 +72,9 @@
     Deux choix~:
     \pause
     \begin{itemize}
-        \item Réduire $A \to \dots$~;
+        \item Réduire $\ntcolour{A} \to \dots$~;
         \pause
-        \item Réduire $B \to \dots$.
+        \item Réduire $\ntcolour{B} \to \dots$.
     \end{itemize}
 
     \pause
@@ -106,9 +93,9 @@
     \pause
     \begin{itemize}
         \item Si c’est $a$, $b$ ou la fin du fichier (\lozenge), réduire
-            $A \to \dots$~;
+            $\ntcolour{A} \to \dots$~;
         \pause
-        \item Si c’est $c$ ou $d$, réduire $B \to \dots$.
+        \item Si c’est $c$ ou $d$, réduire $\ntcolour{B} \to \dots$.
     \end{itemize}
 \end{frame}
 \addtocounter{framenumber}{-1}

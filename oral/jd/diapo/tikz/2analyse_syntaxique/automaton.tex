@@ -8,8 +8,8 @@
 
     \node (q0) [state, initial, initial text={}] {
         $\begin{aligned}
-            \underline{P} & \to \pointeur \text{V égal E} \\
-            V             & \to \pointeur \text{id}
+            \axiomcolour{P} & \to \pointeur \ntcolour{V}~\text{égal}~\ntcolour{E} \\
+            \ntcolour{V}    & \to \pointeur \text{id}
         \end{aligned}$
     };
 
@@ -21,7 +21,7 @@
     }
 
     \node (q1) [state, above=of q0] {
-        $ V \to \text{id} \pointeur $
+        $ \ntcolour{V} \to \text{id} \pointeur $
     };
 
     \uncover<5>{
@@ -30,7 +30,7 @@
     }
 
     \node (q2) [state, below=of q0] {
-        $ \underline{P} \to \text{V \pointeur égal E} $
+        $ \axiomcolour{P} \to \ntcolour{V} \pointeur \text{égal}~\ntcolour{E} $
     };
 
     \uncover<7-31>{
@@ -45,9 +45,9 @@
 
     \node (q3) [state, below=of q2] {
         $\begin{aligned}
-            \underline{P} & \to \text{V égal \pointeur E} \\
-            E             & \to \pointeur \text{ent} \\
-            E             & \to \pointeur \text{parg E O E pard}
+            \axiomcolour{P} & \to \ntcolour{V}~\text{égal} \pointeur \ntcolour{E} \\
+            \ntcolour{E}    & \to \pointeur \text{ent} \\
+            \ntcolour{E}    & \to \pointeur \text{parg}~\ntcolour{E O E}~\text{pard}
         \end{aligned}$
     };
 
@@ -62,7 +62,7 @@
     }
 
     \node (q3bis) [state, below=of q3] {
-        $ \underline{P} \to \text{V égal E \pointeur} $
+        $ \axiomcolour{P} \to \ntcolour{V}~\text{égal}~\ntcolour{E} \pointeur $
     };
 
     \uncover<31>{
@@ -71,7 +71,7 @@
     }
 
     \node (q4) [state, right=of q3] {
-        $ E \to \text{ent} \pointeur $
+        $ \ntcolour{E} \to \text{ent} \pointeur $
     };
 
     \uncover<10, 17, 23>{
@@ -83,9 +83,9 @@
 
     \node (q5) [state, above right=of q3] {
         $\begin{aligned}
-            E & \to \text{parg \pointeur E O E pard} \\
-            E & \to \text{\pointeur ent} \\
-            E & \to \text{\pointeur parg E O E pard}
+            \ntcolour{E} & \to \text{parg} \pointeur \ntcolour{E O E}~\text{pard} \\
+            \ntcolour{E} & \to \text{\pointeur ent} \\
+            \ntcolour{E} & \to \text{\pointeur parg}~\ntcolour{E O E}~\text{pard}
         \end{aligned}$
     };
 
@@ -110,9 +110,9 @@
 
     \node (q6) [state, above=of q5] {
         $\begin{aligned}
-            E & \to \text{parg E \pointeur O E pard} \\
-            O & \to \pointeur \text{plus} \\
-            O & \to \pointeur \text{fois}
+            \ntcolour{E} & \to \text{parg}~\ntcolour{E \pointeur O E}~\text{pard} \\
+            \ntcolour{O} & \to \pointeur \text{plus} \\
+            \ntcolour{O} & \to \pointeur \text{fois}
         \end{aligned}$
     };
 
@@ -137,7 +137,7 @@
     }
 
     \node (q7) [state, above left=of q6, xshift=15mm] {
-        $ O \to \text{plus} \pointeur $
+        $ \ntcolour{O} \to \text{plus} \pointeur $
     };
     \uncover<20>{
         \node (boxq7) [draw, inner sep=1mm, blue, thick, fit=(q7)] {};
@@ -145,7 +145,7 @@
     }
 
     \node (q8) [state, above right=of q6, xshift=-15mm] {
-        $ O \to \text{fois} \pointeur $
+        $ \ntcolour{O} \to \text{fois} \pointeur $
     };
     \uncover<13>{
         \node (boxq8) [draw, inner sep=1mm, blue, thick, fit=(q8)] {};
@@ -154,9 +154,9 @@
 
     \node (q9) [state, right=of q6] {
         $\begin{aligned}
-            E & \to \text{parg E O \pointeur E pard} \\
-            E & \to \pointeur \text{ent} \\
-            E & \to \pointeur \text{parg E O E pard}
+            \ntcolour{E} & \to \text{parg}~\ntcolour{E O \pointeur E}~\text{pard} \\
+            \ntcolour{E} & \to \pointeur \text{ent} \\
+            \ntcolour{E} & \to \pointeur \text{parg}~\ntcolour{E O E}~\text{pard}
         \end{aligned}$
     };
 
@@ -187,7 +187,7 @@
     }
 
     \node (q10) [state, below right=of q9, xshift=-25mm] {
-        $ E \to \text{parg E O E \pointeur pard} $
+        $ \ntcolour{E} \to \text{parg}~\ntcolour{E O E} \pointeur \text{pard} $
     };
     \uncover<25-26, 28-29>{
         \uncover<25, 28>{
@@ -205,7 +205,7 @@
     }
 
     \node (q11) [state, below=of q10] {
-        $ E \to \text{parg E O E pard \pointeur} $
+        $ \ntcolour{E} \to \text{parg}~\ntcolour{E O E}~\text{pard} \pointeur $
     };
     \uncover<26, 29>{
         \node (boxq11) [draw, inner sep=1mm, blue, thick, fit=(q11)] {};
@@ -214,21 +214,21 @@
 
 
     \path[->, every node/.style={font=\footnotesize}]
-        (q0)  edge              node [swap]                    {id}    (q1)
-              edge              node                           {V}     (q2)
-        (q2)  edge              node                           {égal}  (q3)
-        (q3)  edge              node [auto=right]              {ent}   (q4)
-              edge              node                           {parg}  (q5)
-              edge              node                           {E}     (q3bis)
-        (q5)  edge [loop right] node [yshift=4mm, xshift=-1mm] {parg}  ()
-              edge              node                           {ent}   (q4)
-              edge              node                           {E}     (q6)
-        (q6)  edge              node [yshift=2.5mm]            {plus}  (q7)
-              edge              node [yshift=-2.5mm]           {fois}  (q8)
-              edge              node                           {O}     (q9)
-        (q9)  edge              node [auto=right, yshift=-1mm] {parg}  (q5)
-              edge [bend left]  node                           {ent}   (q4)
-              edge              node [yshift=-2.1mm]           {E}     (q10)
-        (q10) edge              node                           {pard}  (q11);
+        (q0)  edge              node [swap]                    {id}           (q1)
+              edge              node                           {\ntcolour{V}} (q2)
+        (q2)  edge              node                           {égal}         (q3)
+        (q3)  edge              node [auto=right]              {ent}          (q4)
+              edge              node                           {parg}         (q5)
+              edge              node                           {\ntcolour{E}} (q3bis)
+        (q5)  edge [loop right] node [yshift=4mm, xshift=-1mm] {parg}         ()
+              edge              node                           {ent}          (q4)
+              edge              node                           {\ntcolour{E}} (q6)
+        (q6)  edge              node [yshift=2.5mm]            {plus}         (q7)
+              edge              node [yshift=-2.5mm]           {fois}         (q8)
+              edge              node                           {\ntcolour{O}} (q9)
+        (q9)  edge              node [auto=right, yshift=-1mm] {parg}         (q5)
+              edge [bend left]  node                           {ent}          (q4)
+              edge              node [yshift=-2.1mm]           {\ntcolour{E}} (q10)
+        (q10) edge              node                           {pard}         (q11);
 
 \end{tikzpicture}
