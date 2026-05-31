@@ -99,13 +99,6 @@
 \begin{frame}
     \frametitle{Automates}
 
-    \only<1>{\input{tikz/2analyse_syntaxique/grammaire_longue.tex}}
-    \only<2>{\input{tikz/2analyse_syntaxique/grammaire_courte.tex}}
-\end{frame}
-
-\begin{frame}
-    \frametitle{Automates}
-
     \begin{minipage}{0.3\textwidth}
     \input{tikz/2analyse_syntaxique/grammaire_courte.tex}
     \end{minipage}%
@@ -197,11 +190,27 @@
 \begin{frame}
     \frametitle{Algorithme LR(0) sur un exemple}
 
-    \[x = (3 \times (1 + 2))\]
-
+    \begin{minipage}{0.5\textwidth}
+    \[
+        \underbrace{
+            \overbrace{
+                \texttt{x}
+            }^\text{\tiny V \normalsize}
+            \texttt{=}
+            \overbrace{
+                \texttt{(3 ×} \overbrace{
+                    \texttt{(1 + 2)}
+                }^\text{\tiny E \normalsize}
+                \texttt{)}
+            }^\text{\tiny E \normalsize}
+        }_\underline{\text{\tiny P\normalsize}}
+    \]
+    \end{minipage}%
+    \begin{minipage}{0.5\textwidth}
     \begin{center}
         \input{tikz/2analyse_syntaxique/arbre_final.tex}%
     \end{center}
+    \end{minipage}
 
     \pause
     En pratique, LR(0) a quelques limitations et on utilise sa variante LR(1).

@@ -1,22 +1,53 @@
 
 \begin{center}
 \begin{tikzpicture}[node distance=0mm and 30mm]
-  \node (source) [draw, rectangle] {
-      \mintinline{ocaml}{let f x = x}
-  };
-
-  \uncover<2-> {
-    \node (tokens) [draw, rectangle, right=of source] {
-      \begin{minipage}{0.25\textwidth}
-        (\mintinline{text}{let}, \mintinline{ocaml}{let}), \\
-        (\mintinline{text}{identifier}, \mintinline{ocaml}{f}), \\
-        (\mintinline{text}{identifier}, \mintinline{ocaml}{x}), \\
-        (\mintinline{text}{equals}, \mintinline{ocaml}{=}), \\
-        (\mintinline{text}{identifier}, \mintinline{ocaml}{x})
-      \end{minipage}
+    \matrix (chars) [
+        matrix of nodes,
+        row sep=-\pgflinewidth,
+        column sep=-\pgflinewidth,
+        nodes={draw, rectangle, align=center, text width=1.25ex},
+        nodes in empty cells,
+        text depth=0.25ex,
+        text height=1ex
+    ] {
+        \texttt{l} &
+        \texttt{e} &
+        \texttt{t} &
+        \texttt{ } &
+        \texttt{p} &
+        \texttt{l} &
+        \texttt{u} &
+        \texttt{s} &
+        \texttt{\_} &
+        \texttt{u} &
+        \texttt{n} &
+        \texttt{ } &
+        \texttt{x} &
+        \texttt{ } &
+        \texttt{=} &
+        \texttt{ } &
+        \texttt{x} &
+        \texttt{+} &
+        \texttt{1} \\
     };
 
-    \draw (source) edge[->] node {} (tokens);
-  }
+    \matrix (tokens) [
+        matrix of nodes,
+        row sep=-\pgflinewidth,
+        column sep=-\pgflinewidth,
+        nodes={draw, rectangle, align=center, visible on=<4->},
+        nodes in empty cells,
+        text depth=0.25ex,
+        text height=1ex,
+        below=of chars
+    ] {
+        \mintinline{ocaml}{let} &
+        \texttt{plus\_un} &
+        \texttt{=} &
+        \texttt{x} &
+        \texttt{+} &
+        \texttt{1} \\
+    };
+
 \end{tikzpicture}
 \end{center}
