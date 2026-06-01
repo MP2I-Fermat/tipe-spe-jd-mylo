@@ -1,1 +1,2 @@
-type 'a token = { token_type : 'a; value : string; start : int; length : int }
+type tok_type = | Identifiant | Entier | Plus | ...
+type token = { typ : tok_type; value : string; start : int; length : int }
