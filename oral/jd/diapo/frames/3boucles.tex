@@ -2,6 +2,51 @@
 \label{secloops}
 \section{Mise sous forme de boucles}
 
+\begin{frame}
+    \frametitle{Mise sous forme de boucles}
+
+    \begin{minipage}{0.5\textwidth}
+        \inputminted{ocaml}{exemples/0intro/somme_liste_rec_court.ml}
+    \end{minipage}%
+    \begin{minipage}{0.5\textwidth}
+        \inputminted{ocaml}{exemples/3boucles/somme_liste_tailrec_court.ml}
+    \end{minipage}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Mise sous forme récursive terminale}
+
+    \maxsizebox{\textwidth}{0.8\textheight}{
+        \begin{tikzpicture}
+            \node (source) [draw, rectangle] {
+                \begin{minipage}{0.4\textwidth}
+                    \inputminted{ocaml}{exemples/0intro/somme_liste_rec_court.ml}
+                \end{minipage}
+            };
+            \node (machine) [right=of source] {
+                \begin{minipage}{0.3\textwidth}
+                    \begin{center}
+                    \begin{tikzpicture}
+                        \draw[thick] \gear{8}{1}{1.2}{10}{2};
+                        \path circle(0.5);
+                        \draw[thick,double distance=2pt,fill=white] circle(0.85);
+                    \end{tikzpicture}
+
+                    Algorithme de passage sous forme récursive terminale
+                    \end{center}
+                \end{minipage}
+            };
+            \node (destination) [draw, rectangle, right=of machine] {
+                \begin{minipage}{0.45\textwidth}
+                    \inputminted{ocaml}{exemples/3boucles/somme_liste_tailrec_court.ml}
+                \end{minipage}
+            };
+            \draw (source) edge[->] node {} (machine);
+            \draw (machine) edge[->] node {} (destination);
+        \end{tikzpicture}
+    }
+\end{frame}
+
 \begin{frame}[fragile]
     \frametitle{Remplacement des appels récursifs}
     \setminted{escapeinside=##}
@@ -39,65 +84,3 @@
     }
 \end{frame}
 
-
-\begin{frame}
-    \frametitle{Mise sous forme de boucles}
-
-    \begin{minipage}{0.5\textwidth}
-        \inputminted{ocaml}{exemples/0intro/somme_liste_rec_court.ml}
-    \end{minipage}%
-    \begin{minipage}{0.5\textwidth}
-        \only<1>{
-            \inputminted{ocaml}{exemples/3boucles/somme_liste_tailrec_court.ml}
-        }
-    \end{minipage}
-\end{frame}
-
-\begin{frame}
-    \frametitle{Problème}
-
-    \begin{center}
-        \begin{minipage}{0.5\textwidth}
-            \only<1>{
-                \inputminted{ocaml}{exemples/0intro/somme_liste_rec_court.ml}
-            }%
-            \only<2>{
-                \inputminted{ocaml}{exemples/3boucles/probleme.ml}
-            }
-        \end{minipage}
-    \end{center}
-\end{frame}
-
-\begin{frame}
-    \frametitle{Mise sous forme récursive terminale}
-
-    \maxsizebox{\textwidth}{0.8\textheight}{
-        \begin{tikzpicture}
-            \node (source) [draw, rectangle] {
-                \begin{minipage}{0.4\textwidth}
-                    \inputminted{ocaml}{exemples/0intro/somme_liste_rec_court.ml}
-                \end{minipage}
-            };
-            \node (machine) [right=of source] {
-                \begin{minipage}{0.3\textwidth}
-                    \begin{center}
-                    \begin{tikzpicture}
-                        \draw[thick] \gear{8}{1}{1.2}{10}{2};
-                        \path circle(0.5);
-                        \draw[thick,double distance=2pt,fill=white] circle(0.85);
-                    \end{tikzpicture}
-
-                    Algorithme de passage sous forme récursive terminale
-                    \end{center}
-                \end{minipage}
-            };
-            \node (destination) [draw, rectangle, right=of machine] {
-                \begin{minipage}{0.45\textwidth}
-                    \inputminted{ocaml}{exemples/3boucles/somme_liste_tailrec_court.ml}
-                \end{minipage}
-            };
-            \draw (source) edge[->] node {} (machine);
-            \draw (machine) edge[->] node {} (destination);
-        \end{tikzpicture}
-    }
-\end{frame}
