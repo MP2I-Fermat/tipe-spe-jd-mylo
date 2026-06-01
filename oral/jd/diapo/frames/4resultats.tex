@@ -2,6 +2,23 @@
 \section{Conclusion}
 
 \begin{frame}
+    \frametitle{Conclusion}
+
+    Temps d’exécution sur la fonction récursive \mintinline{ocaml}{somme}~:
+    \pause
+    \begin{itemize}
+        \item Analyse lexicale~: 0,0803~\si{\second}~;
+        \pause
+        \item Construction de l’automate LR(1)~: 4,6386~\si{\second}~;
+        \pause
+        \item Analyse syntaxique~: 0,0910~\si{\second}~;
+        \pause
+        \item Transformation en boucle~: 0,0006~\si{\second}.
+    \end{itemize}
+
+\end{frame}
+
+\begin{frame}
   \frametitle{Conclusion}
 
   Résultats sur la somme d’une liste à $50\times 10^6$ éléments~:
