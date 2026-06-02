@@ -5,13 +5,13 @@
     node [xshift=13.9mm] (call) {}
     ([yshift=-4pt, xshift=1mm]pic cs:stopcall);
 
-  \draw<4->[blue, thick, rounded corners]
+  \draw<4->[turquoise, thick, rounded corners]
     ([yshift=9pt, xshift=-1mm]pic cs:startreturn)
     rectangle
     node [xshift=1.75mm] (return) {}
     ([yshift=-4pt, xshift=1mm]pic cs:stopreturn);
 
-  \draw<6->[orange, thick, rounded corners]
+  \draw<7->[orange, thick, rounded corners]
     ([yshift=9pt, xshift=-1mm]pic cs:startarg)
     rectangle
     ([yshift=-4pt, xshift=1mm]pic cs:stoparg);
@@ -22,14 +22,17 @@
               \inputminted{ocaml}{exemples/3boucles/new_return.ml}
           \end{minipage}
       };
+      % i have no idea why there is such a shift but hey, at least
+      % it works
+      \draw ([yshift=-0.85mm+48pt]pic cs:newreturn) edge[->] (return);
+  }
+
+  \only<6->{
       \node [right=6mm of call, yshift=-1mm] (newcall) {
           \begin{minipage}{0.4\textwidth}
               \inputminted{ocaml}{exemples/3boucles/new_call.ml}
           \end{minipage}
       };
-      % i have no idea why there is such a shift but hey, at least
-      % it works
-      \draw ([yshift=-0.85mm+48pt]pic cs:newreturn) edge[->] (return);
       \draw ([yshift=1.39mm+15pt]pic cs:newcall) edge[->] (call);
   }
 

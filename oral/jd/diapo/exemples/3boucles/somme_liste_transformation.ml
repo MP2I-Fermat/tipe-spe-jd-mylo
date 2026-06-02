@@ -1,4 +1,4 @@
-let rec somme l a =
+let rec somme_rt l a =
   let c = ref true in
   let res = ref None in
   let l' = l in
@@ -6,4 +6,4 @@ let rec somme l a =
   match #\tikzmark{startarg}#l#\tikzmark{stoparg}# with
   | [] -> #\tikzmark{startreturn}#a#\tikzmark{stopreturn}#
   | x::q ->
-      #\tikzmark{startcall}#somme q (a+x)#\tikzmark{stopcall}#
+      #\tikzmark{startcall}#somme_rt q (a+x)#\tikzmark{stopcall}#
