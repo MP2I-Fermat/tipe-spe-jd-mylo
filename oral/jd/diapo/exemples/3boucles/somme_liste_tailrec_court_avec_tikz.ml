@@ -1,6 +1,6 @@
-let rec somme l a =
+let rec somme_rt l a =
   #\tikzmark{fleche}#
   match l with
   | [] -> a
   | x::q ->
-      somme q (a+x)
+      somme_rt q (a+x)
