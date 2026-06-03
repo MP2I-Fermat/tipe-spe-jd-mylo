@@ -17,14 +17,14 @@
     ([yshift=-4pt, xshift=1mm]pic cs:stoparg);
 
   \only<5->{
-      \node [right=22.15mm of return, yshift=1mm] (newreturn) {
+      \node [right=25.22mm of return, yshift=1mm] (newreturn) {
           \begin{minipage}{0.4\textwidth}
               \inputminted{ocaml}{exemples/3boucles/new_return.ml}
           \end{minipage}
       };
       % i have no idea why there is such a shift but hey, at least
       % it works
-      \draw ([yshift=-0.85mm+48pt]pic cs:newreturn) edge[->] (return);
+      \draw ([yshift=-0.85mm+48pt, xshift=6mm]pic cs:newreturn) edge[->] (return);
   }
 
   \only<6->{
@@ -33,7 +33,7 @@
               \inputminted{ocaml}{exemples/3boucles/new_call.ml}
           \end{minipage}
       };
-      \draw ([yshift=1.39mm+15pt]pic cs:newcall) edge[->] (call);
+      \draw ([yshift=1.39mm+15pt, xshift=6mm]pic cs:newcall) edge[->] ([xshift=4mm] call);
   }
 
 \end{tikzpicture}
