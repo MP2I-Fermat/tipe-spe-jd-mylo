@@ -1,29 +1,34 @@
-\maxsizebox{\textwidth}{0.8\textheight}{
-    \begin{tikzpicture}
-        \node (source) [draw, rectangle] {
+%\maxsizebox{\textwidth}{0.8\textheight}{
+    \begin{tikzpicture}[
+            node distance=15mm and 5mm
+        ]
+        \node (source) {
             \begin{minipage}{0.4\textwidth}
                 \inputminted{ocaml}{exemples/0intro/somme_liste_rec_court.ml}
             \end{minipage}
         };
-        \node (machine) [right=of source] {
-            \begin{minipage}{0.3\textwidth}
-                \begin{center}
-                \begin{tikzpicture}
-                    \draw[thick] \gear{8}{1}{1.2}{10}{2};
-                    \path circle(0.5);
-                    \draw[thick,double distance=2pt,fill=white] circle(0.85);
-                \end{tikzpicture}
-
-                Algorithme de passage sous forme récursive terminale
-                \end{center}
-            \end{minipage}
-        };
-        \node (destination) [draw, rectangle, right=of machine] {
+        \node (midpoint) [right=of source] {};
+        \node (destination) [right=of midpoint] {
             \begin{minipage}{0.48\textwidth}
                 \inputminted{ocaml}{exemples/3boucles/somme_liste_tailrec_court.ml}
             \end{minipage}
         };
-        \draw (source) edge[->] node {} (machine);
-        \draw (machine) edge[->] node {} (destination);
+        \uncover<2->{
+            \node (machine) [below=of midpoint] {
+                \begin{minipage}{0.3\textwidth}
+                    \begin{center}
+                    \begin{tikzpicture}
+                        \draw[thick] \gear{8}{1}{1.2}{10}{2};
+                        \path circle(0.5);
+                        \draw[thick,double distance=2pt,fill=white] circle(0.85);
+                    \end{tikzpicture}
+
+                    Algorithme de passage sous forme récursive terminale
+                    \end{center}
+                \end{minipage}
+            };
+            \draw [->] (source) |- node {} (machine.west);
+            \draw [<-] (destination.south) |- node {} (machine.east);
+        }
     \end{tikzpicture}
-}
+%}
