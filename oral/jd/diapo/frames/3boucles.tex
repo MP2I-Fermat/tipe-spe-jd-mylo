@@ -5,7 +5,11 @@
 \begin{frame}
     \frametitle{Mise sous forme récursive terminale}
 
-    \input{tikz/3boucles/tail_recursive.tex}
+    \begin{adjustwidth}{-1.5 em}{-1.5em}
+        \begin{center}
+            \input{tikz/3boucles/tail_recursive.tex}
+        \end{center}
+    \end{adjustwidth}
 \end{frame}
 
 \begin{frame}[fragile]
@@ -20,7 +24,7 @@
         \end{center}
     }
 
-    \only<3-6>{
+    \only<3-7>{
         \begin{center}
             \inputminted{ocaml}{exemples/3boucles/somme_liste_transformation.ml}
 
@@ -28,7 +32,7 @@
         \end{center}
     }
 
-    \only<7> {
+    \only<8> {
         \begin{center}
             \inputminted{ocaml}{exemples/3boucles/somme_liste_transformation2.ml}
 
@@ -36,7 +40,7 @@
         \end{center}
     }
 
-    \only<8> {
+    \only<9> {
         \maxsizebox{\textwidth}{0.45\textheight}{
             \begin{minipage}{\textwidth}
                 \inputminted{ocaml}{exemples/3boucles/somme_liste_boucle_court.ml}
