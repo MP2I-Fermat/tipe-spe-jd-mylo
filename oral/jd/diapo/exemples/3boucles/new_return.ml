@@ -1,2 +1,2 @@
 c := false;
-res := Some a'
+res := Some !a'
