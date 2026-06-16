@@ -1,0 +1,48 @@
+\documentclass[11pt,a4paper,fleqn]{article}
+
+\input{packages_MPI.tex}
+
+\colorlet{expli}{gray}
+\input{mise_en_forme_MPI.tex}
+
+% Disable _ in the entire file.
+\catcode95=11
+
+\begin{document}
+\pagestyle{fancy} %active les pieds de pages
+
+\titreRenduCode{Réécriture du code récursif à l'aide de boucles}{Juin 2026}
+
+\tableofcontents
+
+\pagebreak
+
+%======================================
+% \subsection{Code du fichier \mintinline{text}{nom_fichier.c}}
+% \inputminted[firstline=1,lastline=20]{c}{code/triangle.c}
+
+
+\section{caml_light.grammar}
+\inputminted[breaklines=true]{text}{../../caml_light.grammar}
+\pagebreak
+
+\foreach \name in {
+        automaton.ml,
+        caml_light.ml,
+        grammar_grammar.ml,
+        lexer.ml,
+        parser.ml,
+        rectify_helper.ml,
+        rectify.ml,
+        regex_grammar.ml,
+        regex.ml,
+        utils.ml,
+        while_cli.ml,
+        while.ml}{
+        \section{\name}
+        \inputminted[]{ocaml}{../../src/\name}
+        \pagebreak
+    }
+
+\label{lastpage}
+\end{document}
