@@ -1,0 +1,235 @@
+\section{Représentation des programmes}
+\subsection{Arbres de syntaxe abstraits}
+
+\begin{frame}[fragile,t]
+    \frametitle{Arbres de syntaxe abstraits (AST)}
+
+    \begin{minted}{ocaml}
+let rec sum (l : int list) : int =
+    match l with
+    | [] -> 0
+    | x :: q -> x + sum q
+    \end{minted}
+
+    \pause
+
+    \maxsizebox{\textwidth}{0.6\textheight}{
+        \begin{forest}
+            [{\texttt{FunctionDefinition(isRec: true, name: sum)}}
+            [{body: \texttt{Match}},s sep=3cm
+            [value : \texttt{Variable(l)}]
+            [cases,s sep=3cm
+            [\texttt{MatchCase}
+            [{pattern : \texttt{EmptyList}},tier=forAlignment]
+            [{expression : \texttt{Integer(0)}},tier=forAlignment]
+            ]
+            [\texttt{MatchCase},tier=forAlignment
+            [pattern : \texttt{Concatenation}[...]]
+            [expression : \texttt{Addition}
+            [lhs : \texttt{Variable(x)}]
+            [rhs : ...]
+            ]
+            ]
+            ]
+            ]
+            [parameters: ...]
+            [returnType: ...]
+            ]
+        \end{forest}
+    }
+\end{frame}
+
+\begin{frame}[fragile,t]
+    \frametitle{AST : Limitations}
+
+    Les AST sont peu adaptés aux algorithmes demandant une connaissance de
+    l'ordre d'évaluation du programme.
+
+    \vspace{0.5cm}
+
+    \begin{minipage}[t]{0.5\textwidth}
+        \begin{minted}{ocaml}
+a + b
+        \end{minted}
+
+        \begin{forest}
+            [\texttt{Addition}
+                [\texttt{Variable(a)}]
+                [\texttt{Variable(b)}]]
+        \end{forest}
+
+        \only<2->{
+            \begin{enumerate}
+                \item \texttt{b}
+                \item \texttt{a}
+                \item \texttt{Addition}
+            \end{enumerate}
+        }
+    \end{minipage}%
+    \begin{minipage}[t]{0.5\textwidth}
+        \begin{minted}{ocaml}
+if a then b
+        \end{minted}
+
+        \begin{forest}
+            [\texttt{If}
+                [\texttt{Variable(a)}]
+                [\texttt{Variable(b)}]]
+        \end{forest}
+
+        \only<2->{
+            \begin{enumerate}
+                \item \texttt{a}
+                \item (Peut-être) \texttt{b}
+            \end{enumerate}
+        }
+    \end{minipage}
+
+    \vspace{0.5cm}
+
+    \only<3->{
+        \textcolor{orange}{$\blacktriangleright$} On préférerait une structure ne nécessitant pas de discriminer selon les étiquettes des nœuds.
+    }
+\end{frame}
+
+\subsection{Formes linéaires}
+
+\begin{frame}[fragile,t]
+    \frametitle{Formes linéaires}
+
+    \begin{itemize}
+        \item La \important{forme linéaire} d'un programme est une liste
+              d'étapes d'évaluation du programme.
+        \item Chaque étape est désignée par un identifiant.
+
+        \item Les étapes conditionnelles contiennent d'autres listes
+              d'étapes.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{Formes linéaires}
+
+    \begin{minipage}{0.5\textwidth}
+        \begin{minted}{ocaml}
+if a = 2 then
+    b * 3
+else
+    a - 2
+        \end{minted}
+    \end{minipage}%
+    \begin{minipage}{0.5\textwidth}
+        \small \begin{align*}
+            a_1 :=\  & \texttt{2}                                      \\
+            a_2 :=\  & \texttt{a}                                      \\
+            a_3 :=\  & a_2 \texttt{ = } a_1                            \\
+            a_4 :=\  & \texttt{if } a_3 \texttt{ then}                 \\
+                     & \hspace{0.5cm} \begin{aligned}
+                                          a_5 & := 3                    \\
+                                          a_6 & := b                    \\
+                                          a_7 & := a_6 \texttt{ * } a_5
+                                      \end{aligned}    \\
+                     & \texttt{else}                                   \\
+                     & \hspace{0.5cm} \begin{aligned}
+                                          a_8    & := 2                    \\
+                                          a_9    & := a                    \\
+                                          a_{10} & := a_9 \texttt{ - } a_8
+                                      \end{aligned}
+        \end{align*}
+    \end{minipage}
+\end{frame}
+
+\subsection{Linéarisation et délinéarisation}
+
+\begin{frame}[t]
+    \frametitle{Linéarisation}
+
+    On définit inductivement la linéarisation :
+
+    \begin{itemize}
+        \pause
+        \item Linéariser(\texttt{a + b}) = Linéariser(\texttt{b}).Linéariser(\texttt{a}).[$a_k$ := $a_i$ \texttt{+} $a_j$] \\
+              \pause
+        \item Linéariser(\texttt{if a then b}) = \\
+              \hspace{0.5cm} Linéariser(\texttt{a}).[$a_k$ := \texttt{if} $a_i$ \texttt{then} Linéariser(\texttt{b})]
+              \pause
+        \item ...
+    \end{itemize}
+    \small \textit{Avec $a_k$, $a_i$ et $a_j$ choisis en fonction des noms déjà utilisés}
+\end{frame}
+
+\begin{frame}[fragile,t]
+    \frametitle{Délinéarisation}
+
+    On peut aussi définir un algorithme transformant une forme linéaire en un
+    programme \texttt{OCaml}:
+
+    $$a_k := expr \longrightarrow \texttt{let a\_k = expr}$$
+
+    \vspace{0.5cm}
+    \pause
+
+    \begin{minipage}{0.5\textwidth}
+        Délinéariser\small$\left(\begin{aligned}
+                    a_1 & := \texttt{a}                                \\
+                    a_2 & := \texttt{2}                                \\
+                    a_3 & := a_1 \texttt{ = } a_2                      \\
+                    a_4 & := \texttt{if } a_3 \texttt{ then}           \\
+                        & \hspace{0.5cm} \begin{aligned}
+                                             a_5 & := 3                    \\
+                                             a_6 & := b                    \\
+                                             a_7 & := a_6 \texttt{ * } a_5
+                                         \end{aligned} \\
+                        & \texttt{else } ...
+                \end{aligned}\right)$
+    \end{minipage}=%
+    \begin{minipage}{0.45\textwidth}
+        \small \begin{minted}{ocaml}
+let a_1 = a in
+let a_2 = 2 in
+let a_3 = a_1 = a_2 in
+if a_3 then
+    let a_5 = 3 in
+    let a_6 = b in
+    a_6 * a_5
+else
+    ...
+            \end{minted}
+    \end{minipage}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile,t]
+    \frametitle{Délinéarisation}
+
+    On peut aussi définir un algorithme transformant une forme linéaire en un
+    programme \texttt{OCaml}:
+
+    $$a_k := expr \longrightarrow \texttt{let a\_k = expr}$$
+
+    \vspace{0.5cm}
+
+    \begin{minipage}{0.5\textwidth}
+        Délinéariser\small$\left(\begin{aligned}
+                    a_1 & := \texttt{a}                                \\
+                    a_2 & := \texttt{2}                                \\
+                    a_3 & := a_1 \texttt{ = } a_2                      \\
+                    a_4 & := \texttt{if } a_3 \texttt{ then}           \\
+                        & \hspace{0.5cm} \begin{aligned}
+                                             a_5 & := 3                    \\
+                                             a_6 & := b                    \\
+                                             a_7 & := a_6 \texttt{ * } a_5
+                                         \end{aligned} \\
+                        & \texttt{else } ...
+                \end{aligned}\right)$
+    \end{minipage}=%
+    \begin{minipage}{0.45\textwidth}
+        \small \begin{minted}{ocaml}
+if a = 2 then
+    b * 3
+else
+    a - 2
+            \end{minted}
+    \end{minipage}
+\end{frame}
+

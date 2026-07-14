@@ -1,0 +1,35 @@
+\documentclass[compress]{beamer} % En animé
+%\documentclass[trans]{beamer} % En superposé
+
+\newcommand{\couleur}[1]{{\usebeamercolor[fg]{structure}#1}}
+\newcommand{\important}[1]{\couleur{\textbf{#1}}}
+
+\newcommand{\initiales}{Mylo FAWCETT}
+
+\input{packages}
+\input{params}
+\input{palette}
+
+\begin{document}
+
+\title{Réécriture du code récursif à l'aide de boucles}
+\author{
+    \large Présentation de \important{Mylo FAWCETT (15980)} \\[0.2cm]
+    \footnotesize travail réalisé avec \couleur{Raphaël BOUÉ-MOREL (50792)} \\[0.4cm]
+    \vspace*{-1.2cm}
+}
+\date[Juin 2026]{}
+
+\begin{frame}[plain]
+    \titlepage
+    \addtocounter{framenumber}{-1}
+\end{frame}
+
+\include{sections/1_intro}
+\include{sections/2_cps}
+\include{sections/3_representation}
+\include{sections/4_rectification}
+\include{sections/5_conclusion}
+\include{sections/6_annexe}
+
+\end{document}

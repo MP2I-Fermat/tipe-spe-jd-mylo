@@ -765,7 +765,7 @@ let rec ast_of_syntax_tree (tree : (string, string) syntax_tree) : program =
             Leaf { token_type = "done" };
           ] ) ->
         let start_node = expression start in
-        let finish_node = expression start in
+        let finish_node = expression finish in
         let body_node = expression body in
 
         ForLoop

@@ -40,7 +40,19 @@ let rec f () : unit =
 
 type 'a tree = Leaf of 'a | Node of 'a tree list
 
-let rec visit_tree (f : 'a -> unit) (t : 'a tree) : unit =
+let rec visit_children f children =
+  match children with
+  | [] -> ()
+  | x :: q ->
+      visit_tree f x;
+      visit_children f q
+
+and visit_tree f tree =
+  match tree with
+  | Leaf label -> f label
+  | Node children -> visit_children f children
+
+let rec visit_tree2 (f : 'a -> unit) (t : 'a tree) : unit =
   let rec iter_list (g : 'b -> unit) (l : 'b list) : unit =
     match l with
     | [] -> ()
@@ -50,4 +62,4 @@ let rec visit_tree (f : 'a -> unit) (t : 'a tree) : unit =
   in
   match t with
   | Leaf l -> f l
-  | Node children -> iter_list (fun child -> visit_tree f child) children
+  | Node children -> iter_list (fun child -> visit_tree2 f child) children

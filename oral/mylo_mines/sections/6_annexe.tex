@@ -1,0 +1,402 @@
+\AtBeginSection[]{}
+\section{Annexe}
+
+\begin{frame}[plain]
+  \footnotesize \tableofcontents[currentsection,sectionstyle=show/hide,hideothersubsections,subsubsectionstyle=shaded/shaded/shaded/hide]
+  \addtocounter{framenumber}{-1}
+\end{frame}
+
+\subsection{Code}
+
+\addtocontents{toc}{\catcode95=11}
+\catcode95=11
+
+\tiny
+
+\subsubsection{caml_light.grammar}
+\texttt{caml_light.grammar}
+\inputminted[breaklines=true]{text}{../../caml_light.grammar}
+\pagebreak
+
+\foreach \name in {
+    automaton.ml,
+    caml_light.ml,
+    grammar_grammar.ml,
+    lexer.ml,
+    parser.ml,
+    rectify_helper.ml,
+    rectify.ml,
+    regex_grammar.ml,
+    regex.ml,
+    utils.ml,
+    while_cli.ml,
+    while.ml}{
+    \subsubsection{\name}
+    \texttt{\name}
+    \inputminted[]{ocaml}{../../src/\name}
+    \pagebreak
+  }
+
+\catcode95=8
+\addtocontents{toc}{\catcode95=8}
+
+\subsection{Algorithmes}
+
+\subsubsection{Rectifier}
+
+\tiny \begin{algorithm}[H]
+  \caption{Rectifier}
+  \Input{
+    Une forme linéaire correcte $l$ rectifiée par $E$ ne contenant pas de
+    variables nommées \texttt{cont} ou \texttt{new\_cont}.
+  }
+  \Output{
+    Une forme linéaire correcte $l'$ rectifiable par $E$ telle que toute
+    fonction de $E$ définie dans $l'$ soit récursive terminale, et pour
+    toute fonction $f$ et en notant $a$ la dernière variable de
+    $l$, $l.[(res, f\ a)]$ est équivalent à $[(\texttt{cont}, f)].l'$.
+  }
+
+  $(a, e) \leftarrow$ le premier élément de $l$ \\
+  $q \leftarrow$ le reste de $l$ \\
+
+  \uSi{$e$ contient une définition d'une fonction de $E$}{
+    Mettre à jour $e$ tel que la fonction définie dedans:
+    \begin{itemize}
+      \item Prenne un argument \texttt{cont} en plus
+      \item Évalue $Rectifier(l', E)$ lors de son appel o\`u $l'$
+            est la forme linéaire évaluée \\ avant cette redéfinition.
+    \end{itemize}
+  }
+
+  \bigskip
+
+  \uSi{$e$ ne contient pas d'appel à une fonction de $E$}{
+    \uSi{$q$ est vide}{
+      Renvoyer
+      \begin{flalign*}
+        a   & := e                & \\
+        res & := \texttt{cont } a &
+      \end{flalign*}
+    }\uSinon{
+      $q_{rec} \leftarrow$ Rectifier($q$, $E$) \\
+      Renvoyer $[(a, e)].q_{rec}$
+    }
+  }
+
+  \ldots
+\end{algorithm}
+
+\tiny \begin{algorithm}[H]
+  \ldots \\
+  \uSinon{
+    \uSi{$e$ est un appel de fonction}{
+      $e_{rec} \leftarrow$ $e$ avec \texttt{cont} rajouté en dernier
+      argument
+    }\uSinon{
+      $e_{rec} \leftarrow$ $e$ avec chaque enfant localement terminal $c$
+      remplacé par Rectifier($c$, $E$)
+    }
+
+    \bigskip
+
+    \uSi{$q$ est vide}{
+      Renvoyer $[(a, e_{rec})]$
+    }\uSinon{
+      $q_{rec} \leftarrow$ Rectifier($q$, $E$) \\
+      Renvoyer
+      \begin{flalign*}
+        \texttt{new\_cont} & := \texttt{fun } a \texttt{ -> } q_{rec} & \\
+        \texttt{cont}      & := \texttt{new\_cont}                    & \\
+        a                  & := e_{rec}                               &
+      \end{flalign*}
+    }
+  }
+\end{algorithm}
+
+\pagebreak
+
+\subsection{Plus d'exemples}
+
+\begin{minted}{ocaml}
+let rec sum (l : int list) : int = match l with [] -> 0 | x :: q -> x + sum q
+
+
+let sum_rectified_whilified (l : int list) (acc : int) : int =
+  let res_ref = ref None in
+  let acc_ref = ref acc in
+  let l_ref = ref l in
+  while !res_ref = None do
+    let acc = !acc_ref in
+    let l = !l_ref in
+    match l with
+    | [] -> res_ref := Some acc
+    | x :: q ->
+        let new_acc (a_7 : int) : int = x + a_7 in
+        l_ref := q;
+        acc_ref := new_acc acc
+  done;
+  Option.get !res_ref
+
+let sum (l : int list) : int = sum_rectified_whilified l 0
+\end{minted}
+
+
+
+
+\begin{minted}{ocaml}
+type int_tree = Leaf of int | Node of int_tree * int * int_tree
+
+let rec sum_tree (t : int_tree) : int =
+  match t with
+  | Leaf v -> v
+  | Node (left, v, right) -> sum_tree left + v + sum_tree right
+
+
+let rec sum_tree_rectified (t : int_tree) (cont : int -> 'ret) : 'ret =
+  match t with
+  | Leaf v -> cont v
+  | Node (left, v, right) ->
+      let new_cont (a_6 : int) : 'ret =
+        let new_cont (a_15 : int) : 'ret = cont (a_6 + v + a_15) in
+        sum_tree_rectified right new_cont
+      in
+      sum_tree_rectified left new_cont
+
+let sum_tree (t : int_tree) : int = sum_tree_rectified t (fun res -> res)
+\end{minted}
+
+
+\begin{minted}{ocaml}
+let rec fibonacci (n : int) : int =
+  if n = 0 || n = 1 then 1 else fibonacci (n - 1) + fibonacci (n - 2)
+
+    
+let rec fibonacci_rectified (n : int) (cont : int -> 'ret) : 'ret =
+  if n = 0 || n = 1 then cont 1
+  else
+    let new_cont (a_20 : int) : 'ret =
+      let new_cont (a_29 : int) : 'ret = cont (a_20 + a_29) in
+      fibonacci_rectified (n - 2) new_cont
+    in
+    fibonacci_rectified (n - 1) new_cont
+
+let fibonacci (n : int) : int = fibonacci_rectified n (fun res -> res)    
+\end{minted}
+
+\begin{minted}{ocaml}
+let rec custom_fold_left (fn : 'acc -> 'el -> 'ac) (init : 'acc) (l : 'el list)
+    : 'ac =
+  match l with [] -> init | x :: q -> custom_fold_left fn (fn init x) q
+
+
+let custom_fold_left_rectified_whilified (fn : 'acc -> 'el -> 'ac) (init : 'acc)
+    (l : 'el list) (cont : 'ac -> 'ret) : 'ret =
+  let res_ref = ref None in
+  let cont_ref = ref cont in
+  let l_ref = ref l in
+  let init_ref = ref init in
+  let fn_ref = ref fn in
+  while !res_ref = None do
+    let cont = !cont_ref in
+    let l = !l_ref in
+    let init = !init_ref in
+    let fn = !fn_ref in
+    match l with
+    | [] -> res_ref := Some (cont init)
+    | x :: q ->
+        fn_ref := fn;
+        init_ref := fn init x;
+        l_ref := q;
+        cont_ref := cont
+  done;
+  Option.get !res_ref
+
+let custom_fold_left (fn : 'acc -> 'el -> 'ac) (init : 'acc) (l : 'el list) :
+    'ac =
+  custom_fold_left_rectified_whilified fn init l (fun res -> res)
+\end{minted}
+
+\begin{minted}{ocaml}
+let rec sum_even_numbers (l : int list) : int =
+  match l with
+  | [] -> 0
+  | x :: q -> if x mod 2 = 0 then x + sum_even_numbers q else sum_even_numbers q
+
+
+let sum_even_numbers_rectified_whilified (l : int list) (acc : int) : int =
+  let res_ref = ref None in
+  let acc_ref = ref acc in
+  let l_ref = ref l in
+  while !res_ref = None do
+    let acc = !acc_ref in
+    let l = !l_ref in
+    match l with
+    | [] -> res_ref := Some acc
+    | x :: q ->
+        if x mod 2 = 0 then (
+          let new_acc (a_16 : int) : int = x + a_16 in
+          l_ref := q;
+          acc_ref := new_acc acc)
+        else (
+          l_ref := q;
+          acc_ref := acc)
+  done;
+  Option.get !res_ref
+
+let sum_even_numbers (l : int list) : int =
+  sum_even_numbers_rectified_whilified l 0
+\end{minted}
+
+\begin{minted}{ocaml}
+let rec is_even_length (l : 'a list) : bool =
+  match l with [] -> true | _ :: q -> not (is_even_length q)
+
+
+let is_even_length_rectified_whilified (l : 'a list) (acc : bool) : bool =
+  let res_ref = ref None in
+  let acc_ref = ref acc in
+  let l_ref = ref l in
+  while !res_ref = None do
+    let acc = !acc_ref in
+    let l = !l_ref in
+    match l with
+    | [] -> res_ref := Some acc
+    | _ :: q ->
+        let new_acc (a_6 : bool) : bool = not a_6 in
+        l_ref := q;
+        acc_ref := new_acc acc
+  done;
+  Option.get !res_ref
+
+let is_even_length (l : 'a list) : bool =
+  is_even_length_rectified_whilified l true
+\end{minted}
+
+\begin{minted}{ocaml}
+let rec length (l : 'a list) : int =
+  match l with [] -> 0 | _ :: q -> 1 + length q
+
+let length_rectified_whilified (l : 'a list) (acc : int) : int =
+  let res_ref = ref None in
+  let acc_ref = ref acc in
+  let l_ref = ref l in
+  while !res_ref = None do
+    let acc = !acc_ref in
+    let l = !l_ref in
+    match l with
+    | [] -> res_ref := Some acc
+    | _ :: q ->
+        let new_acc (a_7 : int) : int = 1 + a_7 in
+        l_ref := q;
+        acc_ref := new_acc acc
+  done;
+  Option.get !res_ref
+
+let length (l : 'a list) : int = length_rectified_whilified l 0
+\end{minted}
+
+\begin{minted}{ocaml}
+let rec f () : unit =
+  let rec g () : unit = f () in
+  g ()
+
+
+let rec f_rectified () (cont : unit -> 'ret) : 'ret =
+  let rec g_rectified () (cont : unit -> 'ret) : 'ret = f_rectified () cont in
+  g_rectified () cont
+
+let f () : unit = f_rectified () (fun res -> res)
+\end{minted}
+
+\begin{minted}{ocaml}
+
+type 'a tree = Leaf of 'a | Node of 'a tree list
+
+let rec visit_tree (f : 'a -> unit) (t : 'a tree) : unit =
+  let rec iter_list (g : 'b -> unit) (l : 'b list) : unit =
+    match l with
+    | [] -> ()
+    | x :: q ->
+        g x;
+        iter_list g q
+  in
+  match t with
+  | Leaf l -> f l
+  | Node children -> iter_list (fun child -> visit_tree f child) children
+
+
+let rec visit_tree_rectified (f : 'a -> unit) (t : 'a tree)
+    (cont : unit -> 'ret) : 'ret =
+  let rec iter_list_rectified (g_rectified : 'b -> (unit -> 'ret) -> 'ret)
+      (l : 'b list) (cont : unit -> 'ret) : 'ret =
+    match l with
+    | [] -> cont ()
+    | x :: q ->
+        let new_cont (a_28 : unit) : 'ret =
+          iter_list_rectified g_rectified q cont
+        in
+        g_rectified x new_cont
+  in
+  match t with
+  | Leaf l -> cont (f l)
+  | Node children ->
+      let a_9_rectified child cont = visit_tree_rectified f child cont in
+      iter_list_rectified a_9_rectified children cont
+
+let visit_tree (f : 'a -> unit) (t : 'a tree) : unit =
+  visit_tree_rectified f t (fun res -> res)
+\end{minted}
+
+\subsection{Fonctions récursives terminales}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile,t]
+  \tiny \begin{minted}{ocaml}
+(* Non récursif terminal *)
+let rec fibo (n : int) : int =
+    if n = 0 || n = 1 then 1
+    else
+        (* L'addition est faite après le retour des appels récursifs *)
+        fibo (n - 1) + fibo (n - 2)
+
+(* Récursif terminal *)
+let fibo (n : int) : int =
+    let rec fibo_depuis (i : int) (f_i : int) (f_im1 : int) : int =
+        if i = n then f_n
+        else
+            (* Cet appel récursif est la dernière opération effectuée *)
+            fibo_depuis (i + 1) (f_i + f_im1) f_i
+    in
+    fibo_depuis 0 1 0
+    \end{minted}
+\end{frame}
+
+\small
+
+\subsection{Preuve de l'indécidabilité de ENS\_RECTIFIANT}
+Par réduction depuis le co-problème de l'arrêt.
+
+Soit $(M, w)$ une entrée de CO-ARRÊT. Considérons la forme linéaire suivante,
+notée $l_{(M, w)}$:
+\begin{align*}
+  a_1 & := \text{Une sérialisation de $M$} \\
+  a_2 & := \text{Une sérialisation de $w$} \\
+  a_3 & := \texttt{m\_univ}                \\
+  a_4 & := a_3\  a_1\  a_2                 \\
+  a_5 & := \texttt{f}                      \\
+  a_6 & := \texttt{()}                     \\
+  a_7 & := a_5 \ a_6
+\end{align*}
+
+Avec \texttt{m\_univ} la machine universelle et \texttt{f} une fonction qui
+conduit à un appel récursif de cette fonction.
+
+Cette forme linéaire est rectifiable par $\emptyset$ si et seulement si $M$
+ne s'arrête pas sur $w$.
+
+On a alors
+$(M, w) \in \text{CO-ARRÊT}^+ \iff (l_{(M, w)}, 0) \in \text{ENS\_RECTIFIANT}^+$.
+
+Ainsi le problème CO-ARRÊT se réduit à ENS\_RECTIFIANT donc ENS\_RECTIFIANT
+est indécidable.

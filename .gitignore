@@ -11,8 +11,12 @@ perf.data.*
 *.fls
 *.log
 *.pdf
-*.synctex.gz
+*.synctex*
 *.toc
+*.nav
+*.snm
+*.vrb
+*.cpt
 
 *.g.ml
 

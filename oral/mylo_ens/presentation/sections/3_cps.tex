@@ -1,0 +1,38 @@
+\section{Continuations}
+
+\begin{frame}[fragile,t]
+    \frametitle{Programmation par continuation (CPS)}
+
+    \begin{itemize}
+        \item Chaque fonction prend un paramètre en plus, une \textit{continuation},
+              qui sera appelée avec le résultat de la fonction.
+        \item À la fin de la fonction, au lieu de renvoyer la valeur de retour,
+              la continuation est appelée avec cette valeur.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile,t]
+    \frametitle{Programmation par continuation (CPS)}
+
+    \begin{adjustwidth}{-1.5em}{-1.5em}
+        \begin{minted}{ocaml}
+let rec sum (l : int list) : int =
+    match l with
+    | [] -> 0
+    | x :: q -> x + sum q
+        \end{minted}
+
+        \vspace{0.5cm}
+
+        \begin{minted}{ocaml}
+let rec sum (l : int list) (cont : int -> 'a) : 'a =
+    match l with
+    | [] -> cont 0
+    | x :: q ->
+        let faire_addition (res : int) =
+            cont (x + res)
+        in
+        sum q faire_addition
+        \end{minted}
+    \end{adjustwidth}
+\end{frame}

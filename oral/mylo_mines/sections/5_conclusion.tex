@@ -1,0 +1,172 @@
+\section{Conclusion}
+
+\begin{frame}[fragile]
+    \frametitle{Résumé}
+
+    \begin{tikzpicture}
+        \node[rectangle, draw] at (-3, 2.5) (code_source) {
+            \begin{minipage}{0.45\textwidth}
+                \tiny \begin{minted}{ocaml}
+let rec sum (l : int list) : int =
+    match l with
+    | [] -> 0
+    | x :: q -> x + sum q 
+                    \end{minted}
+
+                \small
+
+                \begin{center}
+                    Code source
+                \end{center}
+            \end{minipage}
+        };
+
+        \node[rectangle, draw] at (3, 2.5) (ast) {
+            \begin{minipage}{0.45\textwidth}
+                \tiny \begin{forest}
+                    [{\texttt{FunctionDefinition(isRec: true, name: sum)}}
+                            [{body: \texttt{Match}}]
+                            [parameters: ...]
+                            [returnType: ...]
+                    ]
+                \end{forest}
+
+                \small
+
+                \begin{center}
+                    AST
+                \end{center}
+            \end{minipage}
+        };
+        \draw[-latex, red] (code_source) to (ast);
+
+        \node[rectangle, draw] at (3, 0) (forme_lineaire) {
+            \begin{minipage}{0.45\textwidth}
+                \tiny \centering$\begin{aligned}
+                        a_1 :=\  & \texttt{l}                          \\
+                        a_2 :=\  & \texttt{match } a_1 \texttt{ with}  \\
+                                 & \texttt{| [] -> } \begin{aligned}[t]
+                                                         a_3 & := 0
+                                                     \end{aligned} \\
+                                 & \ldots
+                    \end{aligned}$
+
+                \vspace{-0.2cm}
+                \small
+
+                \begin{center}
+                    Forme linéaire
+                \end{center}
+            \end{minipage}
+        };
+        \draw[-latex] (ast) to (forme_lineaire);
+
+        \node[rectangle, draw] at (-3, 0) (rectified) {
+            \begin{minipage}{0.45\textwidth}
+                \tiny \begin{minted}{ocaml}
+let s = sum [0; 1; 2] (fun res -> res)
+                    \end{minted}
+
+                \vspace{-0.2cm}
+                \small
+
+                \begin{center}
+                    Fonction rectifiée sous CPS
+                \end{center}
+            \end{minipage}
+        };
+        \draw[-latex] (forme_lineaire) to (rectified);
+
+        \node[rectangle, draw] at (-3, -2.5) (accumulator) {
+            \begin{minipage}{0.45\textwidth}
+                \tiny \begin{minted}{ocaml}
+let s = sum [0; 1; 2] 0
+                    \end{minted}
+
+                \vspace{-0.2cm}
+                \small
+
+                \begin{center}
+                    Fonction rectifiée avec accumulateur
+                \end{center}
+            \end{minipage}
+        };
+        \draw[-latex] (rectified) to (accumulator);
+
+        \node[rectangle, draw] at (3, -2.5) (loop) {
+            \begin{minipage}{0.45\textwidth}
+                \small
+
+                \begin{center}
+                    Fonction implémentée avec une boucle
+                \end{center}
+            \end{minipage}
+        };
+        \draw[-latex, red] (accumulator) to (loop);
+    \end{tikzpicture}
+\end{frame}
+
+
+\subsection{Exécution du programme}
+\addtocounter{framenumber}{-1}
+\begin{frame}
+    \frametitle{Exécution du programme}
+
+    Temps d'exécution sur la fonction récursive \mintinline{ocaml}{sum}:
+    \begin{itemize}
+        \item Construction de l'AST
+              \begin{itemize}
+                  \item Analyse lexicale : 0,0803 s
+                  \item Construction de l'automate LR(1) : 4,6386 s
+                  \item Analyse syntaxique : 0,0910 s
+              \end{itemize}
+        \item Transformation en fonction récursive terminale : 0,0004 s
+        \item Transformation en boucle : 0,0002 s
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile,t]
+    \frametitle{Résultat}
+
+    \begin{adjustwidth}{-2em}{-2em}
+        \small \begin{minted}[breaklines=false]{ocaml}
+let sum_rectified_whilified (l : int list) (acc : int) : int =
+  let res_ref = ref None in
+  let acc_ref = ref acc in
+  let l_ref = ref l in
+  while !res_ref = None do
+    let acc = !acc_ref in
+    let l = !l_ref in
+    match l with
+    | [] -> res_ref := Some acc
+    | x :: q ->
+        let new_acc (a_7 : int) : int = x + a_7 in
+        l_ref := q;
+        acc_ref := new_acc acc
+  done;
+  Option.get !res_ref
+
+let sum (l : int list) : int = sum_rectified_whilified l 0
+        \end{minted}
+
+    \end{adjustwidth}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile,t]
+    \frametitle{Résultat}
+
+    \begin{adjustwidth}{-2em}{-2em}
+        \small \begin{minted}[breaklines=false]{ocaml}
+let sum_rectified_whilified (l : int list) (acc : int) : int =
+  ...
+
+let sum (l : int list) : int = sum_rectified_whilified l 0
+
+(* 499999500000 *)
+sum (List.init 1_000_000 (fun i -> i))
+        \end{minted}
+
+    \end{adjustwidth}
+\end{frame}
+

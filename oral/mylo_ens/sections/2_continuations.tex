@@ -1,0 +1,51 @@
+\section{Programmation par continuation}
+
+L'outil principal permettant la conversion de fonctions récursives quelconques
+en fonctions récursives terminales est la
+\textit{programmation par continuation} ou CPS (de son nom anglais
+\textit{continuation passing style}). Toute fonction écrite sous ce paradigme de
+programmation prend un argument supplémentaire, une \textit{continuation}, qui
+est une fonction à un argument du type du résultat de la fonction. Cette
+continuation est alors appelée avec le résultat une fois celui-ci calculé. Par
+exemple, la fonction \texttt{sum} précédente peut être ré-écrite sous CPS comme
+suit :
+
+\small
+\begin{minted}{ocaml}
+    let rec sum_cps (l : int list) (continuation : int -> 'a') : 'a =
+        match l with
+        | [] -> continuation 0
+        | x :: q ->
+            let faire_addition (v : int) : 'a =
+                continuation (x + v)
+            in
+            sum_cps q faire_addition
+
+    let sum (l : int list) : int = sum_cps l (fun res -> res)
+\end{minted}
+\normalsize
+
+Ici, la continuation est en effet appelée avec \texttt{0} lorsque
+\texttt{sum\_cps} est appelée sur la liste vide, puisque la somme des éléments
+de la liste vide est nulle. Lorsque \texttt{l} est non vide, une nouvelle
+continuation \texttt{faire\_addition} est créée : celle-ci prend alors le
+résultat de l'appel récursif (dans la deuxième branche du \texttt{match}), y
+ajoute la valeur de \texttt{x}, puis appelle la continuation originale avec la
+nouvelle valeur. Cela correspond bien à la somme de tous les éléments de
+\texttt{l}. Pour obtenir le résultat, il suffit d'appeler la fonction sous CPS
+avec l'identité comme continuation.
+
+On peut de plus remarquer que cette implémentation de \texttt{sum\_cps}
+est récursive terminale (et la nouvelle continuation introduite aussi). Notre
+algorithme aura alors pour but de convertir une fonction récursive quelconque en
+une fonction sous CPS, dont nous pourrons montrer qu'elle est récursive
+terminale.
+
+Notre algorithme est alors constitué de trois étapes principales :
+\begin{enumerate}
+    \item identifier les appels récursifs~;
+    \item mettre les opérations survenant après un appel récursif dans une
+          continuation prenant en argument le résultat de cet appel récursif~;
+    \item modifier le programme pour le mettre sous CPS avec les continuations
+          créées.
+\end{enumerate}

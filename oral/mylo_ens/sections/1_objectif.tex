@@ -1,0 +1,56 @@
+\section{Objectif}
+
+L'utilisation d'algorithmes récursifs lors de l'écriture de programmes
+\texttt{OCaml} est très répandue en raison de l'utilisation courante de
+structures inductives, par exemple le type \texttt{list}. Malheureusement, ces
+algorithmes font souvent face aux limitations imposées par la taille maximale de
+la pile d'appels, contrairement aux fonctions implémentées avec des boucles. Par
+exemple l'implémentation récursive de la fonction \texttt{sum} suivante est plus
+limitée que l'implémentation utilisant des boucles :
+
+\bigskip
+\small
+\begin{minipage}[t]{0.5\textwidth}
+    \begin{minted}[breaklines=true]{ocaml}
+(* Implémentation récursive *)
+let rec sum (l : int list) : int =
+    match l with
+    | [] -> 0
+    | x :: q -> x + sum q
+
+
+
+
+(* Stack overflow during evaluation (looping recursion?). *)
+sum (List.init 1_000_000 (fun i -> i))
+    \end{minted}
+\end{minipage}%
+\begin{minipage}[t]{0.5\textwidth}
+    \begin{minted}[breaklines=true]{ocaml}
+(* Implémentation par boucles *)
+let sum (l : int list) : int =
+    let res = ref 0 in
+    let l_ref = ref l in
+    while !l_ref <> [] do
+        res := !res + List.hd !l_ref;
+        l_ref := List.tl !l_ref
+    done;
+    !res
+
+(* 499999500000 *)
+sum (List.init 1_000_000 (fun i -> i))
+    \end{minted}
+\end{minipage}
+\normalsize
+
+\bigskip
+
+On s'intéresse alors à la conversion automatique de fonctions écrites de façon
+récursive en des fonctions implémentées à l'aide de boucles. Il s'avère que la
+conversion de fonctions récursives \textit{terminales} en fonctions implémentées
+avec des boucles est assez simple, et cette optimisation est même déjà
+implémentée dans les compilateurs \texttt{ocamlc} et \texttt{ocamlopt}. C'est
+mon camarade Raphaël BOUÉ-MOREL qui a implémenté cette partie-là de la
+conversion, et je me suis alors concentré sur la conversion de fonctions
+récursives \textit{quelconques} en fonctions récursives \textit{terminales},
+procédure appelée \textit{rectification} dans la suite.

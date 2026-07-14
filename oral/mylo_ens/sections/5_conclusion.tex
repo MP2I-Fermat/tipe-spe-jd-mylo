@@ -1,0 +1,27 @@
+\section{Conclusion}
+
+Après délinéarisation, l'application de ces étapes sur la fonction \texttt{sum}
+produit alors le code suivant, qui est bien récursif terminal :
+
+\small
+\begin{minted}{ocaml}
+let rec sum_acc (l : int list) (acc : int) : int =
+    match l with
+    | [] -> acc
+    | x :: q ->
+        let new_acc (a_7 : int) : int = x + a_7 in
+        sum_acc q (new_acc acc)
+
+let sum (l : int list) : int = sum_acc l 0
+\end{minted}
+
+\normalsize
+
+Les étapes décrites ci-dessus peuvent être appliquées à des fonctions plus
+compliquées, par exemple des couples de fonctions mutuellement récursives ou des
+fonctions effectuant plusieurs appels récursifs.
+
+Finalement, l'application de la transformation implémentée par mon camarade
+transforme ces fonctions récursives terminales en des fonctions implémentées
+avec des boucles, donnant un résultat similaire à celui montré en exemple dans
+la section 1.

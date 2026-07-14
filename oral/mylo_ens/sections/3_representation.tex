@@ -1,0 +1,150 @@
+\section{Représentation des programmes}
+\subsection{Limitations des AST}
+
+La structure normalement utilisée par les algorithmes opérant sur des programmes
+est l'\textit{arbre abstrait de syntaxe} ou AST (\textit{abstract syntax tree}
+en anglais). Ceux-ci sont une représentation arborescente du code source
+encodant la structure du programme. Malheureusement ils ont deux désavantages
+majeurs pour notre propos :
+
+\begin{itemize}
+    \item les AST n'encodent pas l'ordre d'exécution du programme, celui-ci est
+          défini à part en fonction des étiquettes des nœuds de l'arbre. Cela
+          complique l'identification des opérations survenant après un appel
+          récursif~;
+    \item il est difficile de définir comment scinder un AST en deux, ce qui est
+          nécessaire dans notre algorithme pour séparer les opérations venant
+          après un appel récursif afin de les placer dans une continuation.
+\end{itemize}
+
+Pour ces raisons, nous utilisons une autre représentation des programmes qui
+représente bien comment le programme est évalué.
+
+\subsection{Formes linéaires}
+
+\begin{definition}
+    Une sous-expression $e'$ d'une expression \texttt{OCaml} $e$ est dite
+    \textit{localement terminale} si l'évaluation de $e$ se termine
+    immédiatement après l'évaluation de $e'$, à moins que $e'$ ne soit pas
+    évaluée pour évaluer $e$.
+\end{definition}
+
+\begin{example}
+    Dans l'expression \texttt{if }$a$\texttt{ then }$b$\texttt{ else }$c$, $a$
+    n'est pas localement terminale car son évaluation est forcément suivie de
+    l'évaluation de $b$ ou $c$. En revanche, $b$ et $c$ sont toutes les deux
+    localement terminales car l'évaluation du \texttt{if} se termine
+    immédiatement après l'évaluation de $b$ ou $c$.
+
+    Dans l'expression $a$\texttt{ + }$b$, ni $a$ ni $b$ ne sont localement
+    terminales car leur évaluation est toujours suivie de l'opération d'addition
+    avant la fin de l'évaluation de $a$\texttt{ + }$b$.
+\end{example}
+
+\begin{definition} On définit par induction mutuelle les
+    \textit{opérations élémentaires} et les \textit{formes linéaires}.
+
+
+    Les \textit{opérations élémentaires} sont des entités syntaxiques définies
+    par les mêmes règles que les expressions \texttt{OCaml}, mais légèrement
+    modifiées :
+
+    si $C(e_1, \ldots, e_n)$ est une règle de construction d'une expression
+    \texttt{OCaml} avec $e_1, \ldots, e_n$ ses sous-expressions, alors la règle
+    de construction correspondante pour les opérations élémentaires est \\
+    $C(a_1, \ldots, a_k, l_1, \ldots, l_{n - k})$ avec $a_i$ des noms de
+    variables \texttt{OCaml}, une pour chaque sous-expression
+    \textbf{non localement terminale}, et $l_i$ des \textit{formes linéaires},
+    une pour chaque sous-expression \textbf{localement terminale}.
+
+    Une \textit{forme linéaire} est une liste de couples $(a, e)$ avec $a$ un
+    nom de variable \texttt{OCaml} et $e$ une opération élémentaire.
+\end{definition}
+
+On notera la forme linéaire $[(a_1, e_1), (a_2, e_2), \ldots]$ comme suit :
+\begin{align*}
+    a_1 & := e_1 \\
+    a_2 & := e_2 \\
+    \ldots
+\end{align*}
+
+\begin{remark}
+    Intuitivement, les formes linéaires listent les étapes élémentaires de
+    l'évaluation, et le résultat de chaque opération est stocké dans le nom de
+    variable associé. Le résultat de l'évaluation de la forme linéaire entière
+    est stocké dans le nom de variable du dernier couple.
+\end{remark}
+
+\begin{example}
+    On représente ici une expression \texttt{OCaml} et une forme linéaire
+    équivalente:
+
+    \small
+    \begin{minipage}{0.3\textwidth}
+        \begin{minted}{ocaml}
+match l with
+| [] -> 0
+| x :: q -> x + sum q
+        \end{minted}
+    \end{minipage}%
+    \begin{minipage}{0.7\textwidth}
+        \begin{align*}
+            a_1 := \  & \texttt{l}                                             \\
+            a_2 := \  & \texttt{match } a_1 \texttt{ with}                     \\
+                      & \texttt{| [] -> } a_3 := 0                             \\
+                      & \texttt{| x :: q -> } \begin{aligned}[t]
+                                                  a_4 := \  & \texttt{q}           \\
+                                                  a_6 := \  & \texttt{sum}         \\
+                                                  a_7 := \  & a_6 \ a_4            \\
+                                                  a_8 := \  & \texttt{x}           \\
+                                                  a_9 := \  & a_8 \texttt{ + } a_7
+                                              \end{aligned}
+        \end{align*}
+    \end{minipage}
+
+    \normalsize
+    \bigskip
+
+    Chaque ligne correspond à l'exécution d'une opération élémentaire : charger
+    la valeur d'une variable, effectuer un appel de fonction, faire une addition...
+    On a distingué ici les variables présentes dans le code original en
+    \texttt{monospace} et les variables introduites pour créer la forme linéaire
+    en \textit{italique} mais celles-là sont en réalité du même type.
+\end{example}
+
+\subsection{Linéarisation}
+
+On peut définir un algorithme transformant une expression (représentée par un
+AST) en une forme linéaire équivalente.
+
+\begin{algorithm}[H]
+    \caption{Linéariser}
+    \Entree{$e$ une expression \texttt{OCaml}}
+    \Sortie{$l$ une forme linéaire correspondant à $e$}
+
+    \uSi{$e$ est une addition $a$\texttt{ + }$b$}{
+        $l_a \leftarrow$ Linéariser($a$) \\
+        $l_b \leftarrow$ Linéariser($b$) \\
+        $a_i \leftarrow$ Le nom de variable du dernier couple de $l_a$ \\
+        $a_j \leftarrow$ Le nom de variable du dernier couple de $l_b$ \\
+        $a_k \leftarrow$ Un nom de variable non utilisé dans $e$, $l_a$ ou $l_b$ \\
+        Renvoyer $l_a \cdot l_b \cdot (a_k, a_i\texttt{ + }a_j)$
+    }\uSinon{
+        \strut \ldots \ // On continue de même pour chaque règle de construction
+        des expressions \texttt{OCaml}.
+    }
+\end{algorithm}
+
+On peut définir similairement un algorithme Délinéariser transformant une forme
+linéaire en un AST \texttt{OCaml} en remarquant que chaque instruction $a := e$
+peut être représentée par la construction \texttt{let a = e in}. On peut aussi
+démontrer par induction sur l'ensemble des expressions \texttt{OCaml} que les
+algorithmes Linéariser et Délinéariser préservent le comportement du programme,
+c'est-à-dire que les expressions $e$ et Délinéariser(Linéariser($e$)) sont
+équivalentes.
+
+\begin{remark}
+    En pratique, nous utilisons un algorithme Délinéariser légèrement modifié
+    pour améliorer la lisibilité des programmes en sortie, mais celui-ci ne
+    change pas la correction de l'algorithme.
+\end{remark}

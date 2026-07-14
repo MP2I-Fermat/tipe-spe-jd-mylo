@@ -1,0 +1,142 @@
+\section{Rectification}
+\subsection{Identification des appels récursifs}
+
+L'identification des appels récursifs est assez complexe lorsqu'on considère des
+fonctions mutuellement récursives ou des fonctions qui prennent d'autres
+fonctions en argument. On introduit alors la notion
+d'\textit{ensemble rectifiant :}
+
+\begin{definition}
+    Un ensemble de noms de variables $E$ \textit{rectifie} une forme linéaire
+    $l$ lorsque tout appel de fonction potentiellement récursif dans $l$
+    (directement ou indirectement) est un appel à une fonction dont le nom est
+    dans $E$ (l'opération élémentaire <<~appel de fonction~>> s'applique sur un
+    nom de variable).
+\end{definition}
+
+\begin{example} \strut
+    La forme linéaire de la partie précédente correspondant au corps de la
+    fonction \texttt{sum} est rectifiable par $\{\texttt{sum}, a_6\}$. On peut
+    remarquer qu'il est aussi rectifiable par
+    $\{\texttt{sum}, a_6, \texttt{l}, a_4, a_9\}$; l'ajout de nouveaux noms de
+    variables n'altère pas le caractère rectifiant de l'ensemble.
+\end{example}
+
+On cherche à avoir des ensembles rectifiants les plus petits possibles, car
+nous ne pouvons pas modifier le code de certaines fonctions (de la bibliothèque
+standard \texttt{OCaml}, par exemple). On peut alors considérer le problème de
+décision suivant :
+
+\begin{definition}
+    Le problème de décision ENS\_RECTIFIANT consiste à déterminer, étant donné
+    une forme linéaire $l$ et un entier $k$, s'il existe un ensemble rectifiant
+    $l$ de cardinal plus petit que $k$.
+\end{definition}
+
+\begin{proposition}
+    Le problème ENS\_RECTIFIANT est indécidable.
+\end{proposition}
+
+\begin{proof}
+    Par réduction depuis le co-problème de l'arrêt.
+\end{proof}
+
+Notre algorithme pour calculer un ensemble rectifiant minimal pour une forme
+linéaire n'est alors qu'une approximation, et il existe des entrées sur lesquels
+il abandonne. Cependant il fonctionne bien sur la plupart des programmes
+rencontrés en pratique. Il est implémenté par saturation, avec des règles telles
+que <<~si $f \in E$ et s'il existe une instruction
+$a_k := f$, alors $a_k \in E$~>>, avec un ensemble initialement réduit aux noms
+des fonctions à rectifier.
+
+\subsection{Algorithme de rectification}
+
+Avec les appels récursifs ainsi identifiés, on a alors tous les éléments pour
+mettre en place l'algorithme décrit dans la section 1.
+
+\begin{algorithm}[H]
+    \caption{Rectifier}
+    \Entree{
+        Une forme linéaire $l$ ne contenant pas de variables nommées
+        \texttt{cont} ou \texttt{new\_cont} et $E$ un ensemble rectifiant $l$.
+    }
+    \Sortie{
+        Une forme linéaire récursive terminale $l'$ sous CPS équivalente à $l$
+    }
+
+    $(a, e) \leftarrow$ le premier élément de $l$ \\
+    $q \leftarrow$ le reste de $l$ \\
+
+    \uSi{$e$ contient une définition d'une fonction de $E$}{
+        Mettre à jour $e$ tel que la fonction définie dedans:
+        \begin{itemize}
+            \item Prenne un argument \texttt{cont} en plus
+            \item Évalue $Rectifier(l', E)$ lors de son appel o\`u $l'$
+                  est la forme linéaire évaluée \\ avant cette redéfinition.
+        \end{itemize}
+    }
+
+    \uSi{$e$ ne contient pas d'appel à une fonction de $E$}{
+        \uSi{$q$ est vide}{
+            Renvoyer $\left\{ \hspace{0.2cm} \begin{aligned}
+                    a   & := e                & \\
+                    res & := \texttt{cont } a &
+                \end{aligned} \right. $
+        }\uSinon{
+            $q_{rec} \leftarrow$ Rectifier($q$, $E$) \\
+            Renvoyer $(a, e) \cdot q_{rec}$
+        }
+    }
+    \uSinon{
+        \uSi{$e$ est un appel de fonction}{
+            $e_{rec} \leftarrow$ $e$ avec \texttt{cont} rajouté en dernier
+            argument
+        }\uSinon{
+            $e_{rec} \leftarrow$ $e$ avec chaque enfant localement terminal $c$
+            remplacé par Rectifier($c$, $E$)
+        }
+
+        \bigskip
+
+        \uSi{$q$ est vide}{
+            Renvoyer $[(a, e_{rec})]$
+        }\uSinon{
+            $q_{rec} \leftarrow$ Rectifier($q$, $E$) \\
+            Renvoyer $\left\{ \hspace{0.2cm} \begin{aligned}
+                    \texttt{new\_cont} & := \texttt{fun } a \texttt{ -> } q_{rec} & \\
+                    \texttt{cont}      & := \texttt{new\_cont}                    & \\
+                    a                  & := e_{rec}                               &
+                \end{aligned} \right.$
+        }
+    }
+\end{algorithm}
+
+On peut finalement démontrer la correction de cet algorithme. Le caractère
+récursif terminal de la forme linéaire renvoyée se déduit immédiatement de
+l'algorithme en constatant que les appels récursifs sont toujours à la fin d'une
+forme linéaire, et l'équivalence entre $l$ et $l'$ peut se démontrer par
+récurrence sur le nombre d'opérations élémentaires effectuées lors d'une
+exécution particulière de $l$, en montrant que $l'$ a alors le même résultat (et
+les mêmes effets de bord).
+
+\subsection{Utilisation d'accumulateurs}
+
+Une dernière amélioration à faire est de constater que dans certains cas, une
+fonction sous CPS peut être remplacée par une fonction utilisant un accumulateur
+pour une exécution plus efficace en mémoire. C'est notamment le cas si :
+\begin{itemize}
+    \item Toute nouvelle continuation dans la fonction est la composition de la
+          continuation précédente et d'une fonction $f_i$~;
+    \item La fonction originale a une seule valeur de retour $init$ en dehors
+          des appels récursifs~;
+    \item Les fonctions $f_i$ commutent.
+\end{itemize}
+
+Dans ce cas, la continuation du premier appel de la fonction est forcément
+appelé avec pour argument $f_1(f_2(\ldots f_n(init)))$ qui est égal à
+$f_n(\ldots f_2(f_1(init)))$ puisque les fonctions $f_i$ commutent, et on
+remarque que $f_1(init)$ peut être calculé dès le premier appel récursif car
+$f_1$ et $init$ sont tous deux connus dès ce premier appel. On peut alors
+remplacer la continuation par un accumulateur contenant la valeur de
+$f_k(f_{k-1}(\ldots f_1(init)))$ au $k$-ième appel récursif, amélioration que
+j'ai aussi implémenté.

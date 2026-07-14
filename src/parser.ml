@@ -252,7 +252,7 @@ let construit_automate_LR1 (g : ('token_type, 'non_terminal) grammar)
    * son exécution plus efficace.
 
    * Malheureusement, les états LR(1) ne sont pas compatibles avec le module
-   * Hashtbl d'OCaml tel quels : ils contiennent des Hashset.t, dont l'égalité
+   * Hashtbl d'OCaml tels quels : ils contiennent des Hashset.t, dont l'égalité
    * (i.e Hashset.equals) n'est pas l’identité structurelle (deux Hashtbl.t
    * peuvent contenir les mêmes elements mais ne pas avoir le meme nombre de
    * buckets, par exemple).

@@ -3,64 +3,52 @@ open Caml_light
 type linear_element =
   | Variable of variable
   | Constant of constant
-  | Parenthesised of { inner : linear_form; style : parenthesis_style }
-  | TypeCoercion of { inner : linear_form; typ : type_expression }
-  | ListLiteral of linear_form list
-  | ArrayLiteral of linear_form list
-  | RecordLiteral of (label * linear_form) list
-  | WhileLoop of { condition : linear_form; body : linear_form }
-  | ForLoop of {
-      direction : for_direction;
-      variable : lowercase_ident;
-      start : linear_form;
-      finish : linear_form;
-      body : linear_form;
-    }
-  | Dereference of linear_form
-  | FieldAccess of { receiver : linear_form; target : label }
-  | ArrayAccess of { receiver : linear_form; target : linear_form }
+  | Parenthesised of { inner : variable; style : parenthesis_style }
+  | TypeCoercion of { inner : variable; typ : type_expression }
+  | ListLiteral of variable list
+  | ArrayLiteral of variable list
+  | RecordLiteral of (label * variable) list
+  | Dereference of variable
+  | FieldAccess of { receiver : variable; target : label }
+  | ArrayAccess of { receiver : variable; target : variable }
   | FunctionApplication of {
-      receiver : linear_form;
-      arguments : linear_form list;
+      receiver : variable;
+      arguments : variable list;
+      is_type_constructor : bool;
     }
-  | PrefixOperation of { receiver : linear_form; operation : prefix_operation }
+  | PrefixOperation of { receiver : variable; operation : prefix_operation }
   | InfixOperation of {
-      lhs : linear_form;
-      rhs : linear_form;
+      lhs : variable;
+      rhs : variable;
       operation : infix_operation;
     }
-  | Negation of linear_form
-  | Tuple of linear_form list
-  | FieldAssignment of {
-      receiver : linear_form;
-      target : label;
-      value : linear_form;
-    }
+  | Negation of variable
+  | Tuple of variable list
+  | FieldAssignment of { receiver : variable; target : label; value : variable }
   | ArrayAssignment of {
-      receiver : linear_form;
-      target : linear_form;
-      value : linear_form;
+      receiver : variable;
+      target : variable;
+      value : variable;
     }
-  | ReferenceAssignment of { receiver : linear_form; value : linear_form }
+  | ReferenceAssignment of { receiver : variable; value : variable }
   | If of {
-      condition : linear_form;
+      condition : variable;
       body : linear_form;
       else_body : linear_form option;
     }
-  | Sequence of linear_form list
-  | Match of { value : linear_form; cases : linear_pattern_cases }
-  | Try of { value : linear_form; cases : linear_pattern_cases }
+  | Sequence of variable list
+  | Match of { value : variable; cases : linear_pattern_cases }
   | FunctionLiteral of linear_function_literal
   | LetBinding of {
       bindings : linear_binding list;
       is_rec : bool;
       inner : linear_form;
     }
-  | StringAccess of { receiver : linear_form; target : linear_form }
+  | StringAccess of { receiver : variable; target : variable }
   | StringAssignment of {
-      receiver : linear_form;
-      target : linear_form;
-      value : linear_form;
+      receiver : variable;
+      target : variable;
+      value : variable;
     }
 
 and linear_pattern_cases = (pattern list * linear_form) list
@@ -79,7 +67,7 @@ and linear_function_ = {
 }
 
 and linear_binding =
-  | Variable of { lhs : pattern; value : linear_form }
+  | Variable of { lhs : pattern; value : variable }
   | Function of linear_function_
 
 and linear_form = (variable * linear_element) list
@@ -106,10 +94,8 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
   | TypeCoercion { inner; typ } ->
       let inner_lin, k = linearize inner k in
       let inner_var = last_var inner_lin in
-      let e_elt =
-        TypeCoercion { inner = [ (p (k + 1), Variable inner_var) ]; typ }
-      in
-      (inner_lin @ [ (p k, e_elt) ], k + 2)
+      let e_elt = TypeCoercion { inner = inner_var; typ } in
+      (inner_lin @ [ (p k, e_elt) ], k + 1)
   | ListLiteral l ->
       let elt_lins, elt_names, k =
         List.fold_left
@@ -119,14 +105,8 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
             (elt_lin :: lins, elt_name :: names, k))
           ([], [], k) l
       in
-      let e_elt =
-        ListLiteral
-          (elt_names |> List.rev
-          |> List.mapi (fun i name -> [ (p (k + i + 1), Variable name) ]))
-      in
-      let elt_count = List.length elt_names in
-      ( (elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ],
-        k + elt_count + 1 )
+      let e_elt = ListLiteral (elt_names |> List.rev) in
+      ((elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ], k + 1)
   | ArrayLiteral l ->
       let elt_lins, elt_names, k =
         List.fold_left
@@ -136,14 +116,8 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
             (elt_lin :: lins, elt_name :: names, k))
           ([], [], k) l
       in
-      let e_elt =
-        ArrayLiteral
-          (elt_names |> List.rev
-          |> List.mapi (fun i name -> [ (p (k + i + 1), Variable name) ]))
-      in
-      let elt_count = List.length elt_names in
-      ( (elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ],
-        k + elt_count + 1 )
+      let e_elt = ArrayLiteral (elt_names |> List.rev) in
+      ((elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ], k + 1)
   | RecordLiteral l ->
       let elt_lins, elt_names, k =
         List.fold_left
@@ -153,56 +127,37 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
             (elt_lin :: lins, (field, elt_name) :: names, k))
           ([], [], k) l
       in
-      let e_elt =
-        RecordLiteral
-          (elt_names |> List.rev
-          |> List.mapi (fun i (field, name) ->
-                 (field, [ (p (k + i + 1), Variable name) ])))
-      in
-      let elt_count = List.length elt_names in
-      ( (elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ],
-        k + elt_count + 1 )
+      let e_elt = RecordLiteral (elt_names |> List.rev) in
+      ((elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ], k + 1)
   | WhileLoop _ -> failwith "Cannot linearize while loops"
   | ForLoop _ -> failwith "Cannot linearize for loops"
   | Dereference inner ->
       let inner_lin, k = linearize inner k in
       let inner_var = last_var inner_lin in
-      let e_elt = Dereference [ (p (k + 1), Variable inner_var) ] in
-      (inner_lin @ [ (p k, e_elt) ], k + 2)
+      let e_elt = Dereference inner_var in
+      (inner_lin @ [ (p k, e_elt) ], k + 1)
   | FieldAccess { target; receiver } -> (
       match receiver with
-      | Constant c ->
+      | Constant (Construction (Named name)) ->
           (* This is a module access *)
-          ( [
-              ( p k,
-                FieldAccess { receiver = [ (p (k + 1), Constant c) ]; target }
-              );
-            ],
-            k + 2 )
+          ([ (p k, FieldAccess { receiver = name; target }) ], k + 2)
       | _ ->
           let receiver_lin, k = linearize receiver k in
           let receiver_var = last_var receiver_lin in
-          let e_elt =
-            FieldAccess
-              { target; receiver = [ (p (k + 1), Variable receiver_var) ] }
-          in
-          (receiver_lin @ [ (p k, e_elt) ], k + 2))
+          let e_elt = FieldAccess { target; receiver = receiver_var } in
+          (receiver_lin @ [ (p k, e_elt) ], k + 1))
   | ArrayAccess { target; receiver } ->
       let receiver_lin, k = linearize receiver k in
       let receiver_var = last_var receiver_lin in
       let target_lin, k = linearize target k in
       let target_var = last_var target_lin in
       let e_elt =
-        ArrayAccess
-          {
-            receiver = [ (p (k + 1), Variable receiver_var) ];
-            target = [ (p (k + 2), Variable target_var) ];
-          }
+        ArrayAccess { receiver = receiver_var; target = target_var }
       in
-      (receiver_lin @ target_lin @ [ (p k, e_elt) ], k + 3)
+      (receiver_lin @ target_lin @ [ (p k, e_elt) ], k + 1)
   | FunctionApplication { receiver; arguments } -> (
       match receiver with
-      | Constant c ->
+      | Constant (Construction (Named constructor_name)) ->
           (* This is a type constructor. Technically we deviate from the definition of a correct
           linear form here (the argument may be a parenthesised tuple with depth > 1). *)
           let arguments_lins, argument_names, k =
@@ -225,37 +180,20 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
             | [ argument ] ->
                 FunctionApplication
                   {
-                    receiver = [ (p (k + 1), Constant c) ];
-                    arguments = [ [ (p (k + 2), Variable argument) ] ];
+                    receiver = constructor_name;
+                    arguments = [ argument ];
+                    (* It is a type constructor, but only with one argument. *)
+                    is_type_constructor = false;
                   }
             | _ ->
                 FunctionApplication
                   {
-                    receiver = [ (p (k + 1), Constant c) ];
-                    arguments =
-                      [
-                        [
-                          ( p (k + 2),
-                            Parenthesised
-                              {
-                                style = Parenthesis;
-                                inner =
-                                  [
-                                    ( p (k + 3),
-                                      Tuple
-                                        (argument_names |> List.rev
-                                        |> List.mapi (fun i arg ->
-                                               [ (p (k + i + 4), Variable arg) ])
-                                        ) );
-                                  ];
-                              } );
-                        ];
-                      ];
+                    receiver = constructor_name;
+                    arguments = argument_names;
+                    is_type_constructor = true;
                   }
           in
-          let argument_count = List.length argument_names in
-          ( (arguments_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ],
-            k + argument_count + 4 )
+          ((arguments_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ], k + 1)
       | _ ->
           let receiver_lin, k = linearize receiver k in
           let receiver_var = last_var receiver_lin in
@@ -270,45 +208,33 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
           let e_elt =
             FunctionApplication
               {
-                receiver = [ (p (k + 1), Variable receiver_var) ];
-                arguments =
-                  arg_names |> List.rev
-                  |> List.mapi (fun i name ->
-                         [ (p (k + i + 2), Variable name) ]);
+                receiver = receiver_var;
+                arguments = arg_names |> List.rev;
+                is_type_constructor = false;
               }
           in
           let argument_count = List.length arguments in
           ( receiver_lin
             @ (arg_lins |> List.rev |> List.concat)
             @ [ (p k, e_elt) ],
-            k + argument_count + 2 ))
+            k + argument_count + 1 ))
   | PrefixOperation { operation; receiver } ->
       let receiver_lin, k = linearize receiver k in
       let receiver_var = last_var receiver_lin in
-      let e_elt =
-        PrefixOperation
-          { operation; receiver = [ (p (k + 1), Variable receiver_var) ] }
-      in
-      (receiver_lin @ [ (p k, e_elt) ], k + 2)
+      let e_elt = PrefixOperation { operation; receiver = receiver_var } in
+      (receiver_lin @ [ (p k, e_elt) ], k + 1)
   | InfixOperation { lhs; rhs; operation } ->
       let lhs_lin, k = linearize lhs k in
       let lhs_var = last_var lhs_lin in
       let rhs_lin, k = linearize rhs k in
       let rhs_var = last_var rhs_lin in
-      let e_elt =
-        InfixOperation
-          {
-            operation;
-            lhs = [ (p (k + 1), Variable lhs_var) ];
-            rhs = [ (p (k + 2), Variable rhs_var) ];
-          }
-      in
-      (lhs_lin @ rhs_lin @ [ (p k, e_elt) ], k + 3)
+      let e_elt = InfixOperation { operation; lhs = lhs_var; rhs = rhs_var } in
+      (lhs_lin @ rhs_lin @ [ (p k, e_elt) ], k + 1)
   | Negation inner ->
       let inner_lin, k = linearize inner k in
       let inner_var = last_var inner_lin in
-      let e_elt = Negation [ (p (k + 1), Variable inner_var) ] in
-      (inner_lin @ [ (p k, e_elt) ], k + 2)
+      let e_elt = Negation inner_var in
+      (inner_lin @ [ (p k, e_elt) ], k + 1)
   | Tuple t ->
       let elt_lins, elt_names, k =
         List.fold_left
@@ -318,28 +244,17 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
             (elt_lin :: lins, elt_name :: names, k))
           ([], [], k) t
       in
-      let e_elt =
-        Tuple
-          (elt_names |> List.rev
-          |> List.mapi (fun i name -> [ (p (k + i + 1), Variable name) ]))
-      in
-      let elt_count = List.length elt_names in
-      ( (elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ],
-        k + elt_count + 1 )
+      let e_elt = Tuple elt_names in
+      ((elt_lins |> List.rev |> List.concat) @ [ (p k, e_elt) ], k + 1)
   | FieldAssignment { receiver; target; value } ->
       let receiver_lin, k = linearize receiver k in
       let receiver_var = last_var receiver_lin in
       let value_lin, k = linearize value k in
       let value_var = last_var value_lin in
       let e_elt =
-        FieldAssignment
-          {
-            receiver = [ (p (k + 1), Variable receiver_var) ];
-            target;
-            value = [ (p (k + 2), Variable value_var) ];
-          }
+        FieldAssignment { receiver = receiver_var; target; value = value_var }
       in
-      (receiver_lin @ value_lin @ [ (p k, e_elt) ], k + 3)
+      (receiver_lin @ value_lin @ [ (p k, e_elt) ], k + 1)
   | ArrayAssignment { receiver; target; value } ->
       let receiver_lin, k = linearize receiver k in
       let receiver_var = last_var receiver_lin in
@@ -349,26 +264,18 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
       let value_var = last_var value_lin in
       let e_elt =
         ArrayAssignment
-          {
-            receiver = [ (p (k + 1), Variable receiver_var) ];
-            target = [ (p (k + 2), Variable target_var) ];
-            value = [ (p (k + 3), Variable value_var) ];
-          }
+          { receiver = receiver_var; target = target_var; value = value_var }
       in
-      (receiver_lin @ target_lin @ value_lin @ [ (p k, e_elt) ], k + 4)
+      (receiver_lin @ target_lin @ value_lin @ [ (p k, e_elt) ], k + 1)
   | ReferenceAssignment { receiver; value } ->
       let receiver_lin, k = linearize receiver k in
       let receiver_var = last_var receiver_lin in
       let value_lin, k = linearize value k in
       let value_var = last_var value_lin in
       let e_elt =
-        ReferenceAssignment
-          {
-            receiver = [ (p (k + 1), Variable receiver_var) ];
-            value = [ (p (k + 2), Variable value_var) ];
-          }
+        ReferenceAssignment { receiver = receiver_var; value = value_var }
       in
-      (receiver_lin @ value_lin @ [ (p k, e_elt) ], k + 3)
+      (receiver_lin @ value_lin @ [ (p k, e_elt) ], k + 1)
   | If { condition; body; else_body } ->
       let condition_lin, k = linearize condition k in
       let condition_var = last_var condition_lin in
@@ -383,12 +290,12 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
       let e_elt =
         If
           {
-            condition = [ (p (k + 2), Variable condition_var) ];
+            condition = condition_var;
             body = body_lin;
             else_body = else_body_lin;
           }
       in
-      (condition_lin @ [ (p k, e_elt) ], k + 3)
+      (condition_lin @ [ (p k, e_elt) ], k + 1)
   | Sequence s ->
       let elt_lins, k =
         List.fold_left
@@ -407,16 +314,10 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
           (fun (lins, k) (pattern, body) ->
             let body_lin, k = linearize body k in
             ((pattern, body_lin) :: lins, k))
-          ([], orig_k + 2)
+          ([], orig_k + 1)
           cases
       in
-      let e_elt =
-        Match
-          {
-            value = [ (p (orig_k + 1), Variable value_var) ];
-            cases = List.rev cases_lins;
-          }
-      in
+      let e_elt = Match { value = value_var; cases = List.rev cases_lins } in
       (value_lin @ [ (p orig_k, e_elt) ], k)
   | Try _ -> failwith "Cannot linearize try expressions"
   | FunctionLiteral { style; cases } ->
@@ -451,15 +352,10 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
                      match binding with
                      | Variable { lhs; value } ->
                          let value_lin, k = linearize value !k_ref in
-                         k_ref := k + 1;
+                         k_ref := k;
                          variable_bindings_lins :=
                            value_lin :: !variable_bindings_lins;
-                         (Variable
-                            {
-                              lhs;
-                              value =
-                                [ (p (k + 1), Variable (last_var value_lin)) ];
-                            }
+                         (Variable { lhs; value = last_var value_lin }
                            : linear_binding)
                      | Function { name; parameters; body; return_type } ->
                          let body_lin, k = linearize body !k_ref in
@@ -479,11 +375,7 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
       let target_lin, k = linearize target k in
       let target_var = last_var target_lin in
       let e_elt =
-        ArrayAccess
-          {
-            receiver = [ (p (k + 1), Variable receiver_var) ];
-            target = [ (p (k + 2), Variable target_var) ];
-          }
+        ArrayAccess { receiver = receiver_var; target = target_var }
       in
       (receiver_lin @ target_lin @ [ (p k, e_elt) ], k + 3)
   | StringAssignment { receiver; target; value } ->
@@ -495,11 +387,7 @@ let rec linearize (e : expression) (k : int) : linear_form * int =
       let value_var = last_var value_lin in
       let e_elt =
         ArrayAssignment
-          {
-            receiver = [ (p (k + 1), Variable receiver_var) ];
-            target = [ (p (k + 2), Variable target_var) ];
-            value = [ (p (k + 3), Variable value_var) ];
-          }
+          { receiver = receiver_var; target = target_var; value = value_var }
       in
       (receiver_lin @ target_lin @ value_lin @ [ (p k, e_elt) ], k + 4)
 
@@ -507,41 +395,28 @@ let rec element_contains_reference (f : variable) (e : linear_element) : bool =
   match e with
   | Variable v -> v = f
   | Constant _ -> false
-  | Parenthesised { inner } | TypeCoercion { inner } ->
-      contains_reference f inner
-  | ListLiteral l | ArrayLiteral l -> List.exists (contains_reference f) l
-  | RecordLiteral l -> l |> List.map snd |> List.exists (contains_reference f)
-  | WhileLoop _ -> failwith "Found linearized while loop"
-  | ForLoop _ -> failwith "Found linearized for loop"
-  | Dereference inner -> contains_reference f inner
-  | FieldAccess { receiver } -> contains_reference f receiver
-  | ArrayAccess { receiver; target } ->
-      contains_reference f receiver || contains_reference f target
+  | Parenthesised { inner } | TypeCoercion { inner } -> inner = f
+  | ListLiteral l | ArrayLiteral l -> List.mem f l
+  | RecordLiteral l -> l |> List.map snd |> List.mem f
+  | Dereference inner -> inner = f
+  | FieldAccess { receiver } -> receiver = f
+  | ArrayAccess { receiver; target } -> receiver = f || target = f
   | FunctionApplication { receiver; arguments } ->
-      contains_reference f receiver
-      || List.exists (contains_reference f) arguments
-  | PrefixOperation { receiver } -> contains_reference f receiver
-  | InfixOperation { lhs; rhs } ->
-      contains_reference f lhs || contains_reference f rhs
-  | Negation inner -> contains_reference f inner
-  | Tuple l -> List.exists (contains_reference f) l
-  | FieldAssignment { receiver; value } ->
-      contains_reference f receiver || contains_reference f value
+      receiver = f || List.mem f arguments
+  | PrefixOperation { receiver } -> receiver = f
+  | InfixOperation { lhs; rhs } -> lhs = f || rhs = f
+  | Negation inner -> inner = f
+  | Tuple l -> List.mem f l
+  | FieldAssignment { receiver; value } -> receiver = f || value = f
   | ArrayAssignment { receiver; target; value } ->
-      contains_reference f receiver
-      || contains_reference f target
-      || contains_reference f value
-  | ReferenceAssignment { receiver; value } ->
-      contains_reference f receiver || contains_reference f value
+      receiver = f || target = f || value = f
+  | ReferenceAssignment { receiver; value } -> receiver = f || value = f
   | If { condition; body; else_body } -> (
-      contains_reference f condition
-      || contains_reference f body
+      condition = f || contains_reference f body
       || match else_body with None -> false | Some b -> contains_reference f b)
-  | Sequence s -> List.exists (contains_reference f) s
+  | Sequence s -> List.mem f s
   | Match { value; cases } ->
-      contains_reference f value
-      || cases |> List.map snd |> List.exists (contains_reference f)
-  | Try _ -> failwith "Found linearized try"
+      value = f || cases |> List.map snd |> List.exists (contains_reference f)
   | FunctionLiteral { cases } ->
       List.exists (fun (_, body) -> contains_reference f body) cases
   | LetBinding { bindings; inner } ->
@@ -549,14 +424,11 @@ let rec element_contains_reference (f : variable) (e : linear_element) : bool =
       || bindings
          |> List.exists (fun (binding : linear_binding) ->
                 match binding with
-                | Variable { value } -> contains_reference f value
+                | Variable { value } -> f = value
                 | Function { body } -> contains_reference f body)
-  | StringAccess { receiver; target } ->
-      contains_reference f receiver || contains_reference f target
+  | StringAccess { receiver; target } -> receiver = f || target = f
   | StringAssignment { receiver; target; value } ->
-      contains_reference f receiver
-      || contains_reference f target
-      || contains_reference f value
+      receiver = f || target = f || value = f
 
 (** contains_reference f l is true iff l contains `Variable f` *)
 and contains_reference (f : variable) (l : linear_form) : bool =
@@ -569,210 +441,165 @@ and contains_reference (f : variable) (l : linear_form) : bool =
     variables that were inlined from their definitions. *)
 let rec delinearize_element (e : linear_element) (prev_vars : linear_form) :
     expression * variable list =
-  match e with
-  | Variable v -> (
-      match List.assoc_opt v prev_vars with
-      | None -> (Variable v, [])
-      | Some definition ->
-          let inlined_elt, inlined_vars =
-            delinearize_element definition
-              (List.filter (fun (name, _) -> name <> v) prev_vars)
-          in
-          (* Add parenthesis to prevent any precedence issues. *)
-          ( Parenthesised { inner = inlined_elt; style = Parenthesis },
-            v :: inlined_vars ))
-  | Constant c -> (Constant c, [])
-  | Parenthesised { style; inner } ->
-      let inner_inlined, inlined_vars = delinearize inner prev_vars in
-      (Parenthesised { style; inner = inner_inlined }, inlined_vars)
-  | TypeCoercion { typ; inner } ->
-      let inner_inlined, inlined_vars = delinearize inner prev_vars in
-      (TypeCoercion { typ; inner = inner_inlined }, inlined_vars)
-  | ListLiteral l ->
-      let terms, inlined_vars =
-        List.fold_right
-          (fun elt (terms, inlined_vars) ->
-            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
-            (elt_inlined :: terms, inlined_vars' @ inlined_vars))
-          l ([], [])
-      in
+  let inlined_local = ref [] in
+  let maybe_inline (v : variable) : expression =
+    match List.assoc_opt v prev_vars with
+    | None -> Variable v
+    | Some definition ->
+        let inlined_elt, inlined_vars =
+          delinearize_element definition
+            (List.filter (fun (name, _) -> name <> v) prev_vars)
+        in
 
-      (ListLiteral terms, inlined_vars)
-  | ArrayLiteral l ->
-      let terms, inlined_vars =
-        List.fold_right
-          (fun elt (terms, inlined_vars) ->
-            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
-            (elt_inlined :: terms, inlined_vars' @ inlined_vars))
-          l ([], [])
-      in
+        inlined_local := (v :: inlined_vars) @ !inlined_local;
+        (* Add parenthesis to prevent any precedence issues. *)
+        Parenthesised { inner = inlined_elt; style = Parenthesis }
+  in
 
-      (ArrayLiteral terms, inlined_vars)
-  | RecordLiteral l ->
-      let terms, inlined_vars =
-        List.fold_right
-          (fun (name, elt) (terms, inlined_vars) ->
-            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
-            ((name, elt_inlined) :: terms, inlined_vars' @ inlined_vars))
-          l ([], [])
-      in
+  let (res : expression), inlined =
+    match e with
+    | Variable v -> (maybe_inline v, [])
+    | Constant c -> (Constant c, [])
+    | Parenthesised { style; inner } ->
+        (Parenthesised { style; inner = maybe_inline inner }, [])
+    | TypeCoercion { typ; inner } ->
+        (TypeCoercion { typ; inner = maybe_inline inner }, [])
+    | ListLiteral l -> (ListLiteral (l |> List.map maybe_inline), [])
+    | ArrayLiteral l -> (ArrayLiteral (l |> List.map maybe_inline), [])
+    | RecordLiteral l ->
+        ( RecordLiteral (l |> List.map (fun (name, v) -> (name, maybe_inline v))),
+          [] )
+    | Dereference inner -> (Dereference (maybe_inline inner), [])
+    | FieldAccess { receiver; target } ->
+        (FieldAccess { receiver = maybe_inline receiver; target }, [])
+    | ArrayAccess { receiver; target } ->
+        ( ArrayAccess
+            { receiver = maybe_inline receiver; target = maybe_inline target },
+          [] )
+    | FunctionApplication { receiver; arguments; is_type_constructor } ->
+        if is_type_constructor then
+          ( FunctionApplication
+              {
+                receiver = maybe_inline receiver;
+                arguments =
+                  [
+                    Parenthesised
+                      {
+                        style = Parenthesis;
+                        inner = Tuple (arguments |> List.map maybe_inline);
+                      };
+                  ];
+              },
+            [] )
+        else
+          ( FunctionApplication
+              {
+                receiver = maybe_inline receiver;
+                arguments = arguments |> List.map maybe_inline;
+              },
+            [] )
+    | PrefixOperation { operation; receiver } ->
+        (PrefixOperation { operation; receiver = maybe_inline receiver }, [])
+    | InfixOperation { lhs; operation; rhs } ->
+        ( InfixOperation
+            { lhs = maybe_inline lhs; operation; rhs = maybe_inline rhs },
+          [] )
+    | Negation inner -> (Negation (maybe_inline inner), [])
+    | Tuple l -> (Tuple (l |> List.map maybe_inline), [])
+    | FieldAssignment { receiver; target; value } ->
+        ( FieldAssignment
+            {
+              receiver = maybe_inline receiver;
+              target;
+              value = maybe_inline value;
+            },
+          [] )
+    | ArrayAssignment { receiver; target; value } ->
+        ( ArrayAssignment
+            {
+              receiver = maybe_inline receiver;
+              target = maybe_inline target;
+              value = maybe_inline value;
+            },
+          [] )
+    | ReferenceAssignment { receiver; value } ->
+        ( ReferenceAssignment
+            { receiver = maybe_inline receiver; value = maybe_inline value },
+          [] )
+    | If { condition; body; else_body } ->
+        let body_inlined, inlined_vars_2 = delinearize body prev_vars in
+        let else_inlined, inlined_vars_3 =
+          match else_body with
+          | None -> (None, [])
+          | Some b ->
+              let b_inlined, inlined_vars = delinearize b prev_vars in
+              (Some b_inlined, inlined_vars)
+        in
+        ( If
+            {
+              condition = maybe_inline condition;
+              body = body_inlined;
+              else_body = else_inlined;
+            },
+          inlined_vars_2 @ inlined_vars_3 )
+    | Sequence s -> (Sequence (s |> List.map maybe_inline), [])
+    | Match { value; cases } ->
+        let cases_inlined, inlined_vars_2 =
+          List.fold_right
+            (fun (pattern, elt) (terms, inlined_vars) ->
+              let elt_inlined, inlined_vars' = delinearize elt prev_vars in
+              ((pattern, elt_inlined) :: terms, inlined_vars' @ inlined_vars))
+            cases ([], [])
+        in
 
-      (RecordLiteral terms, inlined_vars)
-  | WhileLoop _ -> failwith "Found linearized while loop"
-  | ForLoop _ -> failwith "Found linearized for loop"
-  | Dereference inner ->
-      let inner_inlined, inlined_vars = delinearize inner prev_vars in
-      (Dereference inner_inlined, inlined_vars)
-  | FieldAccess { receiver; target } ->
-      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
-      (FieldAccess { receiver = receiver_inlined; target }, inlined_vars)
-  | ArrayAccess { receiver; target } ->
-      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
-      let target_inlined, inlined_vars_2 = delinearize receiver prev_vars in
-      ( ArrayAccess { receiver = receiver_inlined; target = target_inlined },
-        inlined_vars @ inlined_vars_2 )
-  | FunctionApplication { receiver; arguments } ->
-      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
-      let arguments_inlined, inlined_vars_2 =
-        List.fold_right
-          (fun elt (terms, inlined_vars) ->
-            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
-            (elt_inlined :: terms, inlined_vars' @ inlined_vars))
-          arguments ([], [])
-      in
-      ( FunctionApplication
-          { receiver = receiver_inlined; arguments = arguments_inlined },
-        inlined_vars @ inlined_vars_2 )
-  | PrefixOperation { operation; receiver } ->
-      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
-      (PrefixOperation { operation; receiver = receiver_inlined }, inlined_vars)
-  | InfixOperation { lhs; operation; rhs } ->
-      let lhs_inlined, inlined_vars = delinearize lhs prev_vars in
-      let rhs_inlined, inlined_vars2 = delinearize rhs prev_vars in
-      ( InfixOperation { lhs = lhs_inlined; operation; rhs = rhs_inlined },
-        inlined_vars @ inlined_vars2 )
-  | Negation inner ->
-      let inner_inlined, inlined_vars = delinearize inner prev_vars in
-      (Negation inner_inlined, inlined_vars)
-  | Tuple l ->
-      let terms, inlined_vars =
-        List.fold_right
-          (fun elt (terms, inlined_vars) ->
-            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
-            (elt_inlined :: terms, inlined_vars' @ inlined_vars))
-          l ([], [])
-      in
-
-      (Tuple terms, inlined_vars)
-  | FieldAssignment { receiver; target; value } ->
-      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
-      let value_inlined, inlined_vars_2 = delinearize value prev_vars in
-      ( FieldAssignment
-          { receiver = receiver_inlined; target; value = value_inlined },
-        inlined_vars @ inlined_vars_2 )
-  | ArrayAssignment { receiver; target; value } ->
-      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
-      let value_inlined, inlined_vars_2 = delinearize value prev_vars in
-      let target_inlined, inlined_vars_3 = delinearize value prev_vars in
-      ( ArrayAssignment
-          {
-            receiver = receiver_inlined;
-            target = target_inlined;
-            value = value_inlined;
-          },
-        inlined_vars @ inlined_vars_2 @ inlined_vars_3 )
-  | ReferenceAssignment { receiver; value } ->
-      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
-      let value_inlined, inlined_vars_2 = delinearize value prev_vars in
-      ( ReferenceAssignment
-          { receiver = receiver_inlined; value = value_inlined },
-        inlined_vars @ inlined_vars_2 )
-  | If { condition; body; else_body } ->
-      let condition_inlined, inlined_vars = delinearize condition prev_vars in
-      let body_inlined, inlined_vars_2 = delinearize body prev_vars in
-      let else_inlined, inlined_vars_3 =
-        match else_body with
-        | None -> (None, [])
-        | Some b ->
-            let b_inlined, inlined_vars = delinearize b prev_vars in
-            (Some b_inlined, inlined_vars)
-      in
-      ( If
-          {
-            condition = condition_inlined;
-            body = body_inlined;
-            else_body = else_inlined;
-          },
-        inlined_vars @ inlined_vars_2 @ inlined_vars_3 )
-  | Sequence s ->
-      let terms, inlined_vars =
-        List.fold_right
-          (fun elt (terms, inlined_vars) ->
-            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
-            (elt_inlined :: terms, inlined_vars' @ inlined_vars))
-          s ([], [])
-      in
-
-      (Sequence terms, inlined_vars)
-  | Match { value; cases } ->
-      let value_inlined, inlined_vars = delinearize value prev_vars in
-      let cases_inlined, inlined_vars_2 =
-        List.fold_right
-          (fun (pattern, elt) (terms, inlined_vars) ->
-            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
-            ((pattern, elt_inlined) :: terms, inlined_vars' @ inlined_vars))
-          cases ([], [])
-      in
-
-      ( Match { value = value_inlined; cases = cases_inlined },
-        inlined_vars @ inlined_vars_2 )
-  | Try _ -> failwith "Found linearized try"
-  | FunctionLiteral { style; cases } ->
-      let cases_inlined, inlined_vars =
-        List.fold_right
-          (fun (pattern, elt) (terms, inlined_vars) ->
-            let elt_inlined, inlined_vars' = delinearize elt prev_vars in
-            ((pattern, elt_inlined) :: terms, inlined_vars' @ inlined_vars))
-          cases ([], [])
-      in
-      (FunctionLiteral { style; cases = cases_inlined }, inlined_vars)
-  | LetBinding { bindings; is_rec; inner } ->
-      let bindings_inlined, inlined_vars =
-        List.fold_right
-          (fun binding (terms, inlined_vars) ->
-            match binding with
-            | (Variable { lhs; value } : linear_binding) ->
-                let value_inlined, inlined_vars' =
-                  delinearize value prev_vars
-                in
-                ( (Variable { lhs; value = value_inlined } : binding) :: terms,
-                  inlined_vars' @ inlined_vars )
-            | Function { name; parameters; body; return_type } ->
-                let body_inlined, inlined_vars' = delinearize body prev_vars in
-                ( Function { name; parameters; body = body_inlined; return_type }
-                  :: terms,
-                  inlined_vars' @ inlined_vars ))
-          bindings ([], [])
-      in
-      let inner_inlined, inlined_vars_2 = delinearize inner prev_vars in
-      ( LetBinding { bindings = bindings_inlined; is_rec; inner = inner_inlined },
-        inlined_vars @ inlined_vars_2 )
-  | StringAccess { receiver; target } ->
-      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
-      let target_inlined, inlined_vars_2 = delinearize receiver prev_vars in
-      ( StringAccess { receiver = receiver_inlined; target = target_inlined },
-        inlined_vars @ inlined_vars_2 )
-  | StringAssignment { receiver; target; value } ->
-      let receiver_inlined, inlined_vars = delinearize receiver prev_vars in
-      let value_inlined, inlined_vars_2 = delinearize value prev_vars in
-      let target_inlined, inlined_vars_3 = delinearize value prev_vars in
-      ( StringAssignment
-          {
-            receiver = receiver_inlined;
-            target = target_inlined;
-            value = value_inlined;
-          },
-        inlined_vars @ inlined_vars_2 @ inlined_vars_3 )
+        ( Match { value = maybe_inline value; cases = cases_inlined },
+          inlined_vars_2 )
+    | FunctionLiteral { style; cases } ->
+        let cases_inlined, inlined_vars =
+          List.fold_right
+            (fun (pattern, elt) (terms, inlined_vars) ->
+              let elt_inlined, inlined_vars' = delinearize elt prev_vars in
+              ((pattern, elt_inlined) :: terms, inlined_vars' @ inlined_vars))
+            cases ([], [])
+        in
+        (FunctionLiteral { style; cases = cases_inlined }, inlined_vars)
+    | LetBinding { bindings; is_rec; inner } ->
+        let bindings_inlined, inlined_vars =
+          List.fold_right
+            (fun binding (terms, inlined_vars) ->
+              match binding with
+              | (Variable { lhs; value } : linear_binding) ->
+                  ( (Variable { lhs; value = maybe_inline value } : binding)
+                    :: terms,
+                    inlined_vars )
+              | Function { name; parameters; body; return_type } ->
+                  let body_inlined, inlined_vars' =
+                    delinearize body prev_vars
+                  in
+                  ( Function
+                      { name; parameters; body = body_inlined; return_type }
+                    :: terms,
+                    inlined_vars' @ inlined_vars ))
+            bindings ([], [])
+        in
+        let inner_inlined, inlined_vars_2 = delinearize inner prev_vars in
+        ( LetBinding
+            { bindings = bindings_inlined; is_rec; inner = inner_inlined },
+          inlined_vars @ inlined_vars_2 )
+    | StringAccess { receiver; target } ->
+        ( StringAccess
+            { receiver = maybe_inline receiver; target = maybe_inline target },
+          [] )
+    | StringAssignment { receiver; target; value } ->
+        ( StringAssignment
+            {
+              receiver = maybe_inline receiver;
+              target = maybe_inline target;
+              value = maybe_inline value;
+            },
+          [] )
+  in
+  (res, inlined @ !inlined_local)
 
 (** delinearize l prev_vars converts a linear form l to an OCaml expression.
 
@@ -843,60 +670,15 @@ and delinearize (l : linear_form) (prev_vars : linear_form) :
 let rec element_contains_application (f : variable) (e : linear_element) : bool
     =
   match e with
-  | Variable _ -> false
-  | Constant _ -> false
-  | Parenthesised { inner } | TypeCoercion { inner } ->
-      contains_application f inner
-  | ListLiteral l | ArrayLiteral l -> List.exists (contains_application f) l
-  | RecordLiteral l -> l |> List.map snd |> List.exists (contains_application f)
-  | WhileLoop _ -> failwith "Found linearized while loop"
-  | ForLoop _ -> failwith "Found linearized for loop"
-  | Dereference inner -> contains_application f inner
-  | FieldAccess { receiver } -> contains_application f receiver
-  | ArrayAccess { receiver; target } ->
-      contains_application f receiver || contains_application f target
-  | FunctionApplication { receiver; arguments } ->
-      (match receiver with [ (_, Variable f') ] -> f' = f | _ -> false)
-      || contains_application f receiver
-      || List.exists (contains_application f) arguments
-  | PrefixOperation { receiver } -> contains_application f receiver
-  | InfixOperation { lhs; rhs } ->
-      contains_application f lhs || contains_application f rhs
-  | Negation inner -> contains_application f inner
-  | Tuple l -> List.exists (contains_application f) l
-  | FieldAssignment { receiver; value } ->
-      contains_application f receiver || contains_application f value
-  | ArrayAssignment { receiver; target; value } ->
-      contains_application f receiver
-      || contains_application f target
-      || contains_application f value
-  | ReferenceAssignment { receiver; value } ->
-      contains_application f receiver || contains_application f value
-  | If { condition; body; else_body } -> (
-      contains_application f condition
-      || contains_application f body
-      ||
-      match else_body with None -> false | Some b -> contains_application f b)
-  | Sequence s -> List.exists (contains_application f) s
-  | Match { value; cases } ->
-      contains_application f value
-      || cases |> List.map snd |> List.exists (contains_application f)
-  | Try _ -> failwith "Found linearized try"
-  (* TODO: Formalize "contains" to better explain this. *)
-  | FunctionLiteral { cases } -> false
-  | LetBinding { bindings; inner } ->
-      contains_application f inner
-      || bindings
-         |> List.exists (fun (binding : linear_binding) ->
-                match binding with
-                | Variable { value } -> contains_application f value
-                | Function { body } -> false)
-  | StringAccess { receiver; target } ->
-      contains_application f receiver || contains_application f target
-  | StringAssignment { receiver; target; value } ->
-      contains_application f receiver
-      || contains_application f target
-      || contains_application f value
+  | FunctionApplication { receiver } -> f = receiver
+  | If { condition; body; else_body } ->
+      contains_application f body
+      || Option.value ~default:false
+           (Option.map (contains_application f) else_body)
+  | Match { cases } ->
+      List.exists (fun (_, body) -> contains_application f body) cases
+  | LetBinding { inner } -> contains_application f inner
+  | _ -> false
 
 (** contains_application f l is true iff l contains a FunctionApplication whose
     receiver is f *)
@@ -926,8 +708,6 @@ let map_locally_terminal_children (f : linear_form -> linear_form)
         }
   | LetBinding { is_rec; bindings; inner } ->
       LetBinding { is_rec; bindings; inner = f inner }
-  | Parenthesised { style; inner } -> Parenthesised { style; inner = f inner }
-  | TypeCoercion { inner; typ } -> TypeCoercion { inner = f inner; typ }
   (* No locally terminal children *)
   | _ -> e
 
@@ -949,45 +729,13 @@ let rec get_name (p : pattern) : variable option =
 let rec find_definitions_in_element (name : variable) (e : linear_element) :
     linear_element list =
   match e with
-  | Variable _ | Constant _ -> []
-  | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
-      find_definitions name inner
-  | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
-      l |> List.map (fun elt -> find_definitions name elt) |> List.concat
-  | RecordLiteral r ->
-      r |> List.map (fun (_, elt) -> find_definitions name elt) |> List.concat
-  | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
-  | FieldAccess { receiver } -> find_definitions name receiver
-  | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
-      find_definitions name receiver @ find_definitions name target
-  | FunctionApplication { receiver; arguments } ->
-      find_definitions name receiver
-      @ (arguments
-        |> List.map (fun arg -> find_definitions name arg)
-        |> List.concat)
-  | PrefixOperation { receiver } -> find_definitions name receiver
-  | InfixOperation { lhs; rhs } ->
-      find_definitions name lhs @ find_definitions name rhs
-  | Negation receiver -> find_definitions name receiver
-  | FieldAssignment { receiver; value } ->
-      find_definitions name receiver @ find_definitions name value
-  | ArrayAssignment { receiver; target; value }
-  | StringAssignment { receiver; target; value } ->
-      find_definitions name receiver
-      @ find_definitions name target
-      @ find_definitions name value
-  | ReferenceAssignment { receiver; value } ->
-      find_definitions name receiver @ find_definitions name value
-  | If { condition; body; else_body } -> (
-      find_definitions name condition
-      @ find_definitions name body
+  | If { body; else_body } -> (
+      find_definitions name body
       @ match else_body with None -> [] | Some b -> find_definitions name b)
   | Match { value; cases } ->
-      find_definitions name value
-      @ (cases
-        |> List.map (fun (_, body) -> find_definitions name body)
-        |> List.concat)
-  | Try _ -> failwith "Found linearized try"
+      cases
+      |> List.map (fun (_, body) -> find_definitions name body)
+      |> List.concat
   | FunctionLiteral { cases } ->
       List.map (fun (_, body) -> find_definitions name body) cases
       |> List.concat
@@ -997,10 +745,7 @@ let rec find_definitions_in_element (name : variable) (e : linear_element) :
         |> List.map (fun (binding : linear_binding) ->
                match binding with
                | Variable { lhs; value } ->
-                   (if get_name lhs = Some name then
-                      [ Variable (last_var value) ]
-                    else [])
-                   @ find_definitions name value
+                   if get_name lhs = Some name then [ Variable value ] else []
                | Function { name = name'; parameters; body; return_type } ->
                    (* It's OK to create a synthetic element here so long as we
                       don't expect to find it in a later AST search. As it
@@ -1084,6 +829,7 @@ let rec find_definitions_in_element (name : variable) (e : linear_element) :
                        parameters
                    @ find_definitions name body)
         |> List.concat)
+  | _ -> []
 
 and find_definitions (name : variable) (l : linear_form) : linear_element list =
   let child_definitions =
@@ -1277,7 +1023,8 @@ let rec rectify (l : linear_form) (cloture_rect : variable list)
               FunctionApplication
                 {
                   receiver;
-                  arguments = arguments @ [ [ ("cont_arg", Variable "cont") ] ];
+                  arguments = arguments @ [ "cont" ];
+                  is_type_constructor = false;
                 }
           | _ ->
               map_locally_terminal_children
@@ -1289,7 +1036,7 @@ let rec rectify (l : linear_form) (cloture_rect : variable list)
         | _ ->
             let e_return_type =
               match e_rect with
-              | FunctionApplication { receiver = [ (p, _) ] } ->
+              | FunctionApplication { receiver = p } ->
                   let rec find_return_type (v : variable) :
                       type_expression option =
                     match find_definition fns v with
@@ -1332,18 +1079,22 @@ let rec rectify (l : linear_form) (cloture_rect : variable list)
               ( "cont_call",
                 FunctionApplication
                   {
-                    receiver = [ ("cont_ref", Variable "cont") ];
-                    arguments = [ [ ("res_ref", Variable name) ] ];
+                    receiver = "cont";
+                    arguments = [ name ];
+                    is_type_constructor = false;
                   } );
             ]
         | _ -> (name, e) :: rectify q cloture_rect fns)
 
 let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
     (new_name : variable -> variable) =
+  let do_rename (v : variable) : variable =
+    if List.mem v cloture_rect then new_name v else v
+  in
+
   let rec rename_elements_in_pattern (p : pattern) : pattern =
     match (p : pattern) with
-    | Ident name ->
-        if List.mem name cloture_rect then Ident (new_name name) else p
+    | Ident name -> Ident (do_rename name)
     | Underscore -> p
     | Parenthesised inner -> Parenthesised (rename_elements_in_pattern inner)
     | TypeCoercion { inner; typ } ->
@@ -1374,119 +1125,61 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
           }
   in
   match e with
-  | Variable v ->
-      if List.mem v cloture_rect then Variable (new_name v) else Variable v
+  | Variable v -> Variable (do_rename v)
   | Constant _ -> e
   | Parenthesised { inner; style } ->
-      Parenthesised
-        { style; inner = rename_elements inner cloture_rect new_name }
-  | TypeCoercion { inner; typ } ->
-      TypeCoercion { inner = rename_elements inner cloture_rect new_name; typ }
-  | ListLiteral l ->
-      ListLiteral
-        (List.map (fun l -> rename_elements l cloture_rect new_name) l)
-  | ArrayLiteral l ->
-      ArrayLiteral
-        (List.map (fun l -> rename_elements l cloture_rect new_name) l)
+      Parenthesised { style; inner = do_rename inner }
+  | TypeCoercion { inner; typ } -> TypeCoercion { inner = do_rename inner; typ }
+  | ListLiteral l -> ListLiteral (List.map do_rename l)
+  | ArrayLiteral l -> ArrayLiteral (List.map do_rename l)
   | RecordLiteral r ->
-      RecordLiteral
-        (List.map
-           (fun (n, e) -> (n, rename_elements e cloture_rect new_name))
-           r)
-  | WhileLoop { condition; body } ->
-      WhileLoop
-        {
-          condition = rename_elements condition cloture_rect new_name;
-          body = rename_elements body cloture_rect new_name;
-        }
-  | ForLoop { direction = direction'; variable; start; finish; body } ->
-      ForLoop
-        {
-          direction = direction';
-          variable;
-          start = rename_elements start cloture_rect new_name;
-          finish = rename_elements finish cloture_rect new_name;
-          body = rename_elements body cloture_rect new_name;
-        }
-  | Dereference e -> Dereference (rename_elements e cloture_rect new_name)
+      RecordLiteral (List.map (fun (n, e) -> (n, do_rename e)) r)
+  | Dereference e -> Dereference (do_rename e)
   | FieldAccess { receiver; target } ->
-      FieldAccess
-        { receiver = rename_elements receiver cloture_rect new_name; target }
+      FieldAccess { receiver = do_rename receiver; target }
   | ArrayAccess { receiver; target } ->
-      ArrayAccess
-        {
-          receiver = rename_elements receiver cloture_rect new_name;
-          target = rename_elements target cloture_rect new_name;
-        }
-  | FunctionApplication { receiver; arguments } ->
+      ArrayAccess { receiver = do_rename receiver; target = do_rename target }
+  | FunctionApplication { receiver; arguments; is_type_constructor } ->
       FunctionApplication
         {
-          receiver = rename_elements receiver cloture_rect new_name;
-          arguments =
-            List.map
-              (fun arg -> rename_elements arg cloture_rect new_name)
-              arguments;
+          receiver = do_rename receiver;
+          arguments = List.map do_rename arguments;
+          is_type_constructor;
         }
   | PrefixOperation { receiver; operation } ->
-      PrefixOperation
-        { operation; receiver = rename_elements receiver cloture_rect new_name }
+      PrefixOperation { operation; receiver = do_rename receiver }
   | InfixOperation { lhs; rhs; operation } ->
-      InfixOperation
-        {
-          lhs = rename_elements lhs cloture_rect new_name;
-          rhs = rename_elements rhs cloture_rect new_name;
-          operation;
-        }
-  | Negation e -> Negation (rename_elements e cloture_rect new_name)
-  | Tuple t ->
-      Tuple (List.map (fun l -> rename_elements l cloture_rect new_name) t)
+      InfixOperation { lhs = do_rename lhs; rhs = do_rename rhs; operation }
+  | Negation e -> Negation (do_rename e)
+  | Tuple t -> Tuple (List.map do_rename t)
   | FieldAssignment { receiver; target; value } ->
       FieldAssignment
-        {
-          receiver = rename_elements receiver cloture_rect new_name;
-          target;
-          value = rename_elements value cloture_rect new_name;
-        }
+        { receiver = do_rename receiver; target; value = do_rename value }
   | ArrayAssignment { receiver; target; value } ->
       ArrayAssignment
         {
-          receiver = rename_elements receiver cloture_rect new_name;
-          target = rename_elements target cloture_rect new_name;
-          value = rename_elements value cloture_rect new_name;
+          receiver = do_rename receiver;
+          target = do_rename target;
+          value = do_rename value;
         }
   | ReferenceAssignment { receiver; value } ->
       ReferenceAssignment
-        {
-          receiver = rename_elements receiver cloture_rect new_name;
-          value = rename_elements value cloture_rect new_name;
-        }
+        { receiver = do_rename receiver; value = do_rename value }
   | If { condition; body; else_body } ->
       If
         {
-          condition = rename_elements condition cloture_rect new_name;
+          condition = do_rename condition;
           body = rename_elements body cloture_rect new_name;
           else_body =
             Option.map
               (fun b -> rename_elements b cloture_rect new_name)
               else_body;
         }
-  | Sequence s ->
-      Sequence (List.map (fun e -> rename_elements e cloture_rect new_name) s)
+  | Sequence s -> Sequence (List.map do_rename s)
   | Match { value; cases } ->
       Match
         {
-          value = rename_elements value cloture_rect new_name;
-          cases =
-            List.map
-              (fun (patterns, e) ->
-                ( List.map rename_elements_in_pattern patterns,
-                  rename_elements e cloture_rect new_name ))
-              cases;
-        }
-  | Try { value; cases } ->
-      Try
-        {
-          value = rename_elements value cloture_rect new_name;
+          value = do_rename value;
           cases =
             List.map
               (fun (patterns, e) ->
@@ -1517,7 +1210,7 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
                     (Variable
                        {
                          lhs = rename_elements_in_pattern lhs;
-                         value = rename_elements value cloture_rect new_name;
+                         value = do_rename value;
                        }
                       : linear_binding)
                 | Function { name; parameters; body; return_type } ->
@@ -1536,17 +1229,13 @@ let rec rename_elements_in (e : linear_element) (cloture_rect : variable list)
           inner = rename_elements inner cloture_rect new_name;
         }
   | StringAccess { receiver; target } ->
-      StringAccess
-        {
-          receiver = rename_elements receiver cloture_rect new_name;
-          target = rename_elements target cloture_rect new_name;
-        }
+      StringAccess { receiver = do_rename receiver; target = do_rename target }
   | StringAssignment { receiver; target; value } ->
       StringAssignment
         {
-          receiver = rename_elements receiver cloture_rect new_name;
-          target = rename_elements target cloture_rect new_name;
-          value = rename_elements value cloture_rect new_name;
+          receiver = do_rename receiver;
+          target = do_rename target;
+          value = do_rename value;
         }
 
 (** rename_elements l c updates the definition and any references to variables
@@ -1601,8 +1290,7 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
             else None
         | Variable v -> get_nth_argument_names v n
         | FunctionApplication { receiver; arguments } ->
-            let receiver_name = last_var receiver in
-            get_nth_argument_names receiver_name (n + List.length arguments)
+            get_nth_argument_names receiver (n + List.length arguments)
         | _ -> None)
     | None -> None
   in
@@ -1644,58 +1332,15 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
       let rec propagate_from_element (e_name : variable) (e : linear_element)
           (enclosing_function : variable) (can_outer_leak : bool) : unit =
         match e with
-        | Variable _ | Constant _ -> ()
-        | Parenthesised { inner } | TypeCoercion { inner } ->
-            propagate_from inner enclosing_function can_outer_leak
-        | Dereference inner -> propagate_from inner enclosing_function false
-        | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
-            l
-            |> List.iter (fun elt ->
-                   propagate_from elt enclosing_function false)
-        | RecordLiteral r ->
-            r
-            |> List.iter (fun (_, elt) ->
-                   propagate_from elt enclosing_function false)
-        | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
-        | FieldAccess { receiver } ->
-            propagate_from receiver enclosing_function false
-        | ArrayAccess { receiver; target } | StringAccess { receiver; target }
-          ->
-            propagate_from receiver enclosing_function false;
-            propagate_from target enclosing_function false
-        | FunctionApplication { receiver; arguments } ->
-            propagate_from receiver enclosing_function true;
-            arguments
-            |> List.iter (fun arg -> propagate_from arg enclosing_function true)
-        | PrefixOperation { receiver } ->
-            propagate_from receiver enclosing_function false
-        | InfixOperation { lhs; rhs } ->
-            propagate_from lhs enclosing_function false;
-            propagate_from rhs enclosing_function false
-        | Negation receiver -> propagate_from receiver enclosing_function false
-        | FieldAssignment { receiver; value } ->
-            propagate_from receiver enclosing_function false;
-            propagate_from value enclosing_function false
-        | ArrayAssignment { receiver; target; value }
-        | StringAssignment { receiver; target; value } ->
-            propagate_from receiver enclosing_function false;
-            propagate_from target enclosing_function false;
-            propagate_from value enclosing_function false
-        | ReferenceAssignment { receiver; value } ->
-            propagate_from receiver enclosing_function false;
-            propagate_from value enclosing_function false
         | If { condition; body; else_body } -> (
-            propagate_from condition enclosing_function false;
             propagate_from body enclosing_function can_outer_leak;
             match else_body with
             | None -> ()
             | Some b -> propagate_from b enclosing_function can_outer_leak)
         | Match { value; cases } ->
-            propagate_from value enclosing_function false;
             cases
             |> List.iter (fun (_, body) ->
                    propagate_from body enclosing_function can_outer_leak)
-        | Try _ -> failwith "Found linearized try"
         | FunctionLiteral { cases } ->
             List.iter (fun (_, body) -> propagate_from body e_name false) cases
         | LetBinding { bindings; inner } ->
@@ -1703,17 +1348,16 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
             bindings
             |> List.iter (fun (binding : linear_binding) ->
                    match binding with
-                   | Variable { lhs; value } ->
-                       (if last_var value = current then
-                          match get_name lhs with
-                          | None ->
-                              raise
-                                (Exit
-                                   "Unable to get unique name for variable LHS")
-                          | Some var -> add_fn var);
-                       (* We can leak from value since this binding will then be in the rectifying set. *)
-                       propagate_from value enclosing_function true
+                   | Variable { lhs; value } -> (
+                       if value = current then
+                         match get_name lhs with
+                         | None ->
+                             raise
+                               (Exit
+                                  "Unable to get unique name for variable LHS")
+                         | Some var -> add_fn var)
                    | Function { name; body } -> propagate_from body name false)
+        | _ -> ()
       and propagate_from (l : linear_form) (enclosing_function : variable)
           (can_leak : bool) : unit =
         if last_var l = current && not can_leak then
@@ -1723,7 +1367,6 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
                match element with
                | Variable n -> if n = current then add_fn name
                | FunctionApplication { receiver; arguments } ->
-                   let receiver = last_var receiver in
                    if receiver = current then
                      if List.length arguments = current_argument_count then (
                        add_fn enclosing_function;
@@ -1741,7 +1384,7 @@ let cloture_rectifiable (fns : (variable * linear_element) list) :
                    else
                      arguments
                      |> List.iteri (fun i argument ->
-                            if last_var argument = current then
+                            if argument = current then
                               let ith_names =
                                 get_nth_argument_names receiver i
                               in
@@ -1782,45 +1425,13 @@ let find_continuations (fns : (variable * linear_element) list)
   let rec find_continuations_in_element (e : linear_element) :
       linear_function_literal list =
     match e with
-    | Variable _ | Constant _ -> []
-    | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
-        find_continuations_in inner
-    | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
-        l |> List.map (fun elt -> find_continuations_in elt) |> List.concat
-    | RecordLiteral r ->
-        r |> List.map (fun (_, elt) -> find_continuations_in elt) |> List.concat
-    | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
-    | FieldAccess { receiver } -> find_continuations_in receiver
-    | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
-        find_continuations_in receiver @ find_continuations_in target
-    | FunctionApplication { receiver; arguments } ->
-        find_continuations_in receiver
-        @ (arguments
-          |> List.map (fun arg -> find_continuations_in arg)
-          |> List.concat)
-    | PrefixOperation { receiver } -> find_continuations_in receiver
-    | InfixOperation { lhs; rhs } ->
-        find_continuations_in lhs @ find_continuations_in rhs
-    | Negation receiver -> find_continuations_in receiver
-    | FieldAssignment { receiver; value } ->
-        find_continuations_in receiver @ find_continuations_in value
-    | ArrayAssignment { receiver; target; value }
-    | StringAssignment { receiver; target; value } ->
-        find_continuations_in receiver
-        @ find_continuations_in target
-        @ find_continuations_in value
-    | ReferenceAssignment { receiver; value } ->
-        find_continuations_in receiver @ find_continuations_in value
     | If { condition; body; else_body } -> (
-        find_continuations_in condition
-        @ find_continuations_in body
+        find_continuations_in body
         @ match else_body with None -> [] | Some b -> find_continuations_in b)
     | Match { value; cases } ->
-        find_continuations_in value
-        @ (cases
-          |> List.map (fun (_, body) -> find_continuations_in body)
-          |> List.concat)
-    | Try _ -> failwith "Found linearized try"
+        cases
+        |> List.map (fun (_, body) -> find_continuations_in body)
+        |> List.concat
     | FunctionLiteral { cases } ->
         List.map (fun (_, body) -> find_continuations_in body) cases
         |> List.concat
@@ -1829,9 +1440,10 @@ let find_continuations (fns : (variable * linear_element) list)
         @ (bindings
           |> List.map (fun (binding : linear_binding) ->
                  match binding with
-                 | Variable { value } -> find_continuations_in value
+                 | Variable { value } -> []
                  | Function { name; body } -> find_continuations_in body)
           |> List.concat)
+    | _ -> []
   and find_continuations_in (l : linear_form) : linear_function_literal list =
     match l with
     | [] -> []
@@ -1864,43 +1476,13 @@ let find_initials (fns : (variable * linear_element) list) :
     let rec find_initials_in_element (e : linear_element) :
         (variable * constant) list =
       match e with
-      | Variable _ | Constant _ -> []
-      | Parenthesised { inner } | TypeCoercion { inner } | Dereference inner ->
-          find_initials_in inner
-      | ListLiteral l | ArrayLiteral l | Tuple l | Sequence l ->
-          l |> List.map (fun elt -> find_initials_in elt) |> List.concat
-      | RecordLiteral r ->
-          r |> List.map (fun (_, elt) -> find_initials_in elt) |> List.concat
-      | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
-      | FieldAccess { receiver } -> find_initials_in receiver
-      | ArrayAccess { receiver; target } | StringAccess { receiver; target } ->
-          find_initials_in receiver @ find_initials_in target
-      | FunctionApplication { receiver; arguments } ->
-          find_initials_in receiver
-          @ (arguments
-            |> List.map (fun arg -> find_initials_in arg)
-            |> List.concat)
-      | PrefixOperation { receiver } -> find_initials_in receiver
-      | InfixOperation { lhs; rhs } ->
-          find_initials_in lhs @ find_initials_in rhs
-      | Negation receiver -> find_initials_in receiver
-      | FieldAssignment { receiver; value } ->
-          find_initials_in receiver @ find_initials_in value
-      | ArrayAssignment { receiver; target; value }
-      | StringAssignment { receiver; target; value } ->
-          find_initials_in receiver @ find_initials_in target
-          @ find_initials_in value
-      | ReferenceAssignment { receiver; value } ->
-          find_initials_in receiver @ find_initials_in value
-      | If { condition; body; else_body } -> (
-          find_initials_in condition @ find_initials_in body
+      | If { body; else_body } -> (
+          find_initials_in body
           @ match else_body with None -> [] | Some b -> find_initials_in b)
       | Match { value; cases } ->
-          find_initials_in value
-          @ (cases
-            |> List.map (fun (_, body) -> find_initials_in body)
-            |> List.concat)
-      | Try _ -> failwith "Found linearized try"
+          cases
+          |> List.map (fun (_, body) -> find_initials_in body)
+          |> List.concat
       | FunctionLiteral { cases } ->
           List.map (fun (_, body) -> find_initials_in body) cases |> List.concat
       | LetBinding { bindings; inner } ->
@@ -1908,20 +1490,15 @@ let find_initials (fns : (variable * linear_element) list) :
           @ (bindings
             |> List.map (fun (binding : linear_binding) ->
                    match binding with
-                   | Variable { value } -> find_initials_in value
+                   | Variable { value } -> []
                    | Function { name; body } -> find_initials_in body)
             |> List.concat)
+      | _ -> []
     and find_initials_in (l : linear_form) : (variable * constant) list =
       match l with
       | [] -> []
-      | [
-       ( _,
-         FunctionApplication
-           {
-             receiver = [ (_, Variable "cont") ];
-             arguments = [ [ (_, Variable arg) ] ];
-           } );
-      ] ->
+      | [ (_, FunctionApplication { receiver = "cont"; arguments = [ arg ] }) ]
+        ->
           let rec find_constant_definition (arg : string) :
               (variable * constant) list =
             match find_definition fns arg with
@@ -1961,11 +1538,9 @@ let extract_continuation_composition (cont : linear_function_literal) :
     match l with
     | [] -> raise NotSimple
     | [
-     ( _,
-       FunctionApplication
-         { receiver = [ (_, Variable "cont") ]; arguments = [ single_arg ] } );
+     (_, FunctionApplication { receiver = "cont"; arguments = [ single_arg ] });
     ] ->
-        single_arg
+        [ ("extracted_res", Variable single_arg) ]
     (* We ony get terminally recursive elements here *)
     | e :: q -> e :: extract_without_continuation q
   in
@@ -2021,16 +1596,13 @@ let commutes (continuations : linear_function_literal list) : bool =
           match find_definition body returned_var with
           | None -> None
           | Some (Variable v) -> check_return_from v
-          | Some (Negation l) -> ensure_is_argument (last_var l)
+          | Some (Negation l) -> ensure_is_argument l
           | Some (PrefixOperation { receiver; operation = Minus | MinusDot }) ->
-              ensure_is_argument (last_var receiver)
+              ensure_is_argument receiver
           | Some
               (InfixOperation
                  { lhs; operation = Plus | PlusDot | Star | StarDot; rhs }) -> (
-              match
-                ( ensure_is_argument (last_var lhs),
-                  ensure_is_argument (last_var rhs) )
-              with
+              match (ensure_is_argument lhs, ensure_is_argument rhs) with
               | Some v, None | None, Some v -> Some v
               | _ -> None)
           | _ -> None
@@ -2043,49 +1615,23 @@ let commutes (continuations : linear_function_literal list) : bool =
     | Some vars_referencing_argument ->
         let rec check_remaining_element (e : linear_element) =
           match e with
-          | Variable _ | Constant _ -> true
-          | Parenthesised { inner } | TypeCoercion { inner } ->
-              check_remaining inner
-          | ListLiteral l | ArrayLiteral l -> List.for_all check_remaining l
-          | RecordLiteral r ->
-              List.for_all (fun (_, value) -> check_remaining value) r
-          | WhileLoop _ | ForLoop _ -> failwith "Found linearized loop"
-          | Dereference inner -> check_remaining inner
-          | FieldAccess { receiver } -> check_remaining receiver
-          | ArrayAccess { receiver; target } ->
-              check_remaining receiver && check_remaining target
           (* No function applications are allowed *)
           | FunctionApplication _ -> false
-          | PrefixOperation { receiver } -> check_remaining receiver
-          | InfixOperation { lhs; rhs } ->
-              check_remaining lhs && check_remaining rhs
-          | Negation inner -> check_remaining inner
-          | Tuple t -> List.for_all check_remaining t
           (* Side effects *)
           | FieldAssignment _ | ArrayAssignment _ | ReferenceAssignment _ ->
               false
-          | If { condition; body; else_body } -> (
-              check_remaining condition && check_remaining body
+          | If { body; else_body } -> (
+              check_remaining body
               &&
               match else_body with None -> true | Some b -> check_remaining b)
-          | Sequence s -> List.for_all check_remaining s
-          | Match { value; cases } ->
-              check_remaining value
-              && List.for_all (fun (_, body) -> check_remaining body) cases
-          | Try _ -> failwith "Found linearized try"
+          | Match { cases } ->
+              List.for_all (fun (_, body) -> check_remaining body) cases
           | FunctionLiteral _ -> true (* We can't call it anyway *)
           | LetBinding { bindings; inner } ->
-              check_remaining inner
-              && List.for_all
-                   (fun (binding : linear_binding) ->
-                     match binding with
-                     | Function _ -> true (* We can't call it anyway *)
-                     | Variable { value } -> check_remaining value)
-                   bindings
-          | StringAccess { receiver; target } ->
-              check_remaining receiver && check_remaining target
+              check_remaining inner (* We can't call any bindings anyway *)
           (* Side effects *)
           | StringAssignment _ -> false
+          | _ -> true
         and check_remaining (l : linear_form) =
           List.for_all
             (fun (name, element) ->
@@ -2102,221 +1648,48 @@ let commutes (continuations : linear_function_literal list) : bool =
   List.for_all check_continuation continuations
 
 let rec replace_element_continuations_with_accumulator (e : linear_element)
-    (cloture_rect : variable list) (vars_to_replace : variable list) =
+    (cloture_rect : variable list) (vars_to_remove : variable list) =
   match e with
-  | Variable _ -> e
-  | Constant _ -> e
-  | Parenthesised { inner; style } ->
-      Parenthesised
-        {
-          style;
-          inner =
-            replace_continuations_with_accumulator inner cloture_rect
-              vars_to_replace;
-        }
-  | TypeCoercion { inner; typ } ->
-      TypeCoercion
-        {
-          inner =
-            replace_continuations_with_accumulator inner cloture_rect
-              vars_to_replace;
-          typ;
-        }
-  | ListLiteral l ->
-      ListLiteral
-        (List.map
-           (fun l ->
-             replace_continuations_with_accumulator l cloture_rect
-               vars_to_replace)
-           l)
-  | ArrayLiteral l ->
-      ArrayLiteral
-        (List.map
-           (fun l ->
-             replace_continuations_with_accumulator l cloture_rect
-               vars_to_replace)
-           l)
-  | RecordLiteral r ->
-      RecordLiteral
-        (List.map
-           (fun (n, e) ->
-             ( n,
-               replace_continuations_with_accumulator e cloture_rect
-                 vars_to_replace ))
-           r)
-  | WhileLoop { condition; body } ->
-      WhileLoop
-        {
-          condition =
-            replace_continuations_with_accumulator condition cloture_rect
-              vars_to_replace;
-          body =
-            replace_continuations_with_accumulator body cloture_rect
-              vars_to_replace;
-        }
-  | ForLoop { direction = direction'; variable; start; finish; body } ->
-      ForLoop
-        {
-          direction = direction';
-          variable;
-          start =
-            replace_continuations_with_accumulator start cloture_rect
-              vars_to_replace;
-          finish =
-            replace_continuations_with_accumulator finish cloture_rect
-              vars_to_replace;
-          body =
-            replace_continuations_with_accumulator body cloture_rect
-              vars_to_replace;
-        }
-  | Dereference e ->
-      Dereference
-        (replace_continuations_with_accumulator e cloture_rect vars_to_replace)
-  | FieldAccess { receiver; target } ->
-      FieldAccess
-        {
-          receiver =
-            replace_continuations_with_accumulator receiver cloture_rect
-              vars_to_replace;
-          target;
-        }
-  | ArrayAccess { receiver; target } ->
-      ArrayAccess
-        {
-          receiver =
-            replace_continuations_with_accumulator receiver cloture_rect
-              vars_to_replace;
-          target =
-            replace_continuations_with_accumulator target cloture_rect
-              vars_to_replace;
-        }
-  | FunctionApplication { receiver = [ (_, Variable "cont") ] } ->
-      Variable "acc"
-  | FunctionApplication { receiver; arguments } ->
-      FunctionApplication
-        {
-          receiver =
-            replace_continuations_with_accumulator receiver cloture_rect
-              vars_to_replace;
-          arguments =
-            List.map
-              (fun arg ->
-                replace_continuations_with_accumulator arg cloture_rect
-                  vars_to_replace)
-              arguments;
-        }
-  | PrefixOperation { receiver; operation } ->
-      PrefixOperation
-        {
-          operation;
-          receiver =
-            replace_continuations_with_accumulator receiver cloture_rect
-              vars_to_replace;
-        }
-  | InfixOperation { lhs; rhs; operation } ->
-      InfixOperation
-        {
-          lhs =
-            replace_continuations_with_accumulator lhs cloture_rect
-              vars_to_replace;
-          rhs =
-            replace_continuations_with_accumulator rhs cloture_rect
-              vars_to_replace;
-          operation;
-        }
-  | Negation e ->
-      Negation
-        (replace_continuations_with_accumulator e cloture_rect vars_to_replace)
-  | Tuple t ->
-      Tuple
-        (List.map
-           (fun l ->
-             replace_continuations_with_accumulator l cloture_rect
-               vars_to_replace)
-           t)
-  | FieldAssignment { receiver; target; value } ->
-      FieldAssignment
-        {
-          receiver =
-            replace_continuations_with_accumulator receiver cloture_rect
-              vars_to_replace;
-          target;
-          value =
-            replace_continuations_with_accumulator value cloture_rect
-              vars_to_replace;
-        }
-  | ArrayAssignment { receiver; target; value } ->
-      ArrayAssignment
-        {
-          receiver =
-            replace_continuations_with_accumulator receiver cloture_rect
-              vars_to_replace;
-          target =
-            replace_continuations_with_accumulator target cloture_rect
-              vars_to_replace;
-          value =
-            replace_continuations_with_accumulator value cloture_rect
-              vars_to_replace;
-        }
-  | ReferenceAssignment { receiver; value } ->
-      ReferenceAssignment
-        {
-          receiver =
-            replace_continuations_with_accumulator receiver cloture_rect
-              vars_to_replace;
-          value =
-            replace_continuations_with_accumulator value cloture_rect
-              vars_to_replace;
-        }
+  | FunctionApplication { receiver = "cont" } -> Variable "acc"
+  | FunctionApplication { receiver; arguments; is_type_constructor } ->
+      if List.mem receiver cloture_rect then
+        let rec replace_continuation (args : variable list) : variable list =
+          match (args : variable list) with
+          | [ "cont" ] -> [ "acc" ]
+          | x :: q -> x :: replace_continuation q
+          | _ -> failwith "Missing continuation argument in rectified function"
+        in
+        FunctionApplication
+          {
+            receiver;
+            arguments = replace_continuation arguments;
+            is_type_constructor;
+          }
+      else e
   | If { condition; body; else_body } ->
       If
         {
-          condition =
-            replace_continuations_with_accumulator condition cloture_rect
-              vars_to_replace;
+          condition;
           body =
             replace_continuations_with_accumulator body cloture_rect
-              vars_to_replace;
+              vars_to_remove;
           else_body =
             Option.map
               (fun b ->
                 replace_continuations_with_accumulator b cloture_rect
-                  vars_to_replace)
+                  vars_to_remove)
               else_body;
         }
-  | Sequence s ->
-      Sequence
-        (List.map
-           (fun e ->
-             replace_continuations_with_accumulator e cloture_rect
-               vars_to_replace)
-           s)
   | Match { value; cases } ->
       Match
         {
-          value =
-            replace_continuations_with_accumulator value cloture_rect
-              vars_to_replace;
+          value;
           cases =
             List.map
               (fun (patterns, e) ->
                 ( patterns,
                   replace_continuations_with_accumulator e cloture_rect
-                    vars_to_replace ))
-              cases;
-        }
-  | Try { value; cases } ->
-      Try
-        {
-          value =
-            replace_continuations_with_accumulator value cloture_rect
-              vars_to_replace;
-          cases =
-            List.map
-              (fun (patterns, e) ->
-                ( patterns,
-                  replace_continuations_with_accumulator e cloture_rect
-                    vars_to_replace ))
+                    vars_to_remove ))
               cases;
         }
   | FunctionLiteral { style; cases; return_type_for_delinearize } ->
@@ -2328,7 +1701,7 @@ let rec replace_element_continuations_with_accumulator (e : linear_element)
               (fun (patterns, e) ->
                 ( patterns,
                   replace_continuations_with_accumulator e cloture_rect
-                    vars_to_replace ))
+                    vars_to_remove ))
               cases;
           return_type_for_delinearize;
         }
@@ -2339,15 +1712,7 @@ let rec replace_element_continuations_with_accumulator (e : linear_element)
             List.map
               (fun (binding : linear_binding) ->
                 match binding with
-                | Variable { lhs; value } ->
-                    (Variable
-                       {
-                         lhs;
-                         value =
-                           replace_continuations_with_accumulator value
-                             cloture_rect vars_to_replace;
-                       }
-                      : linear_binding)
+                | Variable { lhs; value } -> binding
                 | Function { name; parameters; body; return_type } ->
                     Function
                       {
@@ -2355,38 +1720,16 @@ let rec replace_element_continuations_with_accumulator (e : linear_element)
                         parameters;
                         body =
                           replace_continuations_with_accumulator body
-                            cloture_rect vars_to_replace;
+                            cloture_rect vars_to_remove;
                         return_type;
                       })
               bindings;
           is_rec;
           inner =
             replace_continuations_with_accumulator inner cloture_rect
-              vars_to_replace;
+              vars_to_remove;
         }
-  | StringAccess { receiver; target } ->
-      StringAccess
-        {
-          receiver =
-            replace_continuations_with_accumulator receiver cloture_rect
-              vars_to_replace;
-          target =
-            replace_continuations_with_accumulator target cloture_rect
-              vars_to_replace;
-        }
-  | StringAssignment { receiver; target; value } ->
-      StringAssignment
-        {
-          receiver =
-            replace_continuations_with_accumulator receiver cloture_rect
-              vars_to_replace;
-          target =
-            replace_continuations_with_accumulator target cloture_rect
-              vars_to_replace;
-          value =
-            replace_continuations_with_accumulator value cloture_rect
-              vars_to_replace;
-        }
+  | _ -> e
 
 (** Given a linear form l that is terminally recursive for a rectifying set
     cloture_rect, replace CPS with the use of an accumulator. The continuations
@@ -2396,7 +1739,8 @@ let rec replace_element_continuations_with_accumulator (e : linear_element)
     allows the variables defining the initial values passed to the continuations
     to be removed. *)
 and replace_continuations_with_accumulator (l : linear_form)
-    (cloture_rect : variable list) (vars_to_remove : variable list) =
+    (cloture_rect : variable list) (vars_to_remove : variable list) :
+    linear_form =
   let rec get_accumulator_type_from_continuation (l : pattern list) :
       type_expression option =
     match l with
@@ -2424,8 +1768,7 @@ and replace_continuations_with_accumulator (l : linear_form)
          if List.mem name vars_to_remove then None
          else
            Some
-             (if elt = Variable "cont" then (name, Variable "acc")
-              else if name = "new_cont" then
+             (if name = "new_cont" then
                 match elt with
                 | FunctionLiteral f ->
                     ( "new_acc",
@@ -2437,8 +1780,9 @@ and replace_continuations_with_accumulator (l : linear_form)
                 ( "acc",
                   FunctionApplication
                     {
-                      receiver = [ ("new_acc_ref", Variable "new_acc") ];
-                      arguments = [ [ ("acc_ref", Variable "acc") ] ];
+                      receiver = "new_acc";
+                      arguments = [ "acc" ];
+                      is_type_constructor = false;
                     } )
               else
                 let new_elt =

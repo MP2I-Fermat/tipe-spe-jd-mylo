@@ -1,0 +1,388 @@
+\section{Représentation des programmes}
+\subsection{Arbres de syntaxe abstraits}
+
+\begin{frame}[fragile,t]
+    \frametitle{Arbres de syntaxe abstraits (AST)}
+
+    \begin{minted}{ocaml}
+let rec sum (l : int list) : int =
+    match l with
+    | [] -> 0
+    | x :: q -> x + sum q
+    \end{minted}
+
+    \maxsizebox{\textwidth}{0.6\textheight}{
+        \begin{forest}
+            [{\texttt{FunctionDefinition(isRec: true, name: sum)}}
+            [{body: \texttt{Match}},s sep=3cm
+            [value : \texttt{Variable(l)}]
+            [cases,s sep=3cm
+            [\texttt{MatchCase}
+            [{pattern : \texttt{EmptyList}},tier=forAlignment]
+            [{expression : \texttt{Integer(0)}},tier=forAlignment]
+            ]
+            [\texttt{MatchCase},tier=forAlignment
+            [pattern : \texttt{Concatenation}[...]]
+            [expression : \texttt{Addition}
+            [lhs : \texttt{Variable(x)}]
+            [rhs : ...]
+            ]
+            ]
+            ]
+            ]
+            [parameters: ...]
+            [returnType: ...]
+            ]
+        \end{forest}
+    }
+\end{frame}
+
+\begin{frame}[fragile,t]
+    \frametitle{AST : Limitations}
+
+    Les AST sont peu adaptés aux algorithmes demandant une connaissance de
+    l'ordre d'évaluation du programme.
+
+    \vspace{0.5cm}
+
+    \begin{minipage}[t]{0.5\textwidth}
+        \begin{minted}{ocaml}
+a + b
+        \end{minted}
+
+        \begin{forest}
+            [\texttt{Addition}
+                [\texttt{Variable(a)}]
+                [\texttt{Variable(b)}]]
+        \end{forest}
+
+        \only<2->{
+            \begin{enumerate}
+                \item \texttt{b}
+                \item \texttt{a}
+                \item \texttt{Addition}
+            \end{enumerate}
+        }
+    \end{minipage}%
+    \begin{minipage}[t]{0.5\textwidth}
+        \begin{minted}{ocaml}
+if a then b
+        \end{minted}
+
+        \begin{forest}
+            [\texttt{If}
+                [\texttt{Variable(a)}]
+                [\texttt{Variable(b)}]]
+        \end{forest}
+
+        \only<2->{
+            \begin{enumerate}
+                \item \texttt{a}
+                \item (Peut-être) \texttt{b}
+            \end{enumerate}
+        }
+    \end{minipage}
+
+    \vspace{0.5cm}
+
+    \only<3->{
+        \textcolor{orange}{$\blacktriangleright$} On préférerait une structure ne nécessitant pas de discriminer selon les étiquettes des nœuds.
+    }
+\end{frame}
+
+\subsection{Formes linéaires}
+
+\begin{frame}[fragile]
+    \frametitle{Expressions localement terminales}
+
+    \begin{definition}
+        Une sous-expression $e'$ d'une expression \texttt{OCaml} $e$ est dite
+        \textit{localement terminale} si l'évaluation de $e$ se termine
+        immédiatement après l'évaluation de $e'$, à moins que $e'$ ne soit pas
+        évaluée pour évaluer $e$.
+    \end{definition}
+
+    \pause
+
+    \begin{minipage}[t]{0.5\textwidth}
+        \begin{minted}{ocaml}
+if est_pair n then
+    n / 2
+else
+    (n - 1) / 2
+        \end{minted}
+    \end{minipage}%
+    \begin{minipage}[t]{0.5\textwidth}
+        \begin{minted}{ocaml}
+let x = fibonacci 50 in
+x * 10
+        \end{minted}
+    \end{minipage}
+
+\end{frame}
+
+\begin{frame}[t]
+    \frametitle{Opérations élémentaires}
+    \small
+    \vspace{-0.2cm}
+
+    \begin{definition}
+        Si $C(e_1, \ldots, e_n)$ est une règle de construction d'une expression
+        \texttt{OCaml}, alors on peut créer une \textit{opération élémentaire}
+        avec la règle $C(a_1, \ldots, a_k, l_1, \ldots, l_{n - k})$, o\`u:
+
+        \begin{itemize}
+            \item Les $a_i$ sont des noms de variables pour chaque
+                  sous-expression non localement terminale;
+            \item Les $l_i$ sont des formes linéaires pour chaque
+                  sous-expression localement terminale.
+        \end{itemize}
+    \end{definition}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[t]
+    \frametitle{Opérations élémentaires}
+    \small
+    \vspace{-0.2cm}
+
+    \begin{definition}
+        Si $C(e_1, \ldots, e_n)$ est une règle de construction d'une expression
+        \texttt{OCaml}, alors on peut créer une \textit{opération élémentaire}
+        avec la règle $C(a_1, \ldots, a_k, l_1, \ldots, l_{n - k})$.
+    \end{definition}
+
+    $$
+        \texttt{If}_{\texttt{OCaml}}: \left\{ \begin{aligned}
+            E \times E \times E & \rightarrow E                                                            \\
+            (e_1, e_2, e_3)     & \rightarrowtail \texttt{if } e_1 \texttt{ then } e_2 \texttt{ else } e_3
+        \end{aligned} \right.
+    $$
+    \pause
+    $$
+        \texttt{If}_{\text{Opération élémentaire}}: \left\{ \begin{aligned}
+            V \times L \times L & \rightarrow O                                                            \\
+            (a_1, l_1, l_2)     & \rightarrowtail \texttt{if } a_1 \texttt{ then } l_1 \texttt{ else } l_2
+        \end{aligned} \right.
+    $$
+
+    Avec:
+    \begin{itemize}
+        \item $E$ l'ensemble des expressions \texttt{OCaml};
+        \item $V$ l'ensemble des noms de variable \texttt{OCaml};
+        \item $L$ l'ensemble des formes linéaires;
+        \item $O$ l'ensemble des opérations élémentaires.
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Opérations élémentaires : exemples}
+
+    \begin{minipage}{0.5\textwidth}
+        $$
+            \texttt{+} : \left\{
+            \begin{aligned}
+                V \times V & \rightarrow O                        \\
+                (a_1, a_2) & \rightarrowtail a_1 \texttt{ + } a_2
+            \end{aligned} \right.
+        $$
+    \end{minipage}%
+    \begin{minipage}{0.5\textwidth}
+        \texttt{a + b} \\
+        \texttt{$a_1$ + mon\_super\_identifiant}
+    \end{minipage}
+
+    \pause
+
+    \begin{minipage}{0.6\textwidth}
+        $$
+            \text{Tuple} : \left\{
+            \begin{aligned}
+                V^k                & \rightarrow O                                                                \\
+                (a_1, \ldots, a_k) & \rightarrowtail \texttt{(} a_1 \texttt{, } \ldots \texttt{, } a_l \texttt{)}
+            \end{aligned} \right.
+        $$
+    \end{minipage}%
+    \begin{minipage}{0.4\textwidth}
+        \texttt{(a, b, c)} \\
+        \texttt{(a, $a_2$, $a_3$, d)}
+    \end{minipage}
+
+\end{frame}
+
+\begin{frame}[t]
+    \frametitle{Formes linéaires}
+
+    \begin{definition}
+        Une \textit{forme linéaire} est une liste non vide de couples $(a, e)$ avec $a$
+        un nom de variable \texttt{OCaml} et $e$ une opération élémentaire.
+    \end{definition}
+
+    \pause
+
+    On notera la forme linéaire $[(a_1, e_1), (a_2, e_2), \ldots]$ comme suit :
+    \begin{align*}
+        a_1 & := e_1 \\
+        a_2 & := e_2 \\
+        \ldots
+    \end{align*}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Formes linéaires : exemples}
+
+    \begin{align*}
+        a_1 & := \texttt{a + b}                \\
+        a_2 & := \texttt{$a_1$ + c}            \\
+        a_3 & := \texttt{(a, b, c)}            \\
+        a_4 & := \texttt{(a, $a_2$, $a_3$, d)}
+    \end{align*}
+
+    \vspace{0.5cm}
+
+    \pause
+
+    Évaluation avec $\texttt{a} = 3$, $\texttt{b} = 2$, $\texttt{c} = 10$ et
+    $\texttt{d} = -1$ :
+    \begin{align*}
+        a_1 & = 5                       \\
+        a_2 & = 15                      \\
+        a_3 & = (3, 2, 10)              \\
+        a_4 & = (3, 15, (3, 2, 10), -1)
+    \end{align*}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile]
+    \frametitle{Formes linéaires : exemples}
+
+    \begin{align*}
+        a_1 := & \ \texttt{true}                              \\
+        a_2 := & \ \texttt{if } a_1 \texttt{ then}            \\
+               & \hspace{0.5cm} \begin{aligned}
+                                    a_3 & := \texttt{6}           \\
+                                    a_4 & := \texttt{7}           \\
+                                    a_5 & := a_3 \texttt{ * } a_4
+                                \end{aligned} \\
+               & \ \texttt{else}                              \\
+               & \hspace{0.5cm} \begin{aligned}
+                                    a_6 & := \texttt{17}
+                                \end{aligned}
+    \end{align*}
+
+    \pause
+
+    \begin{minted}{ocaml}
+if true then
+    6 * 7
+else
+    17
+    \end{minted}
+\end{frame}
+
+\subsection{Linéarisation et délinéarisation}
+
+\begin{frame}[t]
+    \frametitle{Linéarisation}
+
+    On définit inductivement la linéarisation :
+
+    \begin{itemize}
+        \pause
+        \item Linéariser(\texttt{a + b}) = Linéariser(\texttt{b}).Linéariser(\texttt{a}).[$a_k$ := $a_i$ \texttt{+} $a_j$] \\
+              \pause
+        \item Linéariser(\texttt{if a then b}) = \\
+              \hspace{0.5cm} Linéariser(\texttt{a}).[$a_k$ := \texttt{if} $a_i$ \texttt{then} Linéariser(\texttt{b})]
+              \pause
+        \item ...
+    \end{itemize}
+    \small \textit{Avec $a_k$, $a_i$ et $a_j$ choisis en fonction des noms déjà utilisés}
+
+    \pause
+
+    \vspace{1cm}
+
+    \normalsize
+
+    \begin{itemize}
+        \item On démontre que la linéarisation préserve le comportement du
+              programme.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile,t]
+    \frametitle{Délinéarisation}
+
+    On peut aussi définir un algorithme transformant une forme linéaire en un
+    programme \texttt{OCaml}:
+
+    $$a_k := expr \longrightarrow \texttt{let a\_k = expr}$$
+
+    \vspace{0.5cm}
+    \pause
+
+    \begin{minipage}{0.5\textwidth}
+        Délinéariser\small$\left(\begin{aligned}
+                    a_1 & := \texttt{a}                                \\
+                    a_2 & := \texttt{2}                                \\
+                    a_3 & := a_1 \texttt{ = } a_2                      \\
+                    a_4 & := \texttt{if } a_3 \texttt{ then}           \\
+                        & \hspace{0.5cm} \begin{aligned}
+                                             a_5 & := 3                    \\
+                                             a_6 & := b                    \\
+                                             a_7 & := a_6 \texttt{ * } a_5
+                                         \end{aligned} \\
+                        & \texttt{else } ...
+                \end{aligned}\right)$
+    \end{minipage}=%
+    \begin{minipage}{0.45\textwidth}
+        \small \begin{minted}{ocaml}
+let a_1 = a in
+let a_2 = 2 in
+let a_3 = a_1 = a_2 in
+if a_3 then
+    let a_5 = 3 in
+    let a_6 = b in
+    a_6 * a_5
+else
+    ...
+            \end{minted}
+    \end{minipage}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile,t]
+    \frametitle{Délinéarisation}
+
+    On peut aussi définir un algorithme transformant une forme linéaire en un
+    programme \texttt{OCaml}:
+
+    $$a_k := expr \longrightarrow \texttt{let a\_k = expr}$$
+
+    \vspace{0.5cm}
+
+    \begin{minipage}{0.5\textwidth}
+        Délinéariser\small$\left(\begin{aligned}
+                    a_1 & := \texttt{a}                                \\
+                    a_2 & := \texttt{2}                                \\
+                    a_3 & := a_1 \texttt{ = } a_2                      \\
+                    a_4 & := \texttt{if } a_3 \texttt{ then}           \\
+                        & \hspace{0.5cm} \begin{aligned}
+                                             a_5 & := 3                    \\
+                                             a_6 & := b                    \\
+                                             a_7 & := a_6 \texttt{ * } a_5
+                                         \end{aligned} \\
+                        & \texttt{else } ...
+                \end{aligned}\right)$
+    \end{minipage}=%
+    \begin{minipage}{0.45\textwidth}
+        \small \begin{minted}{ocaml}
+if a = 2 then
+    b * 3
+else
+    a - 2
+            \end{minted}
+    \end{minipage}
+\end{frame}
+

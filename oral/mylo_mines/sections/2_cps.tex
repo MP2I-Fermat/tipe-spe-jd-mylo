@@ -1,0 +1,260 @@
+\section{Continuations}
+
+\subsection{CPS}
+\begin{frame}[fragile,t]
+    \frametitle{Programmation par continuation (CPS)}
+
+    \begin{itemize}
+        \item Chaque fonction prend un paramètre en plus, une \textit{continuation},
+              qui sera appelée avec le résultat de la fonction.
+        \item À la fin de la fonction, au lieu de renvoyer la valeur de retour,
+              la continuation est appelée avec cette valeur.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile,t]
+    \frametitle{Programmation par continuation (CPS)}
+
+    \begin{adjustwidth}{-1.5em}{-1.5em}
+        \begin{minted}{ocaml}
+let rec sum (l : int list) : int =
+    match l with
+    | [] -> 0
+    | x :: q -> x + sum q
+        \end{minted}
+
+        \vspace{0.5cm}
+
+        \begin{minted}{ocaml}
+let rec sum (l : int list) (cont : int -> 'a) : 'a =
+    match l with
+    | [] -> cont 0
+    | x :: q ->
+        let faire_addition (res : int) =
+            cont (x + res)
+        in
+        sum q faire_addition
+        \end{minted}
+    \end{adjustwidth}
+
+    \begin{tikzpicture}[remember picture,overlay]
+        \draw<2->[blue,thick,rounded corners] ([yshift=150,xshift=100]pic cs:start) rectangle ([yshift=137,xshift=158]pic cs:stop);
+        \draw<2->[blue,thick,rounded corners] ([yshift=52,xshift=105]pic cs:start) rectangle ([yshift=39,xshift=165]pic cs:stop);
+    \end{tikzpicture}
+\end{frame}
+
+\subsection{Transformation en CPS}
+
+\begin{frame}[fragile,t]
+    \frametitle{Algorithme de transformation en CPS}
+
+    L'idée générale:
+    \begin{itemize}
+        \item Ajouter une continuation aux paramètres de la fonction
+        \item Remplacer les appels récursifs non terminaux par un appel récursif
+              avec une nouvelle continuation
+        \item Remplacer les retours de fonction par des appels à la continuation
+    \end{itemize}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile,t]
+    \frametitle{Algorithme de transformation en CPS}
+
+    L'idée générale:
+    \begin{itemize}
+        \item[\textcolor{orange}{$\blacktriangleright$}] Ajouter une continuation aux paramètres de la fonction
+        \item Remplacer les appels récursifs non terminaux par un appel récursif
+              avec une nouvelle continuation
+        \item Remplacer les retours de fonction par des appels à la continuation
+    \end{itemize}
+
+    \vspace{0.1cm}
+
+    \begin{adjustwidth}{-1.5em}{-1.5em}
+        \begin{minted}{ocaml}
+let rec sum (l : int list) : int =
+    match l with
+    | [] -> 0
+    | x :: q -> x + sum q
+        \end{minted}
+    \end{adjustwidth}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile,t]
+    \frametitle{Algorithme de transformation en CPS}
+
+    L'idée générale:
+    \begin{itemize}
+        \item[\textcolor{orange}{$\blacktriangleright$}] Ajouter une continuation aux paramètres de la fonction
+        \item Remplacer les appels récursifs non terminaux par un appel récursif
+              avec une nouvelle continuation
+        \item Remplacer les retours de fonction par des appels à la continuation
+    \end{itemize}
+
+    \vspace{0.1cm}
+
+    \begin{adjustwidth}{-1.5em}{-1.5em}
+        \begin{minted}{ocaml}
+let rec sum (l : int list) (cont : int -> 'a) : 'a =
+    match l with
+    | [] -> 0
+    | x :: q -> x + sum q
+        \end{minted}
+    \end{adjustwidth}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile,t]
+    \frametitle{Algorithme de transformation en CPS}
+
+    L'idée générale:
+    \begin{itemize}
+        \item Ajouter une continuation aux paramètres de la fonction
+        \item[\textcolor{orange}{$\blacktriangleright$}] Remplacer les appels récursifs non terminaux par un appel récursif
+              avec une nouvelle continuation
+        \item Remplacer les retours de fonction par des appels à la continuation
+    \end{itemize}
+
+    \vspace{0.1cm}
+
+    \begin{adjustwidth}{-1.5em}{-1.5em}
+        \begin{minted}{ocaml}
+let rec sum (l : int list) (cont : int -> 'a) : 'a =
+    match l with
+    | [] -> 0
+    | x :: q -> x + sum q
+        \end{minted}
+    \end{adjustwidth}
+
+    \begin{tikzpicture}[remember picture,overlay]
+        \draw<2->[red,thick,rounded corners] ([yshift=26,xshift=122]pic cs:start) rectangle ([yshift=10,xshift=158]pic cs:stop);
+        \draw<3->[blue,thick,rounded corners] ([yshift=28,xshift=99]pic cs:start) rectangle ([yshift=8,xshift=160]pic cs:stop);
+    \end{tikzpicture}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile,t]
+    \frametitle{Algorithme de transformation en CPS}
+
+    L'idée générale:
+    \begin{itemize}
+        \item Ajouter une continuation aux paramètres de la fonction
+        \item[\textcolor{orange}{$\blacktriangleright$}] Remplacer les appels récursifs non terminaux par un appel récursif
+              avec une nouvelle continuation
+        \item Remplacer les retours de fonction par des appels à la continuation
+    \end{itemize}
+
+    \vspace{0.1cm}
+
+    \begin{adjustwidth}{-1.5em}{-1.5em}
+        \begin{minted}{ocaml}
+let rec sum (l : int list) (cont : int -> 'a) : 'a =
+    match l with
+    | [] -> 0
+    | x :: q -> 
+        let new_cont (res : int) =
+            cont (x + res)
+        in
+        sum q new_cont
+        \end{minted}
+    \end{adjustwidth}
+
+    \begin{tikzpicture}[remember picture,overlay]
+        \draw[red,thick,rounded corners] ([yshift=25,xshift=53]pic cs:start) rectangle ([yshift=9,xshift=140]pic cs:stop);
+        \draw[blue,thick,rounded corners] ([yshift=52,xshift=105]pic cs:start) rectangle ([yshift=36,xshift=165]pic cs:stop);
+    \end{tikzpicture}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile,t]
+    \frametitle{Algorithme de transformation en CPS}
+
+    L'idée générale:
+    \begin{itemize}
+        \item Ajouter une continuation aux paramètres de la fonction
+        \item Remplacer les appels récursifs non terminaux par un appel récursif
+              avec une nouvelle continuation
+        \item[\textcolor{orange}{$\blacktriangleright$}] Remplacer les retours de fonction par des appels à la continuation
+    \end{itemize}
+
+    \vspace{0.1cm}
+
+    \begin{adjustwidth}{-1.5em}{-1.5em}
+        \begin{minted}{ocaml}
+let rec sum (l : int list) (cont : int -> 'a) : 'a =
+    match l with
+    | [] -> 0
+    | x :: q -> 
+        let new_cont (res : int) =
+            cont (x + res)
+        in
+        sum q new_cont
+        \end{minted}
+    \end{adjustwidth}
+
+    \begin{tikzpicture}[remember picture,overlay]
+        \draw<2>[mauve,thick,rounded corners] ([yshift=92,xshift=75]pic cs:start) rectangle ([yshift=77,xshift=89]pic cs:stop);
+    \end{tikzpicture}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile,t]
+    \frametitle{Algorithme de transformation en CPS}
+
+    L'idée générale:
+    \begin{itemize}
+        \item Ajouter une continuation aux paramètres de la fonction
+        \item Remplacer les appels récursifs non terminaux par un appel récursif
+              avec une nouvelle continuation
+        \item[\textcolor{orange}{$\blacktriangleright$}] Remplacer les retours de fonction par des appels à la continuation
+    \end{itemize}
+
+    \vspace{0.1cm}
+
+    \begin{adjustwidth}{-1.5em}{-1.5em}
+        \begin{minted}{ocaml}
+let rec sum (l : int list) (cont : int -> 'a) : 'a =
+    match l with
+    | [] -> cont 0
+    | x :: q -> 
+        let new_cont (res : int) =
+            cont (x + res)
+        in
+        sum q new_cont
+        \end{minted}
+    \end{adjustwidth}
+
+    \begin{tikzpicture}[remember picture,overlay]
+        \draw[mauve,thick,rounded corners] ([yshift=92,xshift=75]pic cs:start) rectangle ([yshift=77,xshift=120]pic cs:stop);
+    \end{tikzpicture}
+\end{frame}
+
+\addtocounter{framenumber}{-1}
+\begin{frame}[fragile,t]
+    \frametitle{Algorithme de transformation en CPS}
+
+    L'idée générale:
+    \begin{itemize}
+        \item Ajouter une continuation aux paramètres de la fonction
+        \item Remplacer les appels récursifs non terminaux par un appel récursif
+              avec une nouvelle continuation
+        \item Remplacer les retours de fonction par des appels à la continuation
+    \end{itemize}
+
+    \vspace{0.1cm}
+
+    \begin{adjustwidth}{-1.5em}{-1.5em}
+        \begin{minted}{ocaml}
+let rec sum (l : int list) (cont : int -> 'a) : 'a =
+    match l with
+    | [] -> cont 0
+    | x :: q -> 
+        let new_cont (res : int) =
+            cont (x + res)
+        in
+        sum q new_cont
+        \end{minted}
+    \end{adjustwidth}
+\end{frame}
